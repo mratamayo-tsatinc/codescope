@@ -112,7 +112,7 @@ function render(){
           item.playback.index++;
           if(item.playback.index >= total) item.playback.playing = false;
           render();
-        }, 1000);
+        }, DEFAULT_APP_SETTINGS.shell.solutionPlayback.stepDurationMs);
       } else {
         item.playback.playing = false;
       }

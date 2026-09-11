@@ -12,8 +12,8 @@ let pendingLiveStepScrollFrame = null;
 let liveStepStagePending = false;
 let liveStepStageCommitInProgress = false;
 
-const LIVE_STEP_SCROLL_MAX_MS = 900;
-const LIVE_STEP_SCROLL_BOTTOM_INSET = 28;
+const LIVE_STEP_SCROLL_MAX_MS = DEFAULT_APP_SETTINGS.shell.liveStepScroll.maxWaitMs;
+const LIVE_STEP_SCROLL_BOTTOM_INSET = DEFAULT_APP_SETTINGS.shell.liveStepScroll.bottomInsetPx;
 
 function liveStepProgress(item){
   if(!item) return 0;

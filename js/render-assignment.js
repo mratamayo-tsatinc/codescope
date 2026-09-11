@@ -44,8 +44,8 @@ function renderCompoundAssignmentPrefix(statement,context,isActive,item){
   return h('span',{class:'compound-assignment-prefix'},targetNode,' ',renderAssignmentOperator(statement,ready,context,item,isActive),' ');
 }
 
-const COMPOUND_MERGE_DURATION_MS=2200;
-const COMPOUND_WRITEBACK_DELAY_MS=2400;
+const COMPOUND_MERGE_DURATION_MS=DEFAULT_APP_SETTINGS.shell.compoundAssignment.mergeDurationMs;
+const COMPOUND_WRITEBACK_DELAY_MS=DEFAULT_APP_SETTINGS.shell.compoundAssignment.writebackDelayMs;
 
 function compoundOperationInstruction(statement){
   const target=statement.target;

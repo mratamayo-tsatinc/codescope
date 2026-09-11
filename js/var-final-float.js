@@ -5,11 +5,10 @@
 // into a floating, draggable window instead of a fixed block glued to the
 // bottom of the eval panel. Fully self-contained: injects its own <style>
 // tag on first use rather than requiring any edit to styles.css, and keeps
-// every bit of UI state (open/closed, animate-on/off, dragged position) in
-// module-local variables here — none of it lives on `state` (state.js) or
-// on the item, so it survives exactly like showConnectors does (a global,
-// session-long UI preference), but without state.js needing to know this
-// module exists.
+// current UI state (open/closed, selected animation level, dragged position)
+// in module-local variables here. Their deployment defaults are centralized
+// in DEFAULT_APP_SETTINGS.shell in state.js; transient choices do not belong
+// on the item or in student progress.
 //
 // Public surface (called from render-session.js / index.html):
 //   renderVariableFinalFloat(item)   — (re)builds + mounts the floating
@@ -64,13 +63,23 @@
 // causes a double-flash or a silently-skipped one.
 // ============================================================================
 
-let floatVisible = true;
-let flyAnimEnabled = false;
+const MEMORY_PANEL_SETTINGS = DEFAULT_APP_SETTINGS.shell.memoryPanel;
+const MEMORY_TRANSFER_SETTINGS = MEMORY_PANEL_SETTINGS.transferAnimation;
+const SPEED_LEVELS = MEMORY_TRANSFER_SETTINGS.speedLevelsMs.slice();
+const MEMORY_VALUE_ROLL_DURATION_MS = MEMORY_PANEL_SETTINGS.valueRollDurationMs;
+const MEMORY_VALUE_ROLL_FALLBACK_MS = MEMORY_PANEL_SETTINGS.valueRollFallbackMs;
+const MEMORY_PANEL_ENTRANCE_DURATION_MS = MEMORY_PANEL_SETTINGS.entranceDurationMs;
+const MEMORY_TRANSFER_SAFETY_BUFFER_MS = MEMORY_TRANSFER_SETTINGS.safetyBufferMs;
+
+let floatVisible = MEMORY_PANEL_SETTINGS.visible;
+let flyAnimEnabled = MEMORY_TRANSFER_SETTINGS.enabled;
 
 // Flight duration, in ms — one of three discrete levels (1s/2s/3s). The
 // compact header control cycles Off -> 1s -> 2s -> 3s instead of consuming a
 // separate settings row in the panel body.
-let flightDurationMs = 1000;
+let flightDurationMs = SPEED_LEVELS.includes(MEMORY_TRANSFER_SETTINGS.durationMs)
+  ? MEMORY_TRANSFER_SETTINGS.durationMs
+  : SPEED_LEVELS[0];
 
 // Dragged position, in viewport px — null until the user actually drags the
 // panel at least once, in which case the default CSS-anchored corner
@@ -107,7 +116,6 @@ function toggleVarFinalFloatVisible(){
   syncVarFinalFloatToggleUI();
   render();
 }
-const SPEED_LEVELS = [1000, 2000, 3000];
 function cycleVarFinalFlyAnimation(){
   if(!flyAnimEnabled){
     flyAnimEnabled = true;
@@ -680,7 +688,7 @@ function runVarFinalComet(originRect,destRect,color,onArrival){
     else requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
-  setTimeout(finish,durationMs+180); // safety net for a backgrounded tab
+  setTimeout(finish,durationMs+MEMORY_TRANSFER_SAFETY_BUFFER_MS); // safety net for a backgrounded tab
 }
 
 // The memory card itself remains fixed. Only its value line rolls downward:
@@ -718,7 +726,7 @@ function rollVarFinalCardValue(cardEl,value,onComplete,oldTextOverride){
     if(typeof onComplete==='function') onComplete();
   };
   newValue.addEventListener('transitionend',finish,{once:true});
-  setTimeout(finish,560);
+  setTimeout(finish,MEMORY_VALUE_ROLL_FALLBACK_MS);
 }
 
 function settleVarFinalFlight(f, color){
@@ -753,7 +761,7 @@ function ensureVarFinalFloatStyles(){
   background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
   box-shadow:0 10px 30px rgba(0,0,0,0.45);
 }
-.var-final-float-enter{ animation:var-final-float-in .22s ease; }
+.var-final-float-enter{ animation:var-final-float-in ${MEMORY_PANEL_ENTRANCE_DURATION_MS}ms ease; }
 .var-final-float-dragging{ user-select:none; }
 .var-final-float-header{
   display:flex; align-items:center; gap:8px; padding:9px 10px;
@@ -799,7 +807,7 @@ function ensureVarFinalFloatStyles(){
 .vf-value-roll{ position:relative; overflow:hidden; height:1em; width:100%; }
 .vf-value-roll-old,.vf-value-roll-new{
   position:absolute; inset:0; display:block; text-align:center;
-  transition:transform 420ms cubic-bezier(.22,.72,.22,1),opacity 420ms ease;
+  transition:transform ${MEMORY_VALUE_ROLL_DURATION_MS}ms cubic-bezier(.22,.72,.22,1),opacity ${MEMORY_VALUE_ROLL_DURATION_MS}ms ease;
 }
 .vf-value-roll-old{ transform:translateY(0); }
 .vf-value-roll-new{ transform:translateY(-115%); opacity:.45; }

@@ -1,16 +1,60 @@
 // ============================================================================
 // UI STATE + RENDERING
 // ============================================================================
+// Deployment-owned shell defaults live here so shared UI modules do not each
+// carry a private, conflicting configuration. Runtime interaction state (for
+// example the currently selected memory-animation speed) still belongs to the
+// module that operates it; these values define its initial behavior.
+const DEFAULT_SHELL_SETTINGS = Object.freeze({
+  connectors: Object.freeze({
+    visible: true,
+    maxLeadPx: 18
+  }),
+  memoryPanel: Object.freeze({
+    visible: true,
+    transferAnimation: Object.freeze({
+      enabled: true,
+      durationMs: 1000,
+      speedLevelsMs: Object.freeze([1000, 2000, 3000]),
+      safetyBufferMs: 180
+    }),
+    entranceDurationMs: 220,
+    valueRollDurationMs: 420,
+    valueRollFallbackMs: 560
+  }),
+  compoundAssignment: Object.freeze({
+    mergeDurationMs: 2200,
+    writebackDelayMs: 2400
+  }),
+  solutionPlayback: Object.freeze({
+    stepDurationMs: 1000
+  }),
+  liveStepScroll: Object.freeze({
+    maxWaitMs: 900,
+    bottomInsetPx: 28
+  }),
+  pagination: Object.freeze({
+    windowSize: 5
+  }),
+  celebrations: Object.freeze({
+    enabled: true,
+    confettiEnabled: true,
+    firstCorrectCount: 24,
+    perfectItemCount: 36,
+    perfectSessionCount: 60
+  })
+});
+
 const state = {
   screen: 'login', // login | setup | session | done
   userEmail: null,
   userStudentId: null,
   language: 'java',
-  mode: 'practice',
+  mode: 'exam',
   profileId: PROFILES[0].id,
   itemIndex: 0,
   itemIndexByProfile: {}, // Remembers which item each profile was last viewing, so switching profiles via the sidebar returns to that exact item instead of resetting to Item 1
-  showConnectors: true, // whether the operator→result connector line (connector-lines.js) is drawn
+  showConnectors: DEFAULT_SHELL_SETTINGS.connectors.visible, // runtime value toggled by connector-lines.js
   items: [], // {originalTree, originalFlat, decls, correctFinalValue, canonicalTrace, workingFlat, history:[], trace:[], checked, itemScore, revealSolution}
   itemsByProfile: {}, // Stores all generated items per profile for persistence
   sessionSeed: null, // Seed used for reproducible item generation
@@ -34,18 +78,19 @@ const DEFAULT_APP_SETTINGS = Object.freeze({
   // local-configurable | state-only. This deployment switch is intentionally
   // read only: persisted browser data can never override it.
   settingsPolicy: 'local-configurable',
-  mode: 'practice',
-  timerMinutes: 15,
+  mode: 'exam',
+  timerMinutes: 30,
+  shell: DEFAULT_SHELL_SETTINGS,
   practice: Object.freeze({
-    interactionMode: 'guided', // guided | strict-sequence
+    interactionMode: 'strict-sequence', // guided | strict-sequence
     manualResponses:Object.freeze({mode:'profile',namedValueRate:50,operatorRate:50})
   }),
   exam: Object.freeze({
-    interactionMode: 'guided', // guided | strict-sequence
+    interactionMode: 'strict-sequence', // guided | strict-sequence
     allowUndo: true,
     allowReviewFlags: true,
     showNeutralGuidance: false,
-    showScoresDuringExam: false,
+    showScoresDuringExam: true,
     feedbackRelease: 'after-submit', // after-submit | never
     lockItemAfterCheck: true,
     autoSubmitOnTimeout: true,
@@ -60,6 +105,19 @@ function cloneDefaultAppSettings(){
     settingsPolicy:DEFAULT_APP_SETTINGS.settingsPolicy,
     mode:DEFAULT_APP_SETTINGS.mode,
     timerMinutes:DEFAULT_APP_SETTINGS.timerMinutes,
+    shell:{
+      connectors:Object.assign({},DEFAULT_APP_SETTINGS.shell.connectors),
+      memoryPanel:Object.assign({},DEFAULT_APP_SETTINGS.shell.memoryPanel,{
+        transferAnimation:Object.assign({},DEFAULT_APP_SETTINGS.shell.memoryPanel.transferAnimation,{
+          speedLevelsMs:DEFAULT_APP_SETTINGS.shell.memoryPanel.transferAnimation.speedLevelsMs.slice()
+        })
+      }),
+      compoundAssignment:Object.assign({},DEFAULT_APP_SETTINGS.shell.compoundAssignment),
+      solutionPlayback:Object.assign({},DEFAULT_APP_SETTINGS.shell.solutionPlayback),
+      liveStepScroll:Object.assign({},DEFAULT_APP_SETTINGS.shell.liveStepScroll),
+      pagination:Object.assign({},DEFAULT_APP_SETTINGS.shell.pagination),
+      celebrations:Object.assign({},DEFAULT_APP_SETTINGS.shell.celebrations)
+    },
     practice:Object.assign({},DEFAULT_APP_SETTINGS.practice,{manualResponses:Object.assign({},DEFAULT_APP_SETTINGS.practice.manualResponses)}),
     exam:Object.assign({},DEFAULT_APP_SETTINGS.exam,{manualResponses:Object.assign({},DEFAULT_APP_SETTINGS.exam.manualResponses)})
   };

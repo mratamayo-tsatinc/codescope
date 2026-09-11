@@ -54,6 +54,8 @@ const DEFAULT_APP_SETTINGS = Object.freeze({
   mode: 'practice',
   timerMinutes: 15,
 
+  shell: DEFAULT_SHELL_SETTINGS,
+
   practice: Object.freeze({
     interactionMode: 'guided',
     manualResponses: Object.freeze({
@@ -88,6 +90,36 @@ const DEFAULT_APP_SETTINGS = Object.freeze({
 |---|---|---|
 | `mode` | `practice`, `exam` | Selects the activity mode used after login. |
 | `timerMinutes` | Integer `1`–`999` | Sets the total Exam duration. It is ignored by Practice. |
+
+## Shell and animation settings
+
+Shared presentation defaults are centralized in `DEFAULT_SHELL_SETTINGS` in
+`js/state.js`, then exposed as `DEFAULT_APP_SETTINGS.shell`. These values are
+deployment-owned: the login Settings modal does not edit them, and saved
+browser settings do not override them.
+
+| Setting | Default | Effect |
+|---|---:|---|
+| `connectors.visible` | `true` | Initial state of operator/result connector lines. |
+| `connectors.maxLeadPx` | `18` | Maximum straight lead used by connector curves. |
+| `memoryPanel.visible` | `true` | Initial visibility of the floating memory panel. |
+| `memoryPanel.transferAnimation.enabled` | `false` | Initial state of the memory transfer animation. |
+| `memoryPanel.transferAnimation.durationMs` | `1000` | Initial transfer duration. Must match a speed level. |
+| `memoryPanel.transferAnimation.speedLevelsMs` | `[1000, 2000, 3000]` | Durations cycled by the memory header control. |
+| `memoryPanel.entranceDurationMs` | `220` | Memory-panel entrance duration. |
+| `memoryPanel.valueRollDurationMs` | `420` | Duration of the old/new memory value roll. |
+| `compoundAssignment.mergeDurationMs` | `2200` | Compound-assignment convergence duration. |
+| `compoundAssignment.writebackDelayMs` | `2400` | Delay before the merged result is written to memory. Keep this greater than the merge duration. |
+| `solutionPlayback.stepDurationMs` | `1000` | Correct-solution playback interval. |
+| `liveStepScroll.maxWaitMs` | `900` | Maximum wait for guided auto-scroll to settle. |
+| `liveStepScroll.bottomInsetPx` | `28` | Bottom breathing room for the active evaluation row. |
+| `pagination.windowSize` | `5` | Maximum number of item buttons in the pagination window. |
+| `celebrations.enabled` | `true` | Master switch for shared celebration badges/effects. |
+| `celebrations.confettiEnabled` | `true` | Confetti switch independent of celebration badges. |
+
+The remaining values in `memoryPanel` and `celebrations` are timing safety
+margins and burst counts. They are centralized beside the visible controls so
+the shell no longer hides behavioral defaults inside renderer files.
 
 ## Evaluation interaction
 

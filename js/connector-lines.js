@@ -101,7 +101,7 @@ function originColorForStep(steps, i){
 // Capped (via halfGap at each call site) at half the total vertical gap
 // between the two rows so it never overshoots and flips the curve on very
 // short rows.
-const CONNECTOR_MAX_LEAD = 18;
+const CONNECTOR_MAX_LEAD = DEFAULT_APP_SETTINGS.shell.connectors.maxLeadPx;
 
 // Shared geometry/color builder used by both timelines below. `steps` is
 // either item.trace or item.canonicalTrace.steps; `rows` is the NodeList of

@@ -39,6 +39,7 @@
 // ============================================================================
 (function(){
   const root = (typeof globalThis !== 'undefined') ? globalThis : window;
+  const celebrationSettings = DEFAULT_APP_SETTINGS.shell.celebrations;
 
   function safeWrap(name, onBefore, onAfter){
     const original = root[name];
@@ -71,6 +72,7 @@
 
   function spawnConfetti(referenceEl, opts){
     try{
+      if(!celebrationSettings.enabled || !celebrationSettings.confettiEnabled) return;
       if(typeof document === 'undefined') return;
       const vw = window.innerWidth || document.documentElement.clientWidth;
       const vh = window.innerHeight || document.documentElement.clientHeight;
@@ -116,6 +118,7 @@
   // that same card, or null if there's nothing new to celebrate.
   function renderItemCelebration(item, fbEl){
     try{
+      if(!celebrationSettings.enabled) return null;
       if(!item || !item.checked || !fbEl || typeof h !== 'function') return null;
       const badges = [];
 
@@ -129,7 +132,7 @@
       if(isFirstCorrectSoFar && !item._juiceFirstCorrectPlayed){
         item._juiceFirstCorrectPlayed = true;
         badges.push(h('span',{}, h('i',{class:'fa-solid fa-champagne-glasses'}), ' First one down!'));
-        spawnConfetti(fbEl, {count:24});
+        spawnConfetti(fbEl, {count:celebrationSettings.firstCorrectCount});
       }
 
       // Perfect item score (100%, from whichever ITEM_SCORE_MODELS policy
@@ -140,7 +143,7 @@
         item._juicePerfectPlayed = true;
         badges.push(h('span',{}, h('i',{class:'fa-solid fa-star'}),
           item.activityKind ? ' Perfect — every required response correct' : ' Perfect — every step in order'));
-        spawnConfetti(fbEl, {count:36});
+        spawnConfetti(fbEl, {count:celebrationSettings.perfectItemCount});
       }
 
       if(badges.length === 0) return null;
@@ -154,12 +157,13 @@
   // visually center over (the summary hero, ideally).
   function renderSessionCelebration(referenceEl){
     try{
+      if(!celebrationSettings.enabled) return;
       if(typeof state !== 'object' || !state || !Array.isArray(state.items) || state.items.length === 0) return;
       if(state._juiceDoneCelebrated) return;
       const allCorrect = state.items.every(it => it.wasCorrectFinal);
       if(!allCorrect) return;
       state._juiceDoneCelebrated = true;
-      spawnConfetti(referenceEl, {count:60});
+      spawnConfetti(referenceEl, {count:celebrationSettings.perfectSessionCount});
     }catch(e){ /* purely decorative */ }
   }
 

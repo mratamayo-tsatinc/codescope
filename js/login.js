@@ -569,7 +569,7 @@ function populateProfileSidebar() {
 // ITEM PAGINATION (Free navigation between seeded items)
 // ============================================================================
 
-const ITEM_PAGE_WINDOW_SIZE = 5;
+const ITEM_PAGE_WINDOW_SIZE = DEFAULT_APP_SETTINGS.shell.pagination.windowSize;
 
 function buildItemPageWindow(total, current) {
   if (total <= ITEM_PAGE_WINDOW_SIZE) {
