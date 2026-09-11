@@ -77,7 +77,7 @@ const DEFAULT_APP_SETTINGS = Object.freeze({
   schemaVersion: 5,
   // local-configurable | state-only. This deployment switch is intentionally
   // read only: persisted browser data can never override it.
-  settingsPolicy: 'local-configurable',
+  settingsPolicy: 'state-only',
   mode: 'exam',
   timerMinutes: 30,
   shell: DEFAULT_SHELL_SETTINGS,
