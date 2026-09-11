@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">CodeScope</title>
+  <g fill="none" stroke="#101522" stroke-linecap="round" stroke-linejoin="round" stroke-width="5">
+    <path d="M24 18 13 29l11 11"/>
+    <path d="m40 18 11 11-11 11"/>
+    <circle cx="34" cy="36" r="11" fill="#ffb36f"/>
+    <path d="m42 44 10 10"/>
+  </g>
+</svg>

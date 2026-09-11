@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CodeScope</title>
+<link rel="icon" type="image/svg+xml" href="assets/codescope-icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/moment-feedback.css">
+<link rel="stylesheet" href="css/juice.css">
+<link rel="stylesheet" href="css/console-drawer.css">
+<link rel="stylesheet" href="css/feedback-drawer.css">
+<link rel="stylesheet" href="plugins/token-classification/styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+<!-- Login Overlay -->
+<div id="loginOverlay" class="login-overlay">
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-icon"><img src="assets/codescope-icon.svg" alt="" aria-hidden="true"></div>
+        <h1>CodeScope</h1>
+        <p class="login-subtitle">Interactive Programming Activities</p>
+      </div>
+      <form id="loginForm" class="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="emailInput">Email Address</label>
+          <input 
+            type="email" 
+            id="emailInput" 
+            placeholder="School email" 
+            required
+            autocomplete="email"
+          />
+        </div>
+        <div class="form-group">
+          <label for="studentNumInput">Student Number</label>
+          <input 
+            type="text" 
+            id="studentNumInput" 
+            placeholder="Student number" 
+            required
+            autocomplete="off"
+          />
+        </div>
+        <button type="submit" class="login-btn">Begin Session</button>
+        <div id="loginError" class="login-error"></div>
+      </form>
+      <p class="login-footer">Explore how code works, one step at a time.</p>
+      <button id="settingsBtn" class="login-settings-btn" onclick="openSettingsModal()" title="Settings">
+        <i class="fa-solid fa-gear"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal" style="display: none;" role="dialog" aria-labelledby="settingsTitle">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="settingsTitle">Session Settings</h2>
+      <button class="modal-close" onclick="closeSettingsModal()" aria-label="Close settings">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="settingsPolicyNotice" class="settings-policy-notice" style="display:none;" role="status">
+        <i class="fa-solid fa-lock" aria-hidden="true"></i>
+        <span><b>Settings are controlled by this deployment.</b> Session options are read-only because <code>settingsPolicy</code> is set to <code>state-only</code> in <code>state.js</code>. Data-management actions remain available below.</span>
+      </div>
+      <fieldset id="settingsConfigFields" class="settings-config-fields">
+      <div class="settings-section">
+        <label class="settings-label">Activity Mode</label>
+        <div class="mode-options">
+          <label class="radio-option">
+            <input type="radio" name="mode" value="practice" checked onchange="handleModeChange()">
+            <span>Practice Mode</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="mode" value="exam" onchange="handleModeChange()">
+            <span>Exam Mode (Timed)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section" id="practicePolicySection">
+        <label class="settings-label">Practice behavior</label>
+        <label class="settings-field-label" for="practiceInteractionMode">Evaluation interaction</label>
+        <select id="practiceInteractionMode" class="settings-select">
+          <option value="guided">Guided readiness — unavailable operations remain locked</option>
+          <option value="strict-sequence">Strict sequence — invalid actions pause until Undo</option>
+        </select>
+        <small class="input-hint">Strict Practice lets students test executable operator orders. An action that cannot execute pauses the item, explains the problem, and must be undone before continuing.</small>
+        <label class="settings-field-label" for="practiceManualMode">Student-derived values</label>
+        <select id="practiceManualMode" class="settings-select" onchange="handleManualModeChange('practice')">
+          <option value="profile">Use each profile's setting</option><option value="off">Always auto-derive</option><option value="custom">Use custom rates</option>
+        </select>
+        <div id="practiceManualRates" class="manual-rate-fields">
+          <label>Named values (%)<input id="practiceNamedValueRate" type="number" min="0" max="100" value="50"></label>
+          <label>Operator results (%)<input id="practiceOperatorRate" type="number" min="0" max="100" value="50"></label>
+        </div>
+      </div>
+
+      <div class="settings-section" id="timerSection" style="display: none;">
+        <label class="settings-label" for="timerInput">Timer (minutes)</label>
+        <input 
+          type="number" 
+          id="timerInput" 
+          min="1" 
+          max="999" 
+          value="15" 
+          class="timer-input" 
+          placeholder="Enter minutes" 
+          oninput="validateTimerInput(this)"
+        >
+        <small class="input-hint">Enter a number between 1 and 999 minutes</small>
+
+        <div class="exam-policy-settings">
+          <label class="settings-label">Exam behavior</label>
+          <label class="settings-field-label" for="examInteractionMode">Evaluation interaction</label>
+          <select id="examInteractionMode" class="settings-select">
+            <option value="guided">Guided readiness — unavailable operations remain locked</option>
+            <option value="strict-sequence">Strict sequence — all operation candidates are selectable</option>
+          </select>
+          <small class="input-hint">In strict sequence mode, executable choices continue even when their order is wrong. An operation that cannot yet be computed ends the item, preserving only earned prefix credit.</small>
+          <label class="settings-field-label" for="examManualMode">Student-derived values</label>
+          <select id="examManualMode" class="settings-select" onchange="handleManualModeChange('exam')">
+            <option value="profile">Use each profile's setting</option><option value="off">Always auto-derive</option><option value="custom">Use custom rates</option>
+          </select>
+          <div id="examManualRates" class="manual-rate-fields">
+            <label>Named values (%)<input id="examNamedValueRate" type="number" min="0" max="100" value="50"></label>
+            <label>Operator results (%)<input id="examOperatorRate" type="number" min="0" max="100" value="50"></label>
+          </div>
+          <label class="setting-toggle">
+            <input type="checkbox" id="examAllowUndo">
+            <span><b>Allow one-step Undo</b><small>Only within the current unfinished statement.</small></span>
+          </label>
+          <label class="setting-toggle">
+            <input type="checkbox" id="examAllowReviewFlags">
+            <span><b>Allow flags for review</b><small>Students can mark unfinished items to revisit.</small></span>
+          </label>
+          <label class="setting-toggle">
+            <input type="checkbox" id="examShowNeutralGuidance">
+            <span><b>Show neutral guidance</b><small>Displays interaction instructions without correctness feedback.</small></span>
+          </label>
+          <label class="setting-toggle">
+            <input type="checkbox" id="examShowScoresDuringExam">
+            <span><b>Show running scores</b><small>Normally hidden until final submission.</small></span>
+          </label>
+          <label class="settings-field-label" for="examFeedbackRelease">Results after submission</label>
+          <select id="examFeedbackRelease" class="settings-select">
+            <option value="after-submit">Show scores and item results</option>
+            <option value="never">Record submission only</option>
+          </select>
+          <p class="exam-policy-note"><i class="fa-solid fa-lock"></i> Checked items lock permanently. The correct-solution playback is always unavailable in Exam mode, and timeout always submits the saved attempt.</p>
+        </div>
+      </div>
+      </fieldset>
+
+      <div class="settings-section settings-danger-zone">
+        <label class="settings-label">Danger Zone</label>
+        <p class="input-hint" style="margin-top:0;margin-bottom:10px;">These actions have intentionally different scopes.</p>
+        <div class="danger-actions">
+          <div class="danger-action">
+            <button type="button" class="danger-btn" onclick="handleClearAllExamProgress()">
+              <i class="fa-solid fa-user-slash"></i> Clear all exam progress
+            </button>
+            <small>Deletes every student's saved attempt; keeps settings and login.</small>
+            <div id="clearExamProgressResult" class="input-hint danger-result" style="display:none;"></div>
+          </div>
+          <div class="danger-action">
+            <button type="button" class="danger-btn" onclick="handleResetApplicationSettings()">
+              <i class="fa-solid fa-rotate-left"></i> Reset application settings
+            </button>
+            <small>Restores built-in settings; keeps every student attempt.</small>
+            <div id="resetSettingsResult" class="input-hint danger-result" style="display:none;"></div>
+          </div>
+          <div class="danger-action danger-action-total">
+            <button type="button" class="danger-btn danger-btn-solid" onclick="handleClearAllLocalData()">
+              <i class="fa-solid fa-trash"></i> Clear all local application data
+            </button>
+            <small>Deletes settings, saved login, and all student attempts.</small>
+            <div id="clearAllDataResult" class="input-hint danger-result" style="display:none;"></div>
+          </div>
+        </div>
+      </div>
+    </div><!-- closes modal-body -->
+    <div class="modal-footer">
+      <button class="secondary-btn" onclick="closeSettingsModal()">Cancel</button>
+      <button id="saveSettingsBtn" class="primary-btn" onclick="saveSettings()">Save</button>
+    </div>
+  </div><!-- closes modal-content -->
+</div><!-- closes settingsModal -->
+<div id="settingsOverlay" class="modal-overlay" style="display: none;" onclick="closeSettingsModal()"></div>
+
+<!-- Score Summary Modal -->
+<div id="scoreSummaryModal" class="modal" style="display: none;" role="dialog" aria-labelledby="scoreSummaryTitle">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="scoreSummaryTitle">Score Summary</h2>
+      <button class="modal-close" onclick="closeScoreSummaryModal()" aria-label="Close score summary">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="score-summary-user">
+        <div class="ssu-label">Logged in as</div>
+        <div id="scoreSummaryUser" class="ssu-value"></div>
+        <div id="scoreSummaryClock" class="ssu-clock"></div>
+      </div>
+      <div class="score-summary-total">
+        <div id="scoreSummaryTotal" class="sst-value">0 / 0</div>
+        <div class="sst-label">Total score across all profiles</div>
+      </div>
+            <div class="qr-share-section">
+        <div id="scoreQrCodeBox" class="qr-code-box" aria-label="QR code linking to a shareable results page"></div>
+        <p class="qr-caption">Scan to view a shareable results page</p>
+      </div>
+      <!-- Profile breakdown toggle/list intentionally not shown for now —
+           design still undecided. The underlying logic (toggleScoreSummaryDetails,
+           renderScoreSummaryContent's details branch, computeGrandTotalScore)
+           is untouched in score-summary.js; re-add the button + #scoreSummaryDetails
+           div below to bring it back with no JS changes needed. -->
+    </div>
+    <div class="modal-footer">
+      <button class="secondary-btn" onclick="closeScoreSummaryModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="manualResponseModal" class="manual-response-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="manualResponseTitle">
+  <div class="manual-response-card">
+    <div class="manual-response-heading"><i id="manualResponseIcon" class="fa-solid fa-calculator" aria-hidden="true"></i><h2 id="manualResponseTitle">Evaluate</h2></div>
+    <div id="manualResponseVisual" class="manual-response-visual"></div>
+    <div class="manual-response-actions"><button id="manualResponseCancel" type="button">Cancel</button><button id="manualResponseConfirm" type="button" disabled>Use value</button></div>
+  </div>
+</div>
+<div id="scoreSummaryOverlay" class="modal-overlay" style="display: none;" onclick="closeScoreSummaryModal()"></div>
+
+<!-- Console Drawer: reusable slide-in panel with a terminal rendering
+     effect. Shell only — content is wired up separately via
+     setConsoleDrawerContent()/showConsoleDrawerTab(). See console-drawer.js
+     for the full public API. -->
+<button id="consoleDrawerTab" class="console-drawer-tab" onclick="toggleConsoleDrawer()"
+        style="display: none;" aria-label="Show console" aria-controls="consoleDrawerPanel" aria-expanded="false">
+  <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+  <span class="console-drawer-tab-label">Console</span>
+</button>
+
+<div id="consoleDrawerPanel" class="console-drawer-panel" role="dialog" aria-labelledby="consoleDrawerTitle" aria-hidden="true">
+  <div class="console-drawer-titlebar">
+    <div class="console-drawer-lights" aria-hidden="true">
+      <span class="console-drawer-dot red"></span>
+      <span class="console-drawer-dot yellow"></span>
+      <span class="console-drawer-dot green"></span>
+    </div>
+    <h2 id="consoleDrawerTitle" class="console-drawer-title">Console</h2>
+    <button class="console-drawer-close" onclick="closeConsoleDrawer()" aria-label="Close console">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+  <div class="console-drawer-body">
+    <pre id="consoleDrawerContent" class="console-drawer-content"><span class="console-drawer-empty">Nothing to show yet.</span></pre>
+  </div>
+</div>
+<div id="consoleDrawerOverlay" class="console-drawer-overlay" onclick="closeConsoleDrawer()" aria-hidden="true"></div>
+
+<!-- Feedback Drawer: reusable slide-in panel that now holds the
+     "Check answer" feedback card (previously shown inline below the
+     action bar). Shell only — content is wired up separately via
+     setFeedbackDrawerContent(), called from render-session.js. See
+     feedback-drawer.js for the full public API. -->
+<button id="feedbackDrawerTab" class="feedback-drawer-tab" onclick="toggleFeedbackDrawer()"
+        style="display: none;" aria-label="Show feedback" aria-controls="feedbackDrawerPanel" aria-expanded="false">
+  <i class="fa-solid fa-clipboard-check" aria-hidden="true"></i>
+  <span id="feedbackDrawerTabDot" class="feedback-drawer-tab-dot" aria-hidden="true"></span>
+  <span class="feedback-drawer-tab-label">Feedback</span>
+</button>
+
+<div id="feedbackDrawerPanel" class="feedback-drawer-panel" role="dialog" aria-labelledby="feedbackDrawerTitle" aria-hidden="true">
+  <div class="feedback-drawer-titlebar">
+    <h2 id="feedbackDrawerTitle" class="feedback-drawer-title">Feedback</h2>
+    <button class="feedback-drawer-close" onclick="closeFeedbackDrawer()" aria-label="Close feedback">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+  <div class="feedback-drawer-body">
+    <div id="feedbackDrawerContent"><span class="feedback-drawer-empty">No feedback yet — check an answer to see it here.</span></div>
+  </div>
+</div>
+<div id="feedbackDrawerOverlay" class="feedback-drawer-overlay" onclick="closeFeedbackDrawer()" aria-hidden="true"></div>
+
+<div id="mainContent" style="display: none;">
+  <!-- Main layout with sidebar navigation and content area -->
+  <div class="main-layout">
+    <!-- Hamburger menu button (visible on mobile and desktop) -->
+    <button id="sidebarToggleBtn" class="sidebar-hamburger" onclick="toggleSidebar()" title="Toggle profile sidebar" aria-label="Toggle profile sidebar" aria-expanded="false">
+      <i class="fa-solid fa-bars"></i>
+    </button>
+
+    <!-- Sidebar backdrop (mobile overlay) -->
+    <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="closeSidebarIfMobile()" aria-hidden="true"></div>
+
+    <!-- Sidebar navigation -->
+    <nav id="profileSidebar" class="profile-sidebar" role="navigation" aria-label="Profile selection">
+      <button id="sidebarCloseBtn" class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close sidebar">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      
+      <div class="sidebar-header">
+        <div class="sidebar-title">Profiles</div>
+        <div class="sidebar-subtitle">Select an exercise profile</div>
+      </div>
+
+      <ul id="profileList" class="profile-list" role="list">
+        <!-- Profile items will be generated here by JavaScript -->
+      </ul>
+
+      <div class="sidebar-footer">
+        <button onclick="logout()" class="sidebar-logout-btn" title="Log out">
+          <i class="fa-solid fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </nav>
+
+    <!-- Main content area -->
+    <main class="content-area" role="main">
+      <div class="app-header">
+        <div class="app-header-left">
+          <div class="brand"><span class="login-icon"><img src="assets/codescope-icon.svg" alt="" aria-hidden="true"></span><h1>CodeScope</h1></div>
+          <p class="tagline">Explore programming concepts through interactive, step-by-step activities.</p>
+        </div>
+        <div class="user-status">
+          <div id="globalControls" class="global-controls">
+            <div id="timerContainer" class="timer-container" style="display: none;">
+              <span class="timer-label">Time remaining:</span>
+              <span id="timerDisplay" class="timer-display">00:00</span>
+            </div>
+            <span id="headerModeTag" class="mode-tag"></span>
+            <button id="headerLinksToggle" class="link-toggle" onclick="toggleConnectors()"
+              title="Toggle the connector line between an operator and the value it produces">
+              <i class="fa-solid fa-arrow-turn-down"></i> <span id="headerLinksToggleText">Links on</span>
+            </button>
+            <button id="varFloatToggle" class="link-toggle" onclick="toggleVarFinalFloatVisible()"
+              title="Show/hide the floating variable final-state panel">
+              <i class="fa-solid fa-table-cells"></i> <span id="varFloatToggleText">Vars</span>
+            </button>
+            <button id="scoreSummaryBtn" class="score-summary-btn" onclick="openScoreSummaryModal()" title="View score summary">
+              <i class="fa-solid fa-chart-simple"></i> Scores
+            </button>
+            <button id="submitExamBtn" class="submit-exam-btn" onclick="submitExam(false)" title="Submit and lock the examination" style="display:none;">
+              <i class="fa-solid fa-paper-plane"></i> Submit exam
+            </button>
+          </div>
+          <div id="userStatusText" class="user-status-text">
+            <div id="userStatusName"></div>
+            <div id="headerClock" class="header-clock"></div>
+          </div>
+        </div>
+      </div>
+      <div id="app"></div>
+      <!-- Item pagination bar for session navigation -->
+      <div id="itemPaginationContainer" class="item-pagination-container" style="display: none;"></div>
+    </main>
+  </div>
+</div>
+
+<!--
+  Each file below holds ONE logical module (no file combines unrelated
+  code) and is loaded as a classic (non-module) script, so they all share
+  a single global scope/realm — exactly as if this were still one inline
+  <script> block — which is why top-level `function`/`const`/`let` in an
+  earlier file can be referenced by a later one with no imports/exports
+  needed. Order matters: each file is listed after everything it depends on.
+-->
+<script src="js/engine.js"></script>
+<script src="js/flat-model.js"></script>
+<script src="js/template-engine.js"></script>
+<script src="js/generator.js"></script>
+<script src="js/profiles.js"></script> 
+<script src="js/language.js"></script>
+<script src="js/program-ir.js"></script>
+<script src="js/program-core.js"></script>
+<script src="js/activity-core.js"></script>
+<script src="js/legacy-expression-plugin.js"></script>
+<script src="js/declaration-statement-plugin.js"></script>
+<script src="js/assignment-statement-plugin.js"></script>
+<script src="js/unary-update-statement-plugin.js"></script>
+<script src="js/program-item-builder.js"></script>
+<script src="plugins/token-classification/manifest.js"></script>
+<script src="plugins/token-classification/languages/c.js"></script>
+<script src="plugins/token-classification/languages/java.js"></script>
+<script src="plugins/token-classification/classifier.js"></script>
+<script src="plugins/token-classification/generator.js"></script>
+<script src="plugins/token-classification/actions.js"></script>
+<script src="plugins/token-classification/modal.js"></script>
+<script src="plugins/token-classification/feedback.js"></script>
+<script src="plugins/token-classification/renderer.js"></script>
+<script src="plugins/token-classification/profiles/identifier-position.js"></script>
+<script src="plugins/token-classification/profiles/declaration-tokens.js"></script>
+<script src="plugins/token-classification/profiles/chained-statement-tokens.js"></script>
+<script src="plugins/token-classification/plugin.js"></script>
+<script src="js/state.js"></script>
+<script src="js/exam-persistence.js"></script>
+<script src="js/settings-persistence.js"></script>
+<script src="js/manual-response.js"></script>
+<script src="js/live-clock.js"></script>
+<script src="js/qr-share.js"></script>
+<script src="js/score-summary.js"></script>
+<script src="js/moment-feedback.js"></script>
+<script src="js/juice.js"></script>
+<script src="js/dom-helpers.js"></script>
+<script src="js/console-drawer.js"></script>
+<script src="js/console-drawer-content.js"></script>
+<script src="js/feedback-drawer.js"></script>
+<script src="js/connector-lines.js"></script>
+<script src="js/var-final-state.js"></script>
+<script src="js/var-final-float.js"></script>
+<script src="js/live-step-autoscroll.js"></script>
+<script src="js/render-tree.js"></script>
+<script src="js/render-flat.js"></script>
+<script src="js/render-declaration.js"></script>
+<script src="js/render-assignment.js"></script>
+<script src="js/render-unary-update.js"></script>
+<script src="js/render-session.js"></script>
+<script src="js/render-done.js"></script>
+<script src="js/login.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
