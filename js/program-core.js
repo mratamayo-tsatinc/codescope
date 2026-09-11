@@ -109,6 +109,9 @@ function advanceProgram(program){
 function dispatchProgramAction(item, action, services){
   const program = ensureProgramEnvelope(item);
   const statement = currentProgramStatement(item);
+  if(action&&action.statementId&&(!statement||action.statementId!==statement.id)){
+    return {applied:false,ignored:true,reason:'non-current-statement'};
+  }
   const plugin = statementPluginFor(statement);
   if(!plugin || typeof plugin.applyAction !== 'function') return {applied:false, reason:'unsupported-statement'};
   const result = plugin.applyAction({program, statement, item, action, services:services||{}}) || {applied:false};

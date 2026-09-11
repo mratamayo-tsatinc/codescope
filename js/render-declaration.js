@@ -11,14 +11,15 @@ function declarationKeyword(statement){
   return statement.binding.mutable ? type : `final ${type}`;
 }
 
-function renderDeclarationEquals(statement,ready,context,item){
+function renderDeclarationEquals(statement,ready,context,item,isActive){
   const strictCandidate=typeof strictSequenceEnabled==='function'&&strictSequenceEnabled()
-    &&context&&context.isCurrent&&!item.checked&&!item.practiceInvalidExecution;
-  if(!ready&&!strictCandidate) return '=';
+    &&isActive&&context&&context.isCurrent&&!item.checked&&!item.practiceInvalidExecution;
+  const actionable=isActive&&context&&context.isCurrent&&!item.checked&&!item.practiceInvalidExecution&&(ready||strictCandidate);
+  if(!actionable) return h('span',{class:'declaration-equals tok tok-op-muted declaration-equals-static'},'=');
   return h('button',{class:'declaration-equals tok tok-op-active tok-colored ready'+(strictCandidate?' strict-sequence-candidate':''),
     title:`Assign the current value to ${statement.binding.name}`,
     'aria-label':`assign value to ${statement.binding.name}`,
-    onclick:()=>handleTokenClick({type:'commit-assignment'})},'=');
+    onclick:()=>handleTokenClick({type:'commit-assignment',statementId:statement.id})},'=');
 }
 
 function renderDeclarationStatement(ctx){
@@ -49,7 +50,7 @@ function renderDeclarationStatement(ctx){
     interactive:isActive && !runtime.checked && !item.checked && !item.practiceInvalidExecution,
     revealCorrectness:runtime.checked&&state.mode!=='exam',
     isFullyResolved:()=>declarationInitializerResolved(statement),
-    renderEquals:(ready,context)=>renderDeclarationEquals(statement,ready,context,item),
+    renderEquals:(ready,context)=>renderDeclarationEquals(statement,ready,context,item,isActive),
     renderTrailingActions:()=>isActive
       ? renderInlineEvaluationActions({canUndo:canUndoForCurrentMode(item)&&!item.practiceInvalidExecution})
       : renderCollapseStatementAction(statement,statementIndex)

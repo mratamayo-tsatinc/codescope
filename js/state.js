@@ -5,8 +5,8 @@ const state = {
   screen: 'login', // login | setup | session | done
   userEmail: null,
   userStudentId: null,
-  language: 'c',
-  mode: 'exam',
+  language: 'java',
+  mode: 'practice',
   profileId: PROFILES[0].id,
   itemIndex: 0,
   itemIndexByProfile: {}, // Remembers which item each profile was last viewing, so switching profiles via the sidebar returns to that exact item instead of resetting to Item 1
@@ -33,19 +33,19 @@ const DEFAULT_APP_SETTINGS = Object.freeze({
   schemaVersion: 5,
   // local-configurable | state-only. This deployment switch is intentionally
   // read only: persisted browser data can never override it.
-  settingsPolicy: 'state-only',
-  mode: 'exam',
-  timerMinutes: 30,
+  settingsPolicy: 'local-configurable',
+  mode: 'practice',
+  timerMinutes: 15,
   practice: Object.freeze({
-    interactionMode: 'strict-sequence', // guided | strict-sequencee
+    interactionMode: 'guided', // guided | strict-sequence
     manualResponses:Object.freeze({mode:'profile',namedValueRate:50,operatorRate:50})
   }),
   exam: Object.freeze({
-    interactionMode: 'strict-sequence', // guided | strict-sequence
+    interactionMode: 'guided', // guided | strict-sequence
     allowUndo: true,
     allowReviewFlags: true,
     showNeutralGuidance: false,
-    showScoresDuringExam: true,
+    showScoresDuringExam: false,
     feedbackRelease: 'after-submit', // after-submit | never
     lockItemAfterCheck: true,
     autoSubmitOnTimeout: true,
@@ -241,6 +241,9 @@ function handleTokenClick(action){
   const item = currentItem();
   if(!item || item.checked || state.examSubmitted || item.practiceInvalidExecution) return;
   const statement=currentProgramStatement(item);
+  // A handler retained by an expanded/completing row or a queued DOM event
+  // must never be reinterpreted as an action on the new current statement.
+  if(action&&action.statementId&&(!statement||action.statementId!==statement.id)) return false;
   const runtime=statement&&statement.kind==='legacy-expression'?item:(statement&&statement.runtime);
   if(!action.manualResponse&&typeof manualResponseDescriptor==='function'){
     const descriptor=manualResponseDescriptor(item,statement,runtime,action);
@@ -272,7 +275,7 @@ function handleTokenClick(action){
         manualResponseKey:action.manualResponse&&action.manualResponse.key
       });
       render();
-    } else if(strictSequenceEnabled()){
+    } else if(!result.ignored&&strictSequenceEnabled()){
       const reason=strictSequenceInvalidAttemptReason(item,statement,runtime,action);
       if(reason){
         if(state.mode==='exam') terminateStrictExamItem(item,action,reason,statement);

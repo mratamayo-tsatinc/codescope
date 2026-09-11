@@ -1,17 +1,18 @@
 // Assignment presentation is a thin adapter over the shared legacy expression
 // timeline. Only the target/operator label and statement controls are unique.
-function renderAssignmentOperator(statement,ready,context,item){
+function renderAssignmentOperator(statement,ready,context,item,isActive){
   const strictCandidate=typeof strictSequenceEnabled==='function'&&strictSequenceEnabled()
-    &&context&&context.isCurrent&&item&&!item.checked&&!item.practiceInvalidExecution;
-  if(!ready&&!strictCandidate) return isCompoundAssignment(statement)
+    &&isActive&&context&&context.isCurrent&&item&&!item.checked&&!item.practiceInvalidExecution;
+  const actionable=isActive&&context&&context.isCurrent&&item&&!item.checked&&!item.practiceInvalidExecution&&(ready||strictCandidate);
+  if(!actionable) return isCompoundAssignment(statement)
     ? h('span',{class:'tok tok-op-muted assignment-operator-static',
         'data-assignment-op-id':statement.id},statement.operator)
-    : statement.operator;
+    : h('span',{class:'tok tok-op-muted assignment-operator-static','data-assignment-op-id':statement.id},statement.operator);
   return h('button',{class:'declaration-equals tok tok-op-active tok-colored assignment-operator'+(statement.operator.length>1?' compound':'')+' ready'+(strictCandidate?' strict-sequence-candidate':''),
     'data-assignment-op-id':statement.id,
     title:`Apply ${statement.operator} to ${statement.target}`,
     'aria-label':`apply ${statement.operator} to ${statement.target}`,
-    onclick:()=>handleTokenClick({type:'commit-assignment'})},statement.operator);
+    onclick:()=>handleTokenClick({type:'commit-assignment',statementId:statement.id})},statement.operator);
 }
 
 function renderCompoundAssignmentPrefix(statement,context,isActive,item){
@@ -34,13 +35,13 @@ function renderCompoundAssignmentPrefix(statement,context,isActive,item){
     if(interactive){
       attrs.tabindex='0'; attrs.role='button';
       attrs['aria-label']=`read the current value of ${statement.target}`;
-      attrs.onclick=()=>handleTokenClick({type:'reveal-assignment-target'});
-      attrs.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();handleTokenClick({type:'reveal-assignment-target'});}};
+      attrs.onclick=()=>handleTokenClick({type:'reveal-assignment-target',statementId:statement.id});
+      attrs.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();handleTokenClick({type:'reveal-assignment-target',statementId:statement.id});}};
     }
     targetNode=h('span',attrs,statement.target);
   }
   const ready=isActive&&!runtime.checked&&context.isCurrent&&assignmentReadyToApply(statement);
-  return h('span',{class:'compound-assignment-prefix'},targetNode,' ',renderAssignmentOperator(statement,ready,context,item),' ');
+  return h('span',{class:'compound-assignment-prefix'},targetNode,' ',renderAssignmentOperator(statement,ready,context,item,isActive),' ');
 }
 
 const COMPOUND_MERGE_DURATION_MS=2200;
@@ -107,7 +108,7 @@ function renderAssignmentStatement(ctx){
     statementId:statement.id,interactive:isActive&&!runtime.checked&&!item.checked&&!item.practiceInvalidExecution,revealCorrectness:runtime.checked&&state.mode!=='exam',
     statementNumber:statementIndex+1,continuationStyle:true,
     isFullyResolved:()=>compound?assignmentReadyToApply(statement):assignmentRhsResolved(statement),
-    renderEquals:(ready,context)=>renderAssignmentOperator(statement,ready,context,item),
+    renderEquals:(ready,context)=>renderAssignmentOperator(statement,ready,context,item,isActive),
     renderPrefix:compound?(context=>renderCompoundAssignmentPrefix(statement,context,isActive,item)):null,
     renderAfterRows:compound?(timeline=>appendCompoundAssignmentResult(timeline,statement)):null,
     renderTrailingActions:()=>isActive
