@@ -36,6 +36,10 @@ const DEFAULT_SHELL_SETTINGS = Object.freeze({
   pagination: Object.freeze({
     windowSize: 5
   }),
+  scoreSummary: Object.freeze({
+    pngScale: 2,
+    filenamePrefix: 'codescope-score-summary'
+  }),
   celebrations: Object.freeze({
     enabled: true,
     confettiEnabled: true,
@@ -50,7 +54,7 @@ const state = {
   userEmail: null,
   userStudentId: null,
   language: 'java',
-  mode: 'exam',
+  mode: 'practice',
   profileId: PROFILES[0].id,
   itemIndex: 0,
   itemIndexByProfile: {}, // Remembers which item each profile was last viewing, so switching profiles via the sidebar returns to that exact item instead of resetting to Item 1
@@ -77,20 +81,20 @@ const DEFAULT_APP_SETTINGS = Object.freeze({
   schemaVersion: 5,
   // local-configurable | state-only. This deployment switch is intentionally
   // read only: persisted browser data can never override it.
-  settingsPolicy: 'state-only',
-  mode: 'exam',
-  timerMinutes: 30,
+  settingsPolicy: 'local-configurable',
+  mode: 'practice',
+  timerMinutes: 15,
   shell: DEFAULT_SHELL_SETTINGS,
   practice: Object.freeze({
-    interactionMode: 'strict-sequence', // guided | strict-sequence
+    interactionMode: 'guided', // guided | strict-sequence
     manualResponses:Object.freeze({mode:'profile',namedValueRate:50,operatorRate:50})
   }),
   exam: Object.freeze({
-    interactionMode: 'strict-sequence', // guided | strict-sequence
+    interactionMode: 'guided', // guided | strict-sequence
     allowUndo: true,
     allowReviewFlags: true,
     showNeutralGuidance: false,
-    showScoresDuringExam: true,
+    showScoresDuringExam: false,
     feedbackRelease: 'after-submit', // after-submit | never
     lockItemAfterCheck: true,
     autoSubmitOnTimeout: true,
@@ -116,6 +120,7 @@ function cloneDefaultAppSettings(){
       solutionPlayback:Object.assign({},DEFAULT_APP_SETTINGS.shell.solutionPlayback),
       liveStepScroll:Object.assign({},DEFAULT_APP_SETTINGS.shell.liveStepScroll),
       pagination:Object.assign({},DEFAULT_APP_SETTINGS.shell.pagination),
+      scoreSummary:Object.assign({},DEFAULT_APP_SETTINGS.shell.scoreSummary),
       celebrations:Object.assign({},DEFAULT_APP_SETTINGS.shell.celebrations)
     },
     practice:Object.assign({},DEFAULT_APP_SETTINGS.practice,{manualResponses:Object.assign({},DEFAULT_APP_SETTINGS.practice.manualResponses)}),

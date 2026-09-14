@@ -4,7 +4,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>CodeScope</title>
-<link rel="icon" type="image/svg+xml" href="assets/codescope-icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,7 +14,9 @@
 <link rel="stylesheet" href="css/console-drawer.css">
 <link rel="stylesheet" href="css/feedback-drawer.css">
 <link rel="stylesheet" href="plugins/token-classification/styles.css">
+<link rel="stylesheet" href="plugins/falling-token-sort/styles.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 <!-- Login Overlay -->
@@ -23,7 +24,7 @@
   <div class="login-container">
     <div class="login-card">
       <div class="login-header">
-        <div class="login-icon"><img src="assets/codescope-icon.svg" alt="" aria-hidden="true"></div>
+        <div class="login-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></div>
         <h1>CodeScope</h1>
         <p class="login-subtitle">Interactive Programming Activities</p>
       </div>
@@ -227,8 +228,13 @@
            is untouched in score-summary.js; re-add the button + #scoreSummaryDetails
            div below to bring it back with no JS changes needed. -->
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer score-summary-export-actions">
+      <span id="scoreSummaryDownloadStatus" class="score-summary-download-status" role="status" aria-live="polite"></span>
       <button class="secondary-btn" onclick="closeScoreSummaryModal()">Close</button>
+      <button id="scoreSummaryDownloadBtn" class="primary-btn score-summary-download-btn" onclick="downloadScoreSummaryPng()">
+        <i class="fa-solid fa-download" aria-hidden="true"></i>
+        <span>Download PNG</span>
+      </button>
     </div>
   </div>
 </div>
@@ -332,7 +338,7 @@
     <main class="content-area" role="main">
       <div class="app-header">
         <div class="app-header-left">
-          <div class="brand"><span class="login-icon"><img src="assets/codescope-icon.svg" alt="" aria-hidden="true"></span><h1>CodeScope</h1></div>
+          <div class="brand"><span class="login-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span><h1>CodeScope</h1></div>
           <p class="tagline">Explore programming concepts through interactive, step-by-step activities.</p>
         </div>
         <div class="user-status">
@@ -405,6 +411,13 @@
 <script src="plugins/token-classification/profiles/declaration-tokens.js"></script>
 <script src="plugins/token-classification/profiles/chained-statement-tokens.js"></script>
 <script src="plugins/token-classification/plugin.js"></script>
+<script src="plugins/falling-token-sort/manifest.js"></script>
+<script src="plugins/falling-token-sort/generator.js"></script>
+<script src="plugins/falling-token-sort/actions.js"></script>
+<script src="plugins/falling-token-sort/feedback.js"></script>
+<script src="plugins/falling-token-sort/renderer.js"></script>
+<script src="plugins/falling-token-sort/profiles/identifier-fall.js"></script>
+<script src="plugins/falling-token-sort/plugin.js"></script>
 <script src="js/state.js"></script>
 <script src="js/exam-persistence.js"></script>
 <script src="js/settings-persistence.js"></script>

@@ -51,8 +51,75 @@ function openScoreSummaryModal(){
 }
 
 function closeScoreSummaryModal(){
+  if(scoreSummaryDownloadInProgress) return;
   document.getElementById('scoreSummaryModal').style.display = 'none';
   document.getElementById('scoreSummaryOverlay').style.display = 'none';
+}
+
+let scoreSummaryDownloadInProgress = false;
+
+function scoreSummaryPngFilename(now){
+  const pad=value=>String(value).padStart(2,'0');
+  const stamp=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+  return `${DEFAULT_APP_SETTINGS.shell.scoreSummary.filenamePrefix}-${stamp}.png`;
+}
+
+function scoreSummaryCanvasBlob(canvas){
+  return new Promise((resolve,reject)=>{
+    canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('PNG creation returned no image data.')),'image/png');
+  });
+}
+
+async function downloadScoreSummaryPng(){
+  if(scoreSummaryDownloadInProgress) return;
+  const modal=document.getElementById('scoreSummaryModal');
+  const capture=modal&&modal.querySelector('.modal-content');
+  const button=document.getElementById('scoreSummaryDownloadBtn');
+  const buttonLabel=button&&button.querySelector('span');
+  const status=document.getElementById('scoreSummaryDownloadStatus');
+  if(!capture) return;
+
+  scoreSummaryDownloadInProgress=true;
+  if(button){button.disabled=true;button.setAttribute('aria-busy','true');}
+  if(buttonLabel) buttonLabel.textContent='Preparing…';
+  if(status) status.textContent='Preparing PNG…';
+
+  try{
+    if(typeof html2canvas!=='function') throw new Error('The PNG export component is unavailable.');
+    renderScoreSummaryContent();
+    if(typeof tickLiveClock==='function') tickLiveClock();
+    if(typeof renderScoreSummaryQr==='function') await renderScoreSummaryQr();
+    if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+
+    const configuredScale=Number(DEFAULT_APP_SETTINGS.shell.scoreSummary.pngScale)||2;
+    const canvas=await html2canvas(capture,{
+      backgroundColor:getComputedStyle(capture).backgroundColor,
+      scale:Math.max(1,configuredScale),
+      useCORS:true,
+      logging:false,
+      onclone:clonedDocument=>{
+        const clonedCapture=clonedDocument.querySelector('#scoreSummaryModal .modal-content');
+        if(clonedCapture) clonedCapture.classList.add('score-summary-exporting');
+      }
+    });
+    const blob=await scoreSummaryCanvasBlob(canvas);
+    const objectUrl=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=objectUrl;
+    link.download=scoreSummaryPngFilename(new Date());
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(objectUrl),0);
+    if(status) status.textContent='PNG downloaded.';
+  }catch(error){
+    console.error('Score summary PNG export failed:',error);
+    if(status) status.textContent='Could not download PNG. Please try again.';
+  }finally{
+    scoreSummaryDownloadInProgress=false;
+    if(button){button.disabled=false;button.removeAttribute('aria-busy');}
+    if(buttonLabel) buttonLabel.textContent='Download PNG';
+  }
 }
 
 // Local UI-only toggle state for the breakdown list — deliberately not on

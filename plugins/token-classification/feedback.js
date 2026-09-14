@@ -10,20 +10,36 @@ function tcBuildConsoleContent(item,profile){
 function tcRenderSolution(item){
   const playback=h('div',{class:'solution-playback tc-solution-playback'});
   playback.appendChild(h('div',{class:'playback-controls'},h('span',{class:'playback-progress'},`${item.targetIds.length} correct classifications`)));
-  const timeline=h('div',{class:'timeline solution-timeline'});
-  item.targetIds.forEach(id=>{
-    const token=tcTokenById(item,id),response=tcResponseFor(item,id),category=response?response.expectedCategory:token.contextualCategory,
-      def=TC_CATEGORY_DEFS[category],row=h('div',{class:'tl-row done'});
-    row.appendChild(h('div',{class:'tl-dot',style:'background:var(--good)'}));
-    row.appendChild(h('div',{class:'code-out'},h('span',{class:'step-badge ok'},h('i',{class:'fa-solid fa-check'})),
-      h('code',{class:'tc-solution-token'},token.text),' → ',h('strong',{},def.label),
-      h('span',{class:'tc-solution-reason'},tcReason(token,category,item.language))));
-    timeline.appendChild(row);
+  const targetIds=new Set(item.targetIds),groups=h('div',{class:'tc-solution-groups'});
+  item.statements.forEach((statement,statementIndex)=>{
+    const tokens=statement.tokens.filter(token=>targetIds.has(token.id));
+    if(!tokens.length)return;
+    const source=typeof tcStatementSource==='function'
+      ?tcStatementSource(statement)
+      :statement.tokens.map(token=>token.text).join(' ');
+    const group=h('section',{class:'tc-solution-statement','aria-labelledby':`tc-solution-heading-${statement.id}`});
+    group.appendChild(h('div',{class:'tc-solution-statement-head'},
+      h('span',{class:'tc-solution-line-number','aria-hidden':'true'},String(statementIndex+1)),
+      h('div',{class:'tc-solution-statement-title'},
+        h('span',{id:`tc-solution-heading-${statement.id}`,class:'tc-solution-statement-label'},`Statement ${statementIndex+1}`),
+        h('code',{class:'tc-solution-source'},source))));
+    const rows=h('div',{class:'tc-solution-rows'});
+    tokens.forEach(token=>{
+      const response=tcResponseFor(item,token.id),category=response?response.expectedCategory:token.contextualCategory,
+        def=TC_CATEGORY_DEFS[category];
+      rows.appendChild(h('div',{class:'tc-solution-row'},
+        h('span',{class:'tc-solution-status','aria-label':'Correct classification'},h('i',{class:'fa-solid fa-circle-check','aria-hidden':'true'})),
+        h('div',{class:'tc-solution-content'},
+          h('div',{class:'tc-solution-answer'},h('code',{class:'tc-solution-token'},token.text),h('span',{class:'tc-solution-arrow','aria-hidden':'true'},'→'),h('strong',{},def.label)),
+          h('div',{class:'tc-solution-reason'},tcReason(token,category,item.language)))));
+    });
+    group.appendChild(rows);groups.appendChild(group);
   });
-  playback.appendChild(timeline);return playback;
+  playback.appendChild(groups);return playback;
 }
 function tcBuildFeedback(item){
   const correct=item.wasCorrectFinal;
+  const root=h('div',{class:'tc-feedback-stack'});
   const fb=h('div',{class:`feedback ${correct?'correct':'incorrect'}${item._feedbackAnimated?'':' feedback-enter'}`});
   fb.appendChild(h('div',{class:'feedback-head'},h('i',{class:`fa-solid ${correct?'fa-circle-check':'fa-circle-xmark'}`}),correct?' Correct':' Review needed'));
   const terminal=item.invalidSelection&&item.invalidSelection.terminal;
@@ -38,9 +54,11 @@ function tcBuildFeedback(item){
     h('div',{class:'stat'},h('div',{class:'sv'},`${Math.round(item.itemScore*100)}%`),h('div',{class:'sl'},'item score'))));
   if(state.mode==='practice'&&!terminal){
     fb.appendChild(h('button',{class:'solution-toggle',onclick:tcToggleSolution},item.showSolution?'Hide correct solution':'Show correct solution'));
-    if(item.showSolution)fb.appendChild(tcRenderSolution(item));
+    root.appendChild(fb);
+    if(item.showSolution)root.appendChild(tcRenderSolution(item));
+    return root;
   }
-  return fb;
+  root.appendChild(fb);return root;
 }
 function tcSyncDrawers(item,profile){
   if(typeof setConsoleDrawerTitle==='function'){

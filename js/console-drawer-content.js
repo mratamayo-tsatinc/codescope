@@ -593,6 +593,13 @@
         const plugin=activityPluginForProfile(profile);
         const item=typeof currentItem==='function'?currentItem():null;
         if(plugin&&item&&typeof plugin.buildConsoleContent==='function'){
+          const activityGuidanceAllowed=state.mode!=='exam'||state.examSubmitted
+            ||(typeof activeExamPolicy==='function'&&activeExamPolicy().showNeutralGuidance);
+          if(!activityGuidanceAllowed){
+            if(typeof hideConsoleDrawerTab==='function')hideConsoleDrawerTab();
+            if(typeof closeConsoleDrawer==='function')closeConsoleDrawer();
+            return;
+          }
           if(typeof setConsoleDrawerTitle==='function') setConsoleDrawerTitle(`${item.language==='c'?'C':'Java'} Token Guide`);
           if(typeof setConsoleDrawerContent==='function') setConsoleDrawerContent(plugin.buildConsoleContent(item,profile),{cursor:false});
           if(typeof showConsoleDrawerTab==='function') showConsoleDrawerTab();

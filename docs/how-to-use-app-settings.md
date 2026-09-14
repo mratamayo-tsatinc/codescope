@@ -114,6 +114,8 @@ browser settings do not override them.
 | `liveStepScroll.maxWaitMs` | `900` | Maximum wait for guided auto-scroll to settle. |
 | `liveStepScroll.bottomInsetPx` | `28` | Bottom breathing room for the active evaluation row. |
 | `pagination.windowSize` | `5` | Maximum number of item buttons in the pagination window. |
+| `scoreSummary.pngScale` | `2` | Resolution multiplier used by the Score Summary PNG download. |
+| `scoreSummary.filenamePrefix` | `codescope-score-summary` | Prefix used for downloaded Score Summary filenames. |
 | `celebrations.enabled` | `true` | Master switch for shared celebration badges/effects. |
 | `celebrations.confettiEnabled` | `true` | Confetti switch independent of celebration badges. |
 
