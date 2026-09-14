@@ -1,10 +1,27 @@
 # How to Create a Profile
 
 A profile is one JavaScript object added to the `PROFILES_RAW` array in
-`profiles.js`. This file holds *only* profile data — operators, shape,
-templates — with zero generation logic in it; everything that actually
-builds and validates expressions lives in `generator.js`, which you never
-need to open just to add or edit a profile. This guide builds one from
+`js/profiles.js`. This file holds *only* profile data, with zero generation
+logic in it. Expression generation lives in `js/generator.js`; activity-specific
+generation lives in its matching `plugins/<plugin-id>/` directory. You never
+need to add profile configuration inside a plugin directory.
+
+This guide covers expression and statement-sequence profiles. Activity profiles
+use the same global catalog and the same `meta` and `scoring` conventions, but
+replace expression fields with an `activity` block:
+
+```js
+{
+  meta: { id, name, description },
+  scoring: { itemCount, pointsPerItem },
+  activity: { kind: 'plugin-id', ...pluginConfiguration },
+}
+```
+
+For the complete activity-profile example, see
+`docs/how-to-create-a-falling-token-sort-profile.md`.
+
+The remainder of this guide builds an expression profile from
 the simplest possible version
 up to full atomic control, with a working example at every step. Each
 level only adds ONE new idea on top of the last — skip ahead if you

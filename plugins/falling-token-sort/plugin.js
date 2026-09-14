@@ -51,4 +51,3 @@ const fallingTokenSortPlugin=registerActivityPlugin({
   buildConsoleContent:ftsBuildConsoleContent,buildFeedback:ftsBuildFeedback,
   hasAttempt({item}){return !!(item&&item.attempts&&item.attempts.length);}
 });
-registerActivityProfiles(fallingTokenSortPlugin.id,[FTS_PROFILE_IDENTIFIER_FALL]);

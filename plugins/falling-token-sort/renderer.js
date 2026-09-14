@@ -96,8 +96,9 @@ function ftsRenderControls(item){
   if(actions)row.appendChild(actions);return row;
 }
 
-function ftsRenderPracticeResult(item){
-  if(state.mode!=='practice'||!item.lastResult||item.lastResult.wasCorrect)return null;
+function ftsRenderPracticeResult(item,profile){
+  if(state.mode!=='practice'||profile.activity.feedback.practice!=='immediate-return'
+    ||!item.lastResult||item.lastResult.wasCorrect)return null;
   return h('div',{class:'fts-placement-message',role:'status','aria-live':'polite'},
     h('i',{class:'fa-solid fa-rotate-left','aria-hidden':'true'}),
     h('span',{},'That bucket does not match. The token returned so you can choose another bucket.'));
@@ -115,7 +116,7 @@ function ftsRender({container,item,profile}){
   const middle=h('div',{class:`fts-stage-middle${left?' has-left':''}${right?' has-right':''}`});
   if(left)middle.appendChild(left);middle.appendChild(ftsRenderTokenLane(item));if(right)middle.appendChild(right);stage.appendChild(middle);
   const bottom=ftsRenderBucketRegion(item,'bottom',regions.bottom);if(bottom)stage.appendChild(bottom);
-  const result=ftsRenderPracticeResult(item);if(result)stage.appendChild(result);
+  const result=ftsRenderPracticeResult(item,profile);if(result)stage.appendChild(result);
   const controls=ftsRenderControls(item);if(controls)stage.appendChild(controls);
   flow.appendChild(stage);
   if(item.checked&&state.mode==='exam'&&!state.examSubmitted){

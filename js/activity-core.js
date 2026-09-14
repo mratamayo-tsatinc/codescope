@@ -8,7 +8,17 @@ function registerActivityPlugin(plugin){
   ['generateItem','render','applyAction','check'].forEach(name=>{
     if(typeof plugin[name]!=='function') throw new Error(`Activity plugin '${plugin.id}' requires ${name}()`);
   });
+  // Activity configuration lives in the shell's global profile catalog, but
+  // remains dormant when its optional plugin is unavailable. Activate and
+  // validate matching profiles when that plugin registers.
+  const matchingProfiles=(typeof ACTIVITY_PROFILES==='undefined'?[]:ACTIVITY_PROFILES)
+    .filter(profile=>profile.activity&&profile.activity.kind===plugin.id);
+  matchingProfiles.forEach(profile=>{
+    if(PROFILES.some(candidate=>candidate.id===profile.id)) throw new Error(`Duplicate profile id '${profile.id}'`);
+    if(typeof plugin.validateProfile==='function') plugin.validateProfile(profile);
+  });
   activityPluginRegistry.set(plugin.id,Object.freeze(Object.assign({},plugin)));
+  matchingProfiles.forEach(profile=>PROFILES.push(Object.freeze(profile)));
   return plugin;
 }
 

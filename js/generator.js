@@ -245,6 +245,10 @@ function countComparisonOps(node){
 // ----------------------------------------------------------------------------
 function validateProfiles(profiles){
   for(const p of profiles){
+    // Activity profiles are declarative shell entries whose domain-specific
+    // shape is validated by their registered activity plugin. They do not
+    // carry an expression template, operands, or operators.
+    if(p.activity) continue;
     let ast;
     try{ ast = parseTemplate(p.template); }
     catch(e){ throw new Error(`Profile "${p.meta.id}": template parse error: ${e.message}`); }
@@ -322,6 +326,22 @@ function resolvedPointsPerItem(profile){
 // ----------------------------------------------------------------------------
 const DEFAULT_EXTRAS = { unaryWrap: {enabled:false, operators:[], forms:[], fraction:0} };
 function finalizeProfile(raw){
+  // Activity profiles share the shell's global profile catalog and scoring
+  // aliases, but their remaining configuration is owned by the activity
+  // plugin rather than the legacy expression generator.
+  if(raw.activity){
+    const p = {
+      meta: Object.assign({},raw.meta),
+      scoring: Object.assign({},raw.scoring),
+      activity: Object.assign({},raw.activity),
+    };
+    p.id = p.meta.id;
+    p.name = p.meta.name;
+    p.description = p.meta.description;
+    p.itemCount = p.scoring.itemCount;
+    p.pointsPerItem = p.scoring.pointsPerItem;
+    return p;
+  }
   const p = {
     meta: raw.meta,
     shape: Object.assign({operandSources:{}}, raw.shape),
