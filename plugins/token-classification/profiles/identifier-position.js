@@ -1,4 +1,5 @@
 const TC_PROFILE_IDENTIFIER_POSITION={
+  /*
   id:'token-identifier-position',name:'Identifier Position',
   description:'Locate the declaration name and decide whether it is a valid identifier.',
   itemCount:5,pointsPerItem:3,
@@ -22,4 +23,5 @@ const TC_PROFILE_IDENTIFIER_POSITION={
     ]},
     response:{mode:'classify',categories:['valid-identifier','invalid-identifier']}
   }
+    */
 };

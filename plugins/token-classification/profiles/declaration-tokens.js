@@ -1,4 +1,5 @@
 const TC_PROFILE_DECLARATION_TOKENS={
+  /*
   id:'token-declaration-complete',name:'Declaration Token Classification',
   description:'Classify every token according to its position in a variable or constant declaration.',
   itemCount:5,pointsPerItem:6,
@@ -21,4 +22,6 @@ const TC_PROFILE_DECLARATION_TOKENS={
     ]},
     response:{mode:'classify',categories:['valid-identifier','invalid-identifier','reserved-word','operator','literal','separator']}
   }
+    */
+
 };

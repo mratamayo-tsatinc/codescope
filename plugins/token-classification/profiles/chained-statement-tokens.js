@@ -1,4 +1,5 @@
 const TC_PROFILE_CHAINED_TOKENS={
+  /*
   id:'token-program-chain',name:'Chained Statement Tokens',
   description:'Classify tokens by position across connected declarations and assignments.',
   itemCount:5,pointsPerItem:12,
@@ -21,4 +22,5 @@ const TC_PROFILE_CHAINED_TOKENS={
     ]},
     response:{mode:'classify',categories:['valid-identifier','invalid-identifier','reserved-word','operator','literal','separator']}
   }
+    */
 };

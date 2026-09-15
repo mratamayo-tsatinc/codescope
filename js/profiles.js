@@ -77,6 +77,7 @@ const OPS = {
 //     named OPS constant
 // ============================================================================
 const PROFILES_RAW = [
+  /*
   {
     meta: { id:'direct-ltr', name:'Direct Left-to-Right',
       description:'Establishes basic sequential evaluation. No precedence reasoning required.' },
@@ -235,6 +236,7 @@ const PROFILES_RAW = [
     template: '(operand:lit cmp operand:lit or operand:var:bool:unary) and operand:var:bool:unary',
     scoring: { itemCount:5, pointsPerItem:3 },
   },
+  */
   {
     meta: { id:'declaration-chain', name:'Declaration Chain',
       description:'Execute dependent variable and constant declarations before evaluating the final expression.' },
@@ -345,6 +347,7 @@ const PROFILES_RAW = [
     scoring:{itemCount:5,pointsPerItem:4},
     manualResponses:{enabled:true,namedValueRate:50,operatorRate:50},
   },
+  /*
   {
     meta:{id:'falling-identifier-sort',name:'Falling Identifier Sort',
       description:'Sort standalone names as valid identifiers, invalid identifiers, or reserved words.'},
@@ -378,6 +381,7 @@ const PROFILES_RAW = [
       feedback:{practice:'immediate-return',exam:'deferred-until-submit'},
     },
   },
+  */
 ];
 
 const FINALIZED_PROFILES = PROFILES_RAW.map(finalizeProfile);
