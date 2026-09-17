@@ -27,12 +27,47 @@ function tcContextualCategory(token,language){
   }
   return lexical;
 }
+function tcIdentifierViolations(text,rules,lexicalCategory,contextualCategory){
+  const violations=[];
+  if(lexicalCategory==='reserved-word'){
+    if(contextualCategory==='invalid-identifier')violations.push({id:'reserved-word-used-as-identifier',word:text});
+    return violations;
+  }
+  if(lexicalCategory!=='invalid-identifier')return violations;
+  if(!text){violations.push({id:'empty-identifier'});return violations;}
+  [...text].forEach((character,index)=>{
+    if(/\s/.test(character)){
+      violations.push({id:'whitespace',character,index});return;
+    }
+    if(index===0&&!rules.identifierStartPattern.test(character)){
+      violations.push({id:/\d/.test(character)?'starts-with-digit':'invalid-start-character',character,index});return;
+    }
+    if(index>0&&!rules.identifierPartPattern.test(character))violations.push({id:'illegal-character',character,index});
+  });
+  if(!violations.length)violations.push({id:'invalid-pattern'});
+  return violations;
+}
+function tcAnalyzeIdentifierText(text,language,context){
+  const details=context||{},token={text:String(text),role:details.role||'word',position:details.position||'standalone'};
+  const rules=tcLanguage(language),lexicalCategory=tcLexicalCategory(token,language);
+  token.lexicalCategory=lexicalCategory;
+  const contextualCategory=tcContextualCategory(token,language);
+  return {
+    text:token.text,language:rules.id,position:token.position,
+    lexicalCategory,contextualCategory,category:contextualCategory,
+    identifierForm:rules.identifierPattern.test(token.text),reserved:rules.reserved.has(token.text),
+    violations:tcIdentifierViolations(token.text,rules,lexicalCategory,contextualCategory)
+  };
+}
 function tcAnalyzeToken(token,language){
-  token.lexicalCategory=tcLexicalCategory(token,language);
-  token.contextualCategory=tcContextualCategory(token,language);
-  token.category=token.contextualCategory;
-  token.violation=token.lexicalCategory==='reserved-word'&&token.contextualCategory==='invalid-identifier'
-    ?'reserved-word-used-as-identifier':null;
+  const analysis=tcAnalyzeIdentifierText(token.text,language,{role:token.role,position:token.position});
+  token.lexicalCategory=analysis.lexicalCategory;
+  token.contextualCategory=analysis.contextualCategory;
+  token.category=analysis.contextualCategory;
+  token.identifierForm=analysis.identifierForm;
+  token.reserved=analysis.reserved;
+  token.violations=analysis.violations;
+  token.violation=analysis.violations.length?analysis.violations[0].id:null;
   return token;
 }
 function tcClassifyToken(token,language){return tcContextualCategory(token,language);}
@@ -47,13 +82,21 @@ function tcResolveAnswer(resolverId,context){
 }
 function tcReason(token,category,language){
   const rules=tcLanguage(language);
-  if(token.violation==='reserved-word-used-as-identifier')return `“${token.text}” is invalid in this identifier position because ${rules.label} reserves it for language syntax.`;
-  if(category==='reserved-word')return `“${token.text}” occupies a reserved-word position in this ${rules.label} statement.`;
-  if(category==='valid-identifier')return `“${token.text}” is valid in this identifier position under ${rules.label} rules.`;
+  const violation=(token.violations&&token.violations[0])||(token.violation?{id:token.violation}:null);
+  if(violation&&violation.id==='reserved-word-used-as-identifier')return `“${token.text}” is invalid in this identifier position because ${rules.label} reserves it for language syntax.`;
+  if(category==='reserved-word')return token.position==='standalone'
+    ?`“${token.text}” is reserved by ${rules.label}.`
+    :`“${token.text}” occupies a reserved-word position in this ${rules.label} statement.`;
+  if(category==='valid-identifier')return token.position==='standalone'
+    ?`“${token.text}” follows ${rules.label} identifier rules.`
+    :`“${token.text}” is valid in this identifier position under ${rules.label} rules.`;
   if(category==='operator')return `“${token.text}” occupies an operator position.`;
   if(category==='literal')return `“${token.text}” occupies a literal-value position.`;
   if(category==='separator')return `“${token.text}” terminates and separates the statement.`;
-  if(/^\d/.test(token.text))return 'An identifier cannot begin with a digit.';
-  if(/\s/.test(token.text))return 'An identifier cannot contain spaces.';
+  if(violation&&violation.id==='starts-with-digit')return `“${token.text}” is invalid because an identifier cannot begin with the digit “${violation.character}”.`;
+  if(violation&&violation.id==='whitespace')return `“${token.text}” is invalid because an identifier cannot contain whitespace.`;
+  if(violation&&violation.id==='invalid-start-character')return `“${token.text}” is invalid because “${violation.character}” cannot begin a ${rules.label} identifier.`;
+  if(violation&&violation.id==='illegal-character')return `“${token.text}” is invalid because “${violation.character}” is not permitted in a ${rules.label} identifier.`;
+  if(violation&&violation.id==='empty-identifier')return 'An identifier cannot be empty.';
   return `“${token.text}” is not permitted in this ${rules.label} identifier position.`;
 }

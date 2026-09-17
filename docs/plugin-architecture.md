@@ -15,10 +15,9 @@ All profile configuration belongs in the global `PROFILES_RAW` catalog in
 `js/profiles.js`, including profiles backed by an activity plugin. A global
 activity profile remains dormant when its matching plugin is unavailable and is
 activated and plugin-validated when that plugin registers. New plugins must not
-embed profile configuration in their own directory. The older
-`registerActivityProfiles()` entry point is retained only for compatibility
-with activity profiles created before this rule and must not be copied by new
-implementations.
+embed profile configuration in their own directory. Plugins register only
+their capabilities; the shell activates matching global profiles through each
+profile's `activity.kind` value.
 
 Each plugin owns its manifest, generation, canonical domain rules, actions,
 scoring checks, solution trace, renderer, feedback content, styles, language
@@ -31,16 +30,18 @@ drawers, persistence, Undo, Check, scoring aggregation, and design tokens. A
 plugin must not import another plugin's private files. Future inter-plugin
 dependencies must be declared against public capabilities.
 
+The token-classification plugin exposes the shared identifier-language
+capability used by Falling Token Sort: seeded candidate construction, C/Java
+language definitions, and canonical lexical/contextual analysis. Falling Token
+Sort declares that dependency in its manifest and consumes the public analysis
+contract; it does not maintain a second answer list.
+
 ## Reference implementation
 
-`plugins/falling-token-sort/` is the reference directory boundary for new
-activity plugins. Its profile is declared globally in `js/profiles.js`; its
-plugin directory contains only the behavior and presentation needed to execute
-that configuration.
-
-The token-classification activity predates the global-profile-location rule.
-Its bundled profile files remain a compatibility case until that plugin is
-handled by its separate refactoring plan.
+`plugins/falling-token-sort/` and `plugins/token-classification/` are reference
+directory boundaries for activity plugins. Their profiles are declared
+globally in `js/profiles.js`; their plugin directories contain only the
+behavior and presentation needed to execute those configurations.
 
 The four existing statement plugins in `js/` are intentionally unchanged.
 Their migration will be handled by a separate refactoring plan.

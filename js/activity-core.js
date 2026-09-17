@@ -22,18 +22,6 @@ function registerActivityPlugin(plugin){
   return plugin;
 }
 
-function registerActivityProfiles(pluginId,profiles){
-  if(!Array.isArray(profiles)) throw new Error(`Activity plugin '${pluginId}' profiles must be an array`);
-  profiles.forEach(raw=>{
-    const profile=Object.assign({},raw,{activity:Object.assign({},raw.activity,{kind:pluginId})});
-    if(!profile.id||!profile.name||!profile.description) throw new Error(`Activity plugin '${pluginId}' has an invalid profile`);
-    if(PROFILES.some(candidate=>candidate.id===profile.id)) throw new Error(`Duplicate profile id '${profile.id}'`);
-    const plugin=activityPluginRegistry.get(pluginId);
-    if(plugin&&typeof plugin.validateProfile==='function') plugin.validateProfile(profile);
-    PROFILES.push(Object.freeze(profile));
-  });
-}
-
 function activityPluginForProfile(profile){
   return profile&&profile.activity ? activityPluginRegistry.get(profile.activity.kind)||null : null;
 }
@@ -45,7 +33,11 @@ function activityPluginForItem(item){
 function generateActivityItems(profile){
   const plugin=activityPluginForProfile(profile);
   if(!plugin) throw new Error(`No activity plugin registered for '${profile.activity.kind}'`);
-  return Array.from({length:profile.itemCount},(_,index)=>plugin.generateItem({profile,index,language:state.language}));
+  // One opaque context is shared only across items generated for this profile.
+  // Plugins may use it for deterministic uniqueness without exposing domain
+  // knowledge to the shell or leaking values between profiles.
+  const generationContext={};
+  return Array.from({length:profile.itemCount},(_,index)=>plugin.generateItem({profile,index,language:state.language,generationContext}));
 }
 
 function renderActivityItem(container,item){

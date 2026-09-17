@@ -589,6 +589,12 @@ The `token-classification` reference plugin separates five concerns:
 - `assessment.checks` declares actions, answer resolvers, weights, and bonuses.
 - `response.categories` declares the choices presented by the modal.
 
+Identifier-based generators may also declare `generator.identifierGeneration`
+to select semantic templates, naming styles, invalid-mutation strategies, and
+the uniqueness scope. Generated text is always reclassified by the canonical
+language analyzer; profile configuration never supplies an answer key. See
+`docs/identifier-generation.md` for the complete contract.
+
 Selectors may match `positions`, `roles`, `statementKinds`, or contextual
 `categories`. A selection policy may include a named set and then exclude any
 other selector:
@@ -649,7 +655,8 @@ assessment: {
 }
 ```
 
-See `plugins/token-classification/profiles/` for three complete configurations.
+See the three `activity.kind: 'token-classification'` entries in
+`js/profiles.js` for complete configurations.
 
 ## Checklist before shipping a new profile
 

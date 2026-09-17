@@ -77,6 +77,7 @@ const OPS = {
 //     named OPS constant
 // ============================================================================
 const PROFILES_RAW = [
+  /*
   {
     meta: { id:'direct-ltr', name:'Direct Left-to-Right',
       description:'Establishes basic sequential evaluation. No precedence reasoning required.' },
@@ -235,6 +236,7 @@ const PROFILES_RAW = [
     template: '(operand:lit cmp operand:lit or operand:var:bool:unary) and operand:var:bool:unary',
     scoring: { itemCount:5, pointsPerItem:3 },
   },
+  */
   {
     meta: { id:'declaration-chain', name:'Declaration Chain',
       description:'Execute dependent variable and constant declarations before evaluating the final expression.' },
@@ -345,116 +347,11 @@ const PROFILES_RAW = [
     scoring:{itemCount:5,pointsPerItem:4},
     manualResponses:{enabled:true,namedValueRate:50,operatorRate:50},
   },
-  {
-    meta:{id:'token-identifier-position',name:'Identifier Position',
-      description:'Locate the declaration name and decide whether it is a valid identifier.'},
-    scoring:{itemCount:5,pointsPerItem:3},
-    activity:{
-      kind:'token-classification',
-      generator:{capability:'statement-generator',pattern:'declaration',statementKinds:['variable','constant'],identifierGeneration:{
-        templates:['modifier-measurement','entity-measurement','entity-technical'],
-        styles:['camel-case','snake-case','constant-case','pascal-case','underscore-prefix','digit-suffix','dollar-prefix','case-mutated-reserved'],
-        invalidStrategies:['leading-digit','illegal-character','embedded-space','punctuation','reserved-as-identifier'],
-        weights:{
-          templates:{'modifier-measurement':3,'entity-measurement':3,'entity-technical':2},
-          styles:{'camel-case':3,'snake-case':2,'constant-case':2,'pascal-case':1,'underscore-prefix':1,'digit-suffix':2,'dollar-prefix':1,'case-mutated-reserved':1},
-          invalidStrategies:{'leading-digit':3,'illegal-character':3,'embedded-space':2,punctuation:2,'reserved-as-identifier':2}
-        },
-        length:{min:3,max:32},
-        uniqueness:{scope:'profile-session',reuse:'avoid-until-exhausted'}
-      }},
-      instructions:'Tap the name used in the declaration, then classify it as a valid or invalid identifier.',
-      sets:{
-        identifierTargets:{match:{positions:['declaration-name']}},
-        everyToken:{include:[{source:'all'}]}
-      },
-      interaction:{policies:{
-        'practice:guided':{selectable:{include:[{set:'identifierTargets'}],exclude:[]},onOffTarget:'ignore'},
-        'practice:strict-sequence':{selectable:{include:[{set:'everyToken'}],exclude:[]},onOffTarget:'block-until-undo'},
-        'exam:guided':{selectable:{include:[{set:'identifierTargets'}],exclude:[]},onOffTarget:'ignore'},
-        'exam:strict-sequence':{selectable:{include:[{set:'everyToken'}],exclude:[]},onOffTarget:'terminate-item'}
-      }},
-      assessment:{targets:{set:'identifierTargets'},checks:[
-        {id:'target-selection',action:'SELECT_TOKEN',targets:{set:'identifierTargets'},cardinality:'once',weight:1,bonus:true},
-        {id:'identifier-classification',action:'CLASSIFY_TOKEN',targets:{set:'identifierTargets'},cardinality:'per-target',answerResolver:'contextual-category',weight:2}
-      ]},
-      response:{mode:'classify',categories:['valid-identifier','invalid-identifier']}
-    }
-  },
-  {
-    meta:{id:'token-declaration-complete',name:'Declaration Token Classification',
-      description:'Classify every token according to its position in a variable or constant declaration.'},
-    scoring:{itemCount:5,pointsPerItem:6},
-    activity:{
-      kind:'token-classification',
-      generator:{capability:'statement-generator',pattern:'declaration',statementKinds:['variable','constant'],identifierGeneration:{
-        templates:['modifier-measurement','entity-measurement','entity-technical'],
-        styles:['camel-case','snake-case','constant-case','pascal-case','underscore-prefix','digit-suffix','dollar-prefix','case-mutated-reserved'],
-        invalidStrategies:['leading-digit','illegal-character','embedded-space','punctuation','reserved-as-identifier'],
-        weights:{
-          templates:{'modifier-measurement':3,'entity-measurement':3,'entity-technical':2},
-          styles:{'camel-case':3,'snake-case':2,'constant-case':2,'pascal-case':1,'underscore-prefix':1,'digit-suffix':2,'dollar-prefix':1,'case-mutated-reserved':1},
-          invalidStrategies:{'leading-digit':3,'illegal-character':3,'embedded-space':2,punctuation:2,'reserved-as-identifier':2}
-        },
-        length:{min:3,max:32},
-        uniqueness:{scope:'profile-session',reuse:'avoid-until-exhausted'}
-      }},
-      instructions:'Tap each token and classify it according to its position in the statement.',
-      sets:{
-        classificationTargets:{match:{positions:['modifier','type','declaration-name','operator','literal','separator']}},
-        everyToken:{include:[{source:'all'}]}
-      },
-      interaction:{policies:{
-        'practice:guided':{selectable:{include:[{set:'classificationTargets'}],exclude:[]},onOffTarget:'ignore'},
-        'practice:strict-sequence':{selectable:{include:[{set:'everyToken'}],exclude:[]},onOffTarget:'block-until-undo'},
-        'exam:guided':{selectable:{include:[{set:'classificationTargets'}],exclude:[]},onOffTarget:'ignore'},
-        'exam:strict-sequence':{selectable:{include:[{set:'everyToken'}],exclude:[]},onOffTarget:'terminate-item'}
-      }},
-      assessment:{targets:{set:'classificationTargets'},checks:[
-        {id:'token-classification',action:'CLASSIFY_TOKEN',targets:{set:'classificationTargets'},cardinality:'per-target',answerResolver:'contextual-category',weight:1}
-      ]},
-      response:{mode:'classify',categories:['valid-identifier','invalid-identifier','reserved-word','operator','literal','separator']}
-    }
-  },
-  {
-    meta:{id:'token-program-chain',name:'Chained Statement Tokens',
-      description:'Classify tokens by position across connected declarations and assignments.'},
-    scoring:{itemCount:5,pointsPerItem:12},
-    activity:{
-      kind:'token-classification',
-      generator:{capability:'statement-generator',pattern:'statement-chain',statementKinds:['declaration','assignment'],identifierGeneration:{
-        templates:['modifier-measurement','entity-measurement','entity-technical'],
-        styles:['camel-case','snake-case','constant-case','pascal-case','underscore-prefix','digit-suffix','dollar-prefix','case-mutated-reserved'],
-        invalidStrategies:['leading-digit','illegal-character','embedded-space','punctuation','reserved-as-identifier'],
-        weights:{
-          templates:{'modifier-measurement':3,'entity-measurement':3,'entity-technical':2},
-          styles:{'camel-case':3,'snake-case':2,'constant-case':2,'pascal-case':1,'underscore-prefix':1,'digit-suffix':2,'dollar-prefix':1,'case-mutated-reserved':1},
-          invalidStrategies:{'leading-digit':3,'illegal-character':3,'embedded-space':2,punctuation:2,'reserved-as-identifier':2}
-        },
-        length:{min:3,max:32},
-        uniqueness:{scope:'profile-session',reuse:'avoid-until-exhausted'}
-      }},
-      instructions:'Work through each statement and classify every token according to its syntax position.',
-      sets:{
-        classificationTargets:{match:{positions:['modifier','type','declaration-name','assignment-target','assignment-source','operator','literal','separator']}},
-        everyToken:{include:[{source:'all'}]}
-      },
-      interaction:{policies:{
-        'practice:guided':{selectable:{include:[{set:'classificationTargets'}],exclude:[]},onOffTarget:'ignore'},
-        'practice:strict-sequence':{selectable:{include:[{set:'everyToken'}],exclude:[]},onOffTarget:'block-until-undo'},
-        'exam:guided':{selectable:{include:[{set:'classificationTargets'}],exclude:[]},onOffTarget:'ignore'},
-        'exam:strict-sequence':{selectable:{include:[{set:'everyToken'}],exclude:[]},onOffTarget:'terminate-item'}
-      }},
-      assessment:{targets:{set:'classificationTargets'},checks:[
-        {id:'token-classification',action:'CLASSIFY_TOKEN',targets:{set:'classificationTargets'},cardinality:'per-target',answerResolver:'contextual-category',weight:1}
-      ]},
-      response:{mode:'classify',categories:['valid-identifier','invalid-identifier','reserved-word','operator','literal','separator']}
-    }
-  },
+  /*
   {
     meta:{id:'falling-identifier-sort',name:'Falling Identifier Sort',
       description:'Sort standalone names as valid identifiers, invalid identifiers, or reserved words.'},
-    scoring:{itemCount:5,pointsPerItem:3},
+    scoring:{itemCount:1,pointsPerItem:15},
     activity:{
       kind:'falling-token-sort',
       instructions:'Send the current token to the bucket that correctly classifies it.',
@@ -464,18 +361,7 @@ const PROFILES_RAW = [
         {id:'reserved',category:'reserved-word',region:'left',order:3},
       ],
       dropArea:{visibleTokens:1},
-      generator:{capability:'analyzed-token-generation',identifierGeneration:{
-        templates:['modifier-measurement','entity-measurement','entity-technical'],
-        styles:['camel-case','snake-case','constant-case','pascal-case','underscore-prefix','digit-suffix','dollar-prefix','case-mutated-reserved'],
-        invalidStrategies:['leading-digit','illegal-character','embedded-space','punctuation','reserved-as-identifier'],
-        weights:{
-          templates:{'modifier-measurement':3,'entity-measurement':3,'entity-technical':2},
-          styles:{'camel-case':3,'snake-case':2,'constant-case':2,'pascal-case':1,'underscore-prefix':1,'digit-suffix':2,'dollar-prefix':1,'case-mutated-reserved':1},
-          invalidStrategies:{'leading-digit':3,'illegal-character':3,'embedded-space':2,punctuation:2,'reserved-as-identifier':2}
-        },
-        length:{min:3,max:32},
-        uniqueness:{scope:'profile-session',reuse:'avoid-until-exhausted'}
-      },policies:{
+      generator:{capability:'canonical-token-pools',policies:{
         practice:{counts:{
           'valid-identifier':{min:3,max:5},
           'invalid-identifier':{min:3,max:5},
@@ -495,6 +381,7 @@ const PROFILES_RAW = [
       feedback:{practice:'immediate-return',exam:'deferred-until-submit'},
     },
   },
+  */
 ];
 
 const FINALIZED_PROFILES = PROFILES_RAW.map(finalizeProfile);

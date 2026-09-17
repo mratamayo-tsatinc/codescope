@@ -7,6 +7,7 @@ function tcValidateProfile(profile){
   if(!activity||!activity.generator||!activity.sets||!activity.interaction||!activity.assessment||!activity.response)
     throw new Error(`${profile.id}: incomplete token activity configuration`);
   if(!TC_GENERATORS[activity.generator.capability])throw new Error(`${profile.id}: unknown generator capability '${activity.generator.capability}'`);
+  tcValidateIdentifierGeneration(profile,activity.generator.identifierGeneration,'activity.generator.identifierGeneration');
   const categories=activity.response.categories;
   if(!Array.isArray(categories)||!categories.length)throw new Error(`${profile.id}: response categories are required`);
   categories.forEach(category=>{if(!TC_CATEGORY_DEFS[category])throw new Error(`${profile.id}: unknown category '${category}'`);});
@@ -35,4 +36,3 @@ const tokenClassificationPlugin=registerActivityPlugin({
       return {action:'CLASSIFY_TOKEN',tokenId:id,category,position:token.position,reason:tcReason(token,category,item.language)};});
   }
 });
-registerActivityProfiles(tokenClassificationPlugin.id,[TC_PROFILE_IDENTIFIER_POSITION,TC_PROFILE_DECLARATION_TOKENS,TC_PROFILE_CHAINED_TOKENS]);

@@ -1,13 +1,5 @@
 function ftsTokenReason(token,language){
-  const rules=tcLanguage(language);
-  if(token.category==='reserved-word')return `“${token.text}” is reserved by ${rules.label}.`;
-  if(token.category==='valid-identifier')return `“${token.text}” follows ${rules.label} identifier rules.`;
-  if(token.category==='operator')return `“${token.text}” is an operator.`;
-  if(token.category==='literal')return `“${token.text}” is a literal value.`;
-  if(token.category==='separator')return `“${token.text}” is a separator.`;
-  if(/^\d/.test(token.text))return 'An identifier cannot begin with a digit.';
-  if(/\s/.test(token.text))return 'An identifier cannot contain spaces.';
-  return `“${token.text}” does not follow ${rules.label} identifier rules.`;
+  return tcReason(token,token.lexicalCategory||token.category,language);
 }
 
 function ftsCategoryGuide(category,language){
@@ -21,12 +13,63 @@ function ftsCategoryGuide(category,language){
   return `${label}: ${descriptions[category]}.`;
 }
 
+function ftsIdentifierLesson(language){
+  const rules=tcLanguage(language),java=rules.id==='java';
+  return {
+    rules:[
+      java?'Begin with a letter, underscore (_), or dollar sign ($).':'Begin with a letter or underscore (_).',
+      java?'Continue with letters, digits, underscores, or dollar signs.':'Continue with letters, digits, or underscores.',
+      'Do not use spaces, hyphens, punctuation, or other unsupported symbols.',
+      'Names are case-sensitive and cannot be an exact reserved word.'
+    ],
+    styles:[
+      {label:'camelCase',example:'studentScore'},
+      {label:'snake_case',example:'student_score'},
+      {label:'UPPER_SNAKE_CASE',example:'MAX_SCORE'},
+      {label:'digit suffix',example:'score2'}
+    ],
+    languageNote:java
+      ?'Java permits $ in a name, although ordinary application code usually avoids it.'
+      :'C does not permit $ in an identifier in this activity.',
+    reservedWords:[...rules.reserved]
+  };
+}
+
 function ftsBuildConsoleContent(item,profile){
-  const rules=tcLanguage(item.language),root=h('div',{class:'fts-console-guide'});
-  root.appendChild(h('h3',{},`TOKEN GUIDE — ${rules.label.toUpperCase()}`));
-  root.appendChild(h('p',{},'Classify the current token by selecting one of the available buckets.'));
-  root.appendChild(h('ul',{},...profile.activity.buckets.slice().sort((a,b)=>a.order-b.order)
+  const rules=tcLanguage(item.language),lesson=ftsIdentifierLesson(item.language),root=h('div',{class:'fts-console-guide'});
+  const categories=new Set(profile.activity.buckets.map(bucket=>bucket.category));
+  const hasIdentifierBuckets=['valid-identifier','invalid-identifier'].some(category=>categories.has(category));
+  root.appendChild(h('h3',{},`${rules.label.toUpperCase()} IDENTIFIER GUIDE`));
+  root.appendChild(h('p',{class:'fts-guide-intro'},'Read the current token, then choose the bucket that matches its form.'));
+
+  if(hasIdentifierBuckets){
+    const ruleSection=h('section',{class:'fts-guide-section'});
+    ruleSection.appendChild(h('h4',{},'Valid identifier rules'));
+    ruleSection.appendChild(h('ul',{class:'fts-guide-rules'},...lesson.rules.map(rule=>h('li',{},rule))));
+    ruleSection.appendChild(h('p',{class:'fts-guide-note'},lesson.languageNote));
+    root.appendChild(ruleSection);
+
+    const styleSection=h('section',{class:'fts-guide-section'});
+    styleSection.appendChild(h('h4',{},'Common readable styles'));
+    styleSection.appendChild(h('div',{class:'fts-style-list'},...lesson.styles.map(style=>
+      h('div',{class:'fts-style-row'},h('span',{},style.label),h('code',{},style.example)))));
+    root.appendChild(styleSection);
+  }
+
+  const bucketSection=h('section',{class:'fts-guide-section'});
+  bucketSection.appendChild(h('h4',{},'Choose by category'));
+  bucketSection.appendChild(h('ul',{class:'fts-guide-categories'},...profile.activity.buckets.slice().sort((a,b)=>a.order-b.order)
     .map(bucket=>h('li',{},ftsCategoryGuide(bucket.category,item.language)))));
+  root.appendChild(bucketSection);
+
+  if(categories.has('reserved-word')){
+    const reserved=h('details',{class:'fts-reserved-list'});
+    reserved.appendChild(h('summary',{},`Actual ${rules.label} reserved words (${lesson.reservedWords.length})`));
+    reserved.appendChild(h('p',{class:'fts-reserved-note'},
+      'An exact match belongs in Reserved Word. Capitalization changes the token because names are case-sensitive.'));
+    reserved.appendChild(h('div',{class:'fts-reserved-grid'},...lesson.reservedWords.map(word=>h('code',{},word))));
+    root.appendChild(reserved);
+  }
   return root;
 }
 

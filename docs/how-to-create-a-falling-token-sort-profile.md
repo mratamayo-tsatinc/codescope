@@ -39,7 +39,53 @@ configuration used to compose activities.
       visibleTokens: 1,
     },
     generator: {
-      capability: 'canonical-token-pools',
+      capability: 'analyzed-token-generation',
+      identifierGeneration: {
+        templates: [
+          'modifier-measurement',
+          'entity-measurement',
+          'entity-technical',
+        ],
+        styles: [
+          'camel-case',
+          'snake-case',
+          'constant-case',
+          'pascal-case',
+          'underscore-prefix',
+          'digit-suffix',
+          'dollar-prefix',
+          'case-mutated-reserved',
+        ],
+        invalidStrategies: [
+          'leading-digit',
+          'illegal-character',
+          'embedded-space',
+          'punctuation',
+          'reserved-as-identifier',
+        ],
+        weights: {
+          templates: {
+            'modifier-measurement': 3,
+            'entity-measurement': 3,
+            'entity-technical': 2,
+          },
+          styles: {
+            'camel-case': 3,
+            'snake-case': 2,
+            'constant-case': 2,
+          },
+          invalidStrategies: {
+            'leading-digit': 3,
+            'illegal-character': 3,
+            'embedded-space': 2,
+          },
+        },
+        length: { min: 3, max: 32 },
+        uniqueness: {
+          scope: 'profile-session',
+          reuse: 'avoid-until-exhausted',
+        },
+      },
       policies: {
         practice: {
           counts: {
@@ -98,7 +144,7 @@ Every bucket needs four fields:
 | `region` | `top`, `left`, `right`, or `bottom`. |
 | `order` | Numeric order among buckets occupying the same region. |
 
-The current canonical pool supports:
+The current canonical categories support:
 
 | Category | Typical tokens |
 |---|---|
@@ -111,6 +157,14 @@ The current canonical pool supports:
 
 Only configured categories appear in an activity. The app does not add an
 identifier, operator, literal, or separator bucket automatically.
+
+Valid and invalid identifiers are procedurally proposed from the selected
+templates and styles, then independently accepted or rejected by the active
+C/Java analyzer. Reserved words come from the language's canonical reserved
+set. The generator's intended strategy is never treated as an answer key.
+
+See `docs/identifier-generation.md` for vocabulary roles, styles, invalid
+strategies, uniqueness, and the generator/analyzer/feedback boundary.
 
 This example places three buckets along the left and two along the bottom:
 

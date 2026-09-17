@@ -8,7 +8,7 @@ function ftsValidateCountRule(profile,category,rule,path){
 function ftsValidateProfile(profile){
   const activity=profile.activity;
   if(!activity||!Array.isArray(activity.buckets)||!activity.buckets.length)throw new Error(`${profile.id}: buckets are required`);
-  if(!activity.generator||activity.generator.capability!=='canonical-token-pools')
+  if(!activity.generator||!['analyzed-token-generation','canonical-token-pools'].includes(activity.generator.capability))
     throw new Error(`${profile.id}: unknown generator capability '${activity.generator&&activity.generator.capability}'`);
   if(!activity.dropArea||!Number.isInteger(activity.dropArea.visibleTokens)||activity.dropArea.visibleTokens<1)
     throw new Error(`${profile.id}: dropArea.visibleTokens must be a positive integer`);
@@ -20,9 +20,10 @@ function ftsValidateProfile(profile){
     if(categories.has(bucket.category))throw new Error(`${profile.id}: duplicate category bucket '${bucket.category}'`);categories.add(bucket.category);
     if(!['left','right','top','bottom'].includes(bucket.region))throw new Error(`${profile.id}: invalid bucket region '${bucket.region}'`);
     if(!Number.isFinite(bucket.order))throw new Error(`${profile.id}: bucket order is required`);
-    if(!ftsCanonicalPool(bucket.category,'java').length||!ftsCanonicalPool(bucket.category,'c').length)
-      throw new Error(`${profile.id}: category '${bucket.category}' has no canonical language pool`);
+    if(!ftsIdentifierCategory(bucket.category)&&!ftsStaticPool(bucket.category).length)
+      throw new Error(`${profile.id}: category '${bucket.category}' has no canonical token source`);
   });
+  tcValidateIdentifierGeneration(profile,activity.generator.identifierGeneration,'activity.generator.identifierGeneration');
   const policies=activity.generator&&activity.generator.policies;
   if(!policies||!policies.practice||!policies.exam)throw new Error(`${profile.id}: Practice and Exam generator policies are required`);
   Object.entries(policies).forEach(([mode,policy])=>{

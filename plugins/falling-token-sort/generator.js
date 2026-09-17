@@ -23,15 +23,10 @@ function ftsResolveCount(rule){
   return ftsRandomInt(rule.min,rule.max);
 }
 
-// The token-classification dependency remains the source of language rules
-// and identifier/keyword examples. Other canonical categories are exposed so
-// future profiles can compose them without changing this generator.
-function ftsCanonicalPool(category,language){
-  const rules=tcLanguage(language);
+// Non-identifier categories remain finite canonical vocabularies. Identifier
+// text is proposed procedurally and accepted only after canonical analysis.
+function ftsStaticPool(category){
   const pools={
-    'valid-identifier':rules.validNames,
-    'invalid-identifier':rules.invalidNames,
-    'reserved-word':rules.reservedNames,
     operator:['=','+=','-=','*=','/=','%=','==','&&','||'],
     literal:['0','7','42','3.14',"'A'",'true','false'],
     separator:[';',',','(',')','{','}']
@@ -39,9 +34,43 @@ function ftsCanonicalPool(category,language){
   return (pools[category]||[]).slice();
 }
 
-function ftsGenerateCategoryTokens(category,count,language){
-  const pool=ftsShuffle(ftsCanonicalPool(category,language));
-  if(!pool.length)throw new Error(`No canonical token pool for '${category}'`);
+function ftsIdentifierCategory(category){return ['valid-identifier','invalid-identifier','reserved-word'].includes(category);}
+
+function ftsGenerateIdentifierTokens(category,count,language,configuration,generationContext,itemUsed){
+  const resolved=tcIdentifierGenerationConfig(configuration,tcLanguage(language));
+  const used=tcGenerationUsedSet(generationContext,resolved.uniqueness.scope,itemUsed),tokens=[];
+  for(let index=0;index<count;index++){
+    let accepted=null;
+    for(let attempt=0;attempt<resolved.maxAttempts;attempt++){
+      const candidate=tcProposeIdentifierCandidate({language,intent:category,configuration});
+      const analysis=tcAnalyzeIdentifierText(candidate.text,language,{role:'word',position:'standalone'});
+      if(analysis.lexicalCategory!==category||!tcIdentifierLengthAllowed(candidate.text,resolved)||used.has(candidate.text))continue;
+      used.add(candidate.text);accepted={candidate,analysis};break;
+    }
+    if(!accepted&&resolved.uniqueness.reuse==='avoid-until-exhausted'){
+      for(let attempt=0;attempt<resolved.maxAttempts;attempt++){
+        const candidate=tcProposeIdentifierCandidate({language,intent:category,configuration});
+        const analysis=tcAnalyzeIdentifierText(candidate.text,language,{role:'word',position:'standalone'});
+        if(analysis.lexicalCategory!==category||!tcIdentifierLengthAllowed(candidate.text,resolved))continue;
+        used.add(candidate.text);accepted={candidate,analysis};break;
+      }
+    }
+    if(!accepted)throw new Error(`Unable to generate a unique ${category} for ${language} after ${resolved.maxAttempts} attempts`);
+    tokens.push(Object.assign({
+      id:`fts-token-${++ftsTokenSequence}`,
+      text:accepted.candidate.text,
+      category:accepted.analysis.lexicalCategory,
+      language,
+      role:'word',position:'standalone',generation:accepted.candidate
+    },accepted.analysis));
+  }
+  return tokens;
+}
+
+function ftsGenerateCategoryTokens(category,count,language,configuration,generationContext,itemUsed){
+  if(ftsIdentifierCategory(category))return ftsGenerateIdentifierTokens(category,count,language,configuration,generationContext,itemUsed);
+  const pool=ftsShuffle(ftsStaticPool(category));
+  if(!pool.length)throw new Error(`No canonical token source for '${category}'`);
   const tokens=[];
   for(let index=0;index<count;index++){
     tokens.push({
@@ -54,15 +83,15 @@ function ftsGenerateCategoryTokens(category,count,language){
   return tokens;
 }
 
-function ftsGenerateItem({profile,index,language}){
+function ftsGenerateItem({profile,index,language,generationContext}){
   const languageSnapshot=language==='c'?'c':'java';
   const modeSnapshot=state.mode==='exam'?'exam':'practice';
   const policy=ftsGenerationPolicy(profile,modeSnapshot);
-  const tokens=[],counts={};
+  const tokens=[],counts={},itemUsed=new Set(),identifierGeneration=profile.activity.generator.identifierGeneration||{};
   profile.activity.buckets.forEach(bucket=>{
     const count=ftsResolveCount(policy.counts[bucket.category]);
     counts[bucket.category]=count;
-    tokens.push(...ftsGenerateCategoryTokens(bucket.category,count,languageSnapshot));
+    tokens.push(...ftsGenerateCategoryTokens(bucket.category,count,languageSnapshot,identifierGeneration,generationContext||{},itemUsed));
   });
   const orderedTokens=policy.shuffle===false?tokens:ftsShuffle(tokens);
   return {
