@@ -26,6 +26,109 @@ const FTS_TRANSFER_COLORS=Object.freeze({
   operator:'#76aee8',literal:'#b5c48b',separator:'#9aa7bb'
 });
 
+const ftsDropStateByItem=new WeakMap();
+let ftsStageResizeObserver=null;
+let ftsNextDropTimer=null;
+
+function ftsResetLandingAnimation(item){ftsDropStateByItem.delete(item);}
+
+function ftsDropHash(value){
+  let hash=2166136261;
+  for(const character of String(value)){hash=Math.imul(hash^character.charCodeAt(0),16777619);}
+  return hash>>>0;
+}
+
+function ftsMotionEnabled(){
+  return (typeof flyAnimEnabled==='undefined'||flyAnimEnabled)
+    &&!(typeof window!=='undefined'&&typeof window.matchMedia==='function'
+      &&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+function ftsDropPlan(item,visible,now,motion){
+  let entries=ftsDropStateByItem.get(item);
+  if(!entries){entries=new Map();ftsDropStateByItem.set(item,entries);}
+  let nextStart=now;
+  visible.forEach((token,index)=>{
+    let entry=entries.get(token.id);
+    if(!entry){
+      const hash=ftsDropHash(`${item.itemNumber||0}:${token.id}:${token.text}`);
+      const duration=3200+(hash%1500)+Math.max(0,(typeof flightDurationMs==='number'?flightDurationMs:1000)-1000)*.5;
+      entry={startAt:motion?nextStart:now,duration,position:(hash%1000)/1000};
+      entries.set(token.id,entry);
+    }else if(!motion&&entry.startAt>now)entry.startAt=now;
+    if(motion)nextStart=Math.max(nextStart,entry.startAt+entry.duration+260);
+  });
+  return entries;
+}
+
+function ftsStageHeightFromBounds(appBottom,middleTop,scrollTop,followingHeight,paddingBottom,minimum){
+  return Math.max(minimum,Math.floor(appBottom-(middleTop+scrollTop)-followingHeight-paddingBottom));
+}
+
+function ftsFitStageToApp(middle,stage){
+  const app=stage.closest('#app');
+  if(ftsStageResizeObserver){ftsStageResizeObserver.disconnect();ftsStageResizeObserver=null;}
+  if(!app)return;
+  const fit=()=>{
+    if(!middle.isConnected)return;
+    const appBottom=app.getBoundingClientRect().bottom;
+    const middleRect=middle.getBoundingClientRect();
+    const followingHeight=app.lastElementChild.getBoundingClientRect().bottom-middleRect.bottom;
+    const paddingBottom=parseFloat(getComputedStyle(app).paddingBottom)||0;
+    const mobile=typeof window!=='undefined'&&typeof window.matchMedia==='function'
+      &&window.matchMedia('(max-width: 680px)').matches;
+    const height=ftsStageHeightFromBounds(appBottom,middleRect.top,app.scrollTop,
+      followingHeight,paddingBottom,mobile?380:340);
+    middle.style.setProperty('--fts-stage-height',`${height}px`);
+    ftsLayoutTokenPile(stage);
+  };
+  fit();
+  if(typeof ResizeObserver==='function'){
+    ftsStageResizeObserver=new ResizeObserver(fit);
+    ftsStageResizeObserver.observe(app);
+  }
+}
+
+function ftsLayoutTokenPile(stage){
+  const lane=stage.querySelector('.fts-token-lane');
+  if(!lane)return;
+  const tokens=[...lane.querySelectorAll('.fts-current-token')];
+  const placed=[];
+  const width=lane.clientWidth;
+  tokens.forEach(element=>{
+    const tokenWidth=element.offsetWidth,tokenHeight=element.offsetHeight;
+    const usable=Math.max(0,width-tokenWidth-24);
+    const left=12+Math.round(usable*Number(element.dataset.position));
+    let bottom=22;
+    placed.forEach(previous=>{
+      if(left<previous.left+previous.width+8&&left+tokenWidth+8>previous.left)
+        bottom=Math.max(bottom,previous.bottom+previous.height+8);
+    });
+    element.style.left=`${left}px`;
+    element.style.bottom=`${bottom}px`;
+    placed.push({left,width:tokenWidth,bottom,height:tokenHeight});
+    if(element.classList.contains('fts-token-dropping')){
+      const elapsed=Math.min(Date.now()-Number(element.dataset.startAt),Number(element.dataset.duration));
+      element.style.setProperty('--fts-drop-duration',`${element.dataset.duration}ms`);
+      element.style.setProperty('--fts-drop-delay',`${-Math.max(0,elapsed)}ms`);
+      element.style.setProperty('--fts-drop-distance',`${Math.round(lane.clientHeight-bottom)}px`);
+    }
+  });
+}
+
+function ftsScheduleNextDrop(item,profile){
+  if(ftsNextDropTimer!==null){clearTimeout(ftsNextDropTimer);ftsNextDropTimer=null;}
+  if(!ftsMotionEnabled())return;
+  const entries=ftsDropStateByItem.get(item),now=Date.now();
+  const next=ftsVisibleTokens(item,profile).map(token=>entries.get(token.id)?.startAt)
+    .filter(startAt=>startAt>now).sort((a,b)=>a-b)[0];
+  if(next===undefined)return;
+  ftsNextDropTimer=setTimeout(()=>{
+    ftsNextDropTimer=null;
+    if(currentItem()===item)render();
+  },Math.max(1,next-now));
+}
+
 function ftsChooseBucket(bucketId,bucketElement){
   const item=currentItem();
   if(!item||item.checked||item._transferInProgress)return;
@@ -82,22 +185,29 @@ function ftsRenderBucketRegion(item,profile,name,buckets){
 function ftsRenderTokenLane(item,profile){
   const visible=ftsVisibleTokens(item,profile),single=profile.activity.dropArea.visibleTokens===1;
   const completed=!visible.length;
+  const now=Date.now(),motion=ftsMotionEnabled(),entries=ftsDropPlan(item,visible,now,motion);
   const lane=h('section',{class:'fts-token-lane','aria-label':'Token sorting area'});
   lane.appendChild(h('div',{class:'fts-token-lane-label'},completed?'Item ready to check':single?'Current token':'Select a token'));
   const live=h('div',{class:'fts-token-live','aria-live':'polite','aria-atomic':'true'});
   if(visible.length){
-    const choices=h('div',{class:`fts-token-choices${single?'':' fts-token-choices-multiple'}`});
+    const choices=h('div',{class:'fts-token-choices'});
     visible.forEach(token=>{
-      if(single)choices.appendChild(h('code',{class:'fts-current-token',tabindex:'0','data-token-id':token.id},token.text));
+      const entry=entries.get(token.id);
+      if(motion&&entry.startAt>now)return;
+      const dropping=motion&&now<entry.startAt+entry.duration;
+      const attributes={'data-token-id':token.id,'data-position':String(entry.position),
+        'data-start-at':String(entry.startAt),'data-duration':String(entry.duration)};
+      if(single)choices.appendChild(h('code',{class:`fts-current-token${dropping?' fts-token-dropping':''}`,
+        tabindex:'0',...attributes},token.text));
       else choices.appendChild(h('button',{
-        class:`fts-current-token fts-token-choice${item.selectedTokenId===token.id?' fts-token-selected':''}`,
-        type:'button','data-token-id':token.id,'aria-pressed':item.selectedTokenId===token.id?'true':'false',
+        class:`fts-current-token fts-token-choice${item.selectedTokenId===token.id?' fts-token-selected':''}${dropping?' fts-token-dropping':''}`,
+        type:'button',...attributes,'aria-pressed':item.selectedTokenId===token.id?'true':'false',
         'aria-label':`Select token ${token.text}`,disabled:item._transferInProgress||item.checked,
         onclick:()=>ftsSelectToken(token.id)
       },h('code',{},token.text)));
     });
-    live.appendChild(choices);
     live.appendChild(h('span',{class:'fts-token-position'},`${item.cursor} of ${item.tokens.length} tokens placed`));
+    live.appendChild(choices);
   }else{
     live.appendChild(h('div',{class:'fts-placement-complete'},h('i',{class:'fa-solid fa-circle-check','aria-hidden':'true'}),
       h('span',{},`All ${item.tokens.length} tokens placed`)));
@@ -150,6 +260,8 @@ function ftsRender({container,item,profile}){
     container.appendChild(h('div',{class:'action-bar'},h('div',{class:'btn-group'},
       h('button',{class:'btn',onclick:handleRetrySameItem},h('i',{class:'fa-solid fa-rotate-right'}),' Try again'))));
   }
+  ftsFitStageToApp(middle,stage);
+  ftsScheduleNextDrop(item,profile);
   ftsSyncDrawers(item,profile);
   if(item._arrivedBucketId)item._arrivedBucketId=null;
   if(item._focusBucketsAfterRender&&typeof requestAnimationFrame==='function'){

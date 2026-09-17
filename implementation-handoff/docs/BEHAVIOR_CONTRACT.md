@@ -130,6 +130,10 @@ Canonical classification is contextual, not merely lexical.
   category.
 - The count badge reports tokens already placed into each bucket.
 - The transfer uses the shared curved trailing-line visual language.
+- Newly visible tokens enter one at a time from varied horizontal positions,
+  fall slowly, and bounce on landing. Unsorted tokens pile where their landing
+  positions overlap. A falling token can be selected and sorted before landing;
+  scoring does not wait for the animation.
 - The Console drawer presents neutral C/Java identifier guidance and the actual
   reserved-word catalog without revealing the current token's answer.
 

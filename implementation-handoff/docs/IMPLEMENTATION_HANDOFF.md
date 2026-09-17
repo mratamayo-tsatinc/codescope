@@ -68,7 +68,9 @@ Last consolidated: 2026-09-17
 ## Deliberate limitations and deferred work
 
 - Falling Token Sort supports profile-configured visible token counts and
-  selection of any visible token before choosing a bucket.
+  selection of any arrived token before choosing a bucket. Tokens enter the
+  fitted drop area one at a time and remain selectable during their slow fall;
+  they bounce and stack at varied landing positions when motion is enabled.
 - Current statement plugins are not yet moved into plugin directories.
 - C and Java identifier analysis intentionally follows the app's documented
   supported character patterns; advanced Unicode and implementation-reserved

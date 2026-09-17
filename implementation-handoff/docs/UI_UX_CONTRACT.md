@@ -85,6 +85,11 @@ New activities must look like members of the existing application.
 - Transfers in both directions use the selected duration.
 - Curved comet/trailing-line transfers should be reused by compatible plugin
   interactions rather than inventing a separate flight animation.
+- Falling Token Sort uses the available vertical space for its token area.
+  Tokens drop one at a time at varied horizontal positions, bounce, and stack
+  when their landing positions overlap. Each token keeps its seeded text on one
+  line at its natural width and remains selectable while falling. Animation Off
+  and reduced motion show the tokens at rest.
 
 ## Actions and lifecycle
 
@@ -113,4 +118,3 @@ New activities must look like members of the existing application.
 Every UI change must be checked at desktop width and at approximately 390 px
 mobile width. Verify readable text, reachable actions, wrapping, modal fit,
 drawer scrolling, and absence of page-level horizontal overflow.
-

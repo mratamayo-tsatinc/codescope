@@ -69,6 +69,13 @@ coverage, then run the full suite.
 - [ ] Bucket counts increase after accepted placements.
 - [ ] With multiple visible tokens, selecting and sorting out of order refills
       the visible area; Undo restores the selected token and its place in it.
+- [ ] Tokens enter one at a time at varied positions, fall slowly, bounce and
+      stack on overlap; a falling token remains selectable and sortable.
+- [ ] Seeded token text stays on one line at content width. Selecting a token
+      does not restart its fall; Animation Off and reduced motion show the
+      visible tokens at rest.
+- [ ] On a desktop viewport, the drop area, landed tokens, and buckets remain
+      above the fixed item pager; resizing and scrolling keep the stage usable.
 - [ ] A one-token profile still accepts direct bucket selection.
 - [ ] Wrong Practice placement follows the configured return policy.
 - [ ] Console guidance switches between C and Java.

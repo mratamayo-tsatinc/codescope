@@ -86,6 +86,7 @@ function ftsClearAttempt(item){
   item.nextAttemptNumber=1;item.lastResult=null;item.showSolution=false;item.selectedTokenId=null;
   Object.keys(item.bucketCounts).forEach(bucketId=>{item.bucketCounts[bucketId]=0;});
   item.examActionLog=[];
+  if(typeof ftsResetLandingAnimation==='function')ftsResetLandingAnimation(item);
 }
 
 function ftsReset({item}){

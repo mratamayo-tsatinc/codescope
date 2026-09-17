@@ -219,6 +219,13 @@ that area. A single visible token retains the original direct bucket workflow.
 Selection is included in saved Exam progress, while scoring still applies only
 to each token's bucket attempts.
 
+Newly visible tokens enter one at a time from varied horizontal positions,
+fall slowly, and bounce at the bottom. Tokens whose landing positions overlap
+stack. A token is selectable and sortable while falling; its seeded text stays
+on one line at its natural width. Sorting does not wait for landing. Selecting
+an already visible token does not replay its fall. After Try again, the sequence
+starts over. Animation Off and reduced motion show all visible tokens at rest.
+
 ## Configure scoring
 
 ```js

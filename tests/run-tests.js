@@ -1350,7 +1350,20 @@ function testFallingTokenSortMultiple(){
       placements:[],attempts:[],scoreResults:[],history:[],nextAttemptNumber:1,
       bucketCounts:{valid:0,invalid:0,reserved:0},lastResult:null,examActionLog:[],checked:false});
     const item=makeItem(),initial=ftsVisibleTokens(item,profile).map(token=>token.id);
+    const fittedHeight=ftsStageHeightFromBounds(873,315,0,16,24,340);
+    const fittedAfterScroll=ftsStageHeightFromBounds(873,-85,400,16,24,340);
+    const compactMinimum=ftsStageHeightFromBounds(500,315,0,16,24,340);
+    const scheduled=ftsDropPlan(makeItem(),tokens.slice(0,3),1000,true);
+    const sequential=scheduled.get('t2').startAt>scheduled.get('t1').startAt+scheduled.get('t1').duration
+      &&scheduled.get('t3').startAt>scheduled.get('t2').startAt+scheduled.get('t2').duration;
+    const variedPositions=new Set([...scheduled.values()].map(entry=>entry.position)).size>1;
+    const slowEnough=[...scheduled.values()].every(entry=>entry.duration>=3200);
     const before=ftsRenderTokenLane(item,profile);
+    const firstDrops=countNodesWithClass(before,'fts-token-dropping');
+    const selectionRerenderDrops=countNodesWithClass(ftsRenderTokenLane(item,profile),'fts-token-dropping');
+    flyAnimEnabled=false;
+    const motionOffCount=countNodesWithClass(ftsRenderTokenLane(makeItem(),profile),'fts-token-choice');
+    flyAnimEnabled=true;
     const needsSelection=!ftsApplyAction({item,profile,action:{type:'SORT_TOKEN',bucketId:'valid'},state}).applied;
     const hiddenRejected=!ftsApplyAction({item,profile,action:{type:'SELECT_TOKEN',tokenId:'t4'},state}).applied;
     const selected=ftsApplyAction({item,profile,action:{type:'SELECT_TOKEN',tokenId:'t3'},state});
@@ -1358,6 +1371,7 @@ function testFallingTokenSortMultiple(){
     const mismatchRejected=!ftsApplyAction({item,profile,action:{type:'SORT_TOKEN',tokenId:'t2',bucketId:'reserved'},state}).applied;
     const outOfOrder=ftsApplyAction({item,profile,action:{type:'SORT_TOKEN',tokenId:'t3',bucketId:'reserved'},state});
     const after=ftsVisibleTokens(item,profile).map(token=>token.id);
+    const refillQueued=ftsDropPlan(item,ftsVisibleTokens(item,profile),Date.now(),true).get('t4').startAt>Date.now();
     const progress=ftsProgressSteps(item).map(step=>step.status);
     const undo=ftsUndo({item}),restored=ftsVisibleTokens(item,profile).map(token=>token.id);
     ftsApplyAction({item,profile,action:{type:'SELECT_TOKEN',tokenId:'t2'},state});
@@ -1383,11 +1397,15 @@ function testFallingTokenSortMultiple(){
     const retry=ftsRetry({item:complete});
     ftsApplyAction({item:complete,profile,action:{type:'SELECT_TOKEN',tokenId:'t1'},state});
     const resetSelection=ftsReset({item:complete});
+    const resetDrops=countNodesWithClass(ftsRenderTokenLane(complete,profile),'fts-token-dropping');
     state.mode='exam';const exam=makeItem();
     ftsApplyAction({item:exam,profile,action:{type:'SELECT_TOKEN',tokenId:'t2'},state});
     const examWrong=ftsApplyAction({item:exam,profile,action:{type:'SORT_TOKEN',bucketId:'valid'},state});
     const examRestored=JSON.parse(JSON.stringify(exam));
-    return JSON.stringify({initial,invalidRejected,choiceCount:countNodesWithClass(before,'fts-token-choice'),needsSelection,
+    return JSON.stringify({initial,invalidRejected,fittedHeight,fittedAfterScroll,compactMinimum,
+      sequential,variedPositions,slowEnough,
+      choiceCount:countNodesWithClass(before,'fts-token-choice'),
+      firstDrops,selectionRerenderDrops,motionOffCount,refillQueued,resetDrops,needsSelection,
       hiddenRejected,selected:selected.applied,bucketEnabled:!('disabled' in selectedBucket.attributes),
       mismatchRejected,outOfOrder:outOfOrder.applied,after,progress,undo:undo.applied,restored,
       wrongAccepted:wrong.accepted,returned,corrected:corrected.accepted,firstScore,remaining,
@@ -1398,7 +1416,10 @@ function testFallingTokenSortMultiple(){
       examVisible:ftsVisibleTokens(examRestored,profile).map(token=>token.id)});
   })()`));
   assert.deepStrictEqual(result,{
-    initial:['t1','t2','t3'],invalidRejected:true,choiceCount:3,needsSelection:true,hiddenRejected:true,
+    initial:['t1','t2','t3'],invalidRejected:true,fittedHeight:518,fittedAfterScroll:518,compactMinimum:340,
+    sequential:true,variedPositions:true,slowEnough:true,choiceCount:1,
+    firstDrops:1,selectionRerenderDrops:1,motionOffCount:3,refillQueued:true,resetDrops:1,
+    needsSelection:true,hiddenRejected:true,
     selected:true,bucketEnabled:true,mismatchRejected:true,outOfOrder:true,
     after:['t1','t2','t4'],progress:['current','waiting','complete','waiting'],
     undo:true,restored:['t1','t2','t3'],wrongAccepted:false,returned:true,
