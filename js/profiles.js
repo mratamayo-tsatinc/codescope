@@ -457,13 +457,13 @@ const PROFILES_RAW = [
     scoring:{itemCount:5,pointsPerItem:3},
     activity:{
       kind:'falling-token-sort',
-      instructions:'Send the current token to the bucket that correctly classifies it.',
+      instructions:'Select a token, then send it to the bucket that correctly classifies it.',
       buckets:[
         {id:'valid',category:'valid-identifier',region:'left',order:1},
         {id:'invalid',category:'invalid-identifier',region:'left',order:2},
         {id:'reserved',category:'reserved-word',region:'left',order:3},
       ],
-      dropArea:{visibleTokens:1},
+      dropArea:{visibleTokens:3},
       generator:{capability:'analyzed-token-generation',identifierGeneration:{
         templates:['modifier-measurement','entity-measurement','entity-technical'],
         styles:['camel-case','snake-case','constant-case','pascal-case','underscore-prefix','digit-suffix','dollar-prefix','case-mutated-reserved'],

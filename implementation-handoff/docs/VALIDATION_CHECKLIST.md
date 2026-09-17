@@ -67,6 +67,9 @@ coverage, then run the full suite.
 - [ ] A fresh Practice session changes the permutation.
 - [ ] An Exam refresh restores the exact token order and placements.
 - [ ] Bucket counts increase after accepted placements.
+- [ ] With multiple visible tokens, selecting and sorting out of order refills
+      the visible area; Undo restores the selected token and its place in it.
+- [ ] A one-token profile still accepts direct bucket selection.
 - [ ] Wrong Practice placement follows the configured return policy.
 - [ ] Console guidance switches between C and Java.
 - [ ] The reserved-word list exactly matches the active analyzer catalog.
@@ -90,4 +93,3 @@ Every completed implementation should state:
 - manual checks performed;
 - known limitation or deferred follow-up;
 - whether any contract document changed and why.
-

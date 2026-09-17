@@ -121,7 +121,9 @@ Canonical classification is contextual, not merely lexical.
 
 - Buckets, categories, regions, order, counts, mode policies, and scoring are
   profile configuration rather than plugin-name conditions.
-- The current profile shows one token at a time and uses clickable buckets.
+- The current profile shows three tokens at a time. Students select a visible
+  token, then choose a bucket; a newly available token appears after placement.
+- Profiles configured with one visible token retain direct bucket selection.
 - Current buckets are Valid Identifier, Invalid Identifier, and Reserved Word,
   all in the left region.
 - Practice generates 3–5 tokens per category. Exam generates exactly 5 per
@@ -139,4 +141,3 @@ Canonical classification is contextual, not merely lexical.
 - Exam never exposes this toggle.
 - Activity feedback must be readable on desktop and mobile and must wrap rather
   than create horizontal overflow.
-

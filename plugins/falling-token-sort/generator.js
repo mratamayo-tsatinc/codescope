@@ -103,6 +103,7 @@ function ftsGenerateItem({profile,index,language,generationContext}){
     generatedCounts:counts,
     tokens:orderedTokens,
     cursor:0,
+    selectedTokenId:null,
     placements:[],
     attempts:[],
     scoreResults:[],

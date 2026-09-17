@@ -9,7 +9,7 @@ Last consolidated: 2026-09-17
   CodeScope replacement.
 - Runtime: static vanilla HTML/CSS/classic JavaScript.
 - Profile count: 34, all in `js/profiles.js`.
-- Activity plugins: `token-classification` 1.1.0 and `falling-token-sort` 1.6.0.
+- Activity plugins: `token-classification` 1.1.0 and `falling-token-sort` 1.7.0.
 - Statement plugins: legacy expression, declaration, assignment, unary update.
 - Persistence: browser localStorage; no backend database.
 - Full test command: `node tests/run-tests.js`.
@@ -67,8 +67,8 @@ Last consolidated: 2026-09-17
 
 ## Deliberate limitations and deferred work
 
-- Falling Token Sort currently validates `dropArea.visibleTokens === 1`.
-  Multi-token selection was designed conceptually but is not implemented.
+- Falling Token Sort supports profile-configured visible token counts and
+  selection of any visible token before choosing a bucket.
 - Current statement plugins are not yet moved into plugin directories.
 - C and Java identifier analysis intentionally follows the app's documented
   supported character patterns; advanced Unicode and implementation-reserved

@@ -1,4 +1,17 @@
-function ftsCurrentToken(item){return item&&item.tokens[item.cursor]||null;}
+function ftsRemainingTokens(item){
+  if(!item)return [];
+  const placed=new Set(item.placements.map(placement=>placement.tokenId));
+  return item.tokens.filter(token=>!placed.has(token.id));
+}
+function ftsVisibleTokens(item,profile){
+  return ftsRemainingTokens(item).slice(0,profile.activity.dropArea.visibleTokens);
+}
+function ftsCurrentToken(item,profile){
+  if(!item||!profile)return null;
+  const visible=ftsVisibleTokens(item,profile);
+  return visible.find(token=>token.id===item.selectedTokenId)
+    ||(profile.activity.dropArea.visibleTokens===1?visible[0]:null);
+}
 function ftsBucketById(profile,bucketId){return profile.activity.buckets.find(bucket=>bucket.id===bucketId)||null;}
 function ftsScoreResult(item,tokenId){return item.scoreResults.find(result=>result.tokenId===tokenId)||null;}
 function ftsAttemptById(item,attemptId){return item.attempts.find(attempt=>attempt.id===attemptId)||null;}
@@ -18,9 +31,18 @@ function ftsRecordScoredAttempt(item,profile,attempt){
 }
 
 function ftsApplyAction({item,profile,action,state}){
-  if(!item||item.checked||!action||action.type!=='SORT_TOKEN')return {applied:false};
-  const token=ftsCurrentToken(item),bucket=ftsBucketById(profile,action.bucketId);
+  if(!item||item.checked||!action)return {applied:false};
+  if(action.type==='SELECT_TOKEN'){
+    if(profile.activity.dropArea.visibleTokens===1)return {applied:false};
+    const token=ftsVisibleTokens(item,profile).find(candidate=>candidate.id===action.tokenId);
+    if(!token)return {applied:false,reason:'invalid-target'};
+    item.selectedTokenId=token.id;item.lastResult=null;
+    return {applied:true,token};
+  }
+  if(action.type!=='SORT_TOKEN')return {applied:false};
+  const token=ftsCurrentToken(item,profile),bucket=ftsBucketById(profile,action.bucketId);
   if(!token||!bucket)return {applied:false,reason:'invalid-target'};
+  if(action.tokenId&&action.tokenId!==token.id)return {applied:false,reason:'invalid-target'};
   const wasCorrect=bucket.category===token.category;
   const attempt={
     id:`fts-attempt-${item.nextAttemptNumber++}`,
@@ -36,6 +58,7 @@ function ftsApplyAction({item,profile,action,state}){
     item.placements.push({attemptId:attempt.id,tokenId:token.id,bucketId:bucket.id,category:bucket.category});
     item.bucketCounts[bucket.id]=(item.bucketCounts[bucket.id]||0)+1;
     item.cursor++;
+    item.selectedTokenId=null;
   }
   if(state.mode==='exam')item.examActionLog.push({type:'sort-token',attemptId:attempt.id,tokenId:token.id,
     bucketId:bucket.id,wasCorrect,timestamp:attempt.timestamp});
@@ -49,6 +72,7 @@ function ftsUndo({item}){
     item.cursor=Math.max(0,item.cursor-1);
     item.placements=item.placements.filter(placement=>placement.attemptId!==last.attemptId);
     item.bucketCounts[last.bucketId]=Math.max(0,(item.bucketCounts[last.bucketId]||0)-1);
+    item.selectedTokenId=last.tokenId;
   }
   item.attempts=item.attempts.filter(candidate=>candidate.id!==last.attemptId);
   item.scoreResults=item.scoreResults.filter(result=>result.id!==last.attemptId);
@@ -59,14 +83,14 @@ function ftsUndo({item}){
 
 function ftsClearAttempt(item){
   item.cursor=0;item.placements=[];item.attempts=[];item.scoreResults=[];item.history=[];
-  item.nextAttemptNumber=1;item.lastResult=null;item.showSolution=false;
+  item.nextAttemptNumber=1;item.lastResult=null;item.showSolution=false;item.selectedTokenId=null;
   Object.keys(item.bucketCounts).forEach(bucketId=>{item.bucketCounts[bucketId]=0;});
   item.examActionLog=[];
 }
 
 function ftsReset({item}){
   if(!item||item.checked)return {applied:false};
-  const changed=!!(item.cursor||item.attempts.length||item.history.length);
+  const changed=!!(item.cursor||item.selectedTokenId||item.attempts.length||item.history.length);
   ftsClearAttempt(item);return {applied:changed};
 }
 

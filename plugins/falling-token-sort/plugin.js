@@ -12,7 +12,6 @@ function ftsValidateProfile(profile){
     throw new Error(`${profile.id}: unknown generator capability '${activity.generator&&activity.generator.capability}'`);
   if(!activity.dropArea||!Number.isInteger(activity.dropArea.visibleTokens)||activity.dropArea.visibleTokens<1)
     throw new Error(`${profile.id}: dropArea.visibleTokens must be a positive integer`);
-  if(activity.dropArea.visibleTokens!==1)throw new Error(`${profile.id}: version 1 supports one visible token; multi-token selection is reserved for a later capability`);
   const ids=new Set(),categories=new Set();
   activity.buckets.forEach(bucket=>{
     if(!bucket.id||ids.has(bucket.id))throw new Error(`${profile.id}: bucket ids must be unique`);ids.add(bucket.id);

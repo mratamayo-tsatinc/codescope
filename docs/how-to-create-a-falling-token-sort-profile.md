@@ -1,7 +1,7 @@
 # How to Create a Falling Token Sort Profile
 
-Falling Token Sort presents one token at a time and asks the student to send it
-to one of the configured category buckets. The token follows the shared curved
+Falling Token Sort presents a configurable number of tokens and asks the student
+to send each one to a configured category bucket. The token follows the shared curved
 transfer animation into the selected bucket. Practice and Exam behavior, token
 counts, scoring, feedback, bucket positions, and category choices all come from
 the profile rather than from a profile-name check.
@@ -29,14 +29,14 @@ configuration used to compose activities.
   },
   activity: {
     kind: 'falling-token-sort',
-    instructions: 'Send the current token to the bucket that correctly classifies it.',
+    instructions: 'Select a token, then send it to the bucket that correctly classifies it.',
     buckets: [
       { id: 'valid', category: 'valid-identifier', region: 'left', order: 1 },
       { id: 'invalid', category: 'invalid-identifier', region: 'left', order: 2 },
       { id: 'reserved', category: 'reserved-word', region: 'left', order: 3 },
     ],
     dropArea: {
-      visibleTokens: 1,
+      visibleTokens: 3,
     },
     generator: {
       capability: 'analyzed-token-generation',
@@ -209,13 +209,15 @@ exam restores the original items together with student progress.
 ## Configure visible tokens
 
 ```js
-dropArea: { visibleTokens: 1 }
+dropArea: { visibleTokens: 3 }
 ```
 
-Version 1 supports exactly one visible token. The current token therefore needs
-no separate selection step: selecting a bucket classifies it immediately.
-Values greater than one are rejected during profile validation because the
-multi-token selection interaction has not been implemented yet.
+`visibleTokens` is a positive integer. With more than one visible token, the
+student selects a token before choosing a bucket. After a placement, the next
+unplaced token enters the visible area; tokens can be sorted in any order within
+that area. A single visible token retains the original direct bucket workflow.
+Selection is included in saved Exam progress, while scoring still applies only
+to each token's bucket attempts.
 
 ## Configure scoring
 
@@ -298,7 +300,7 @@ Before using a new profile, verify that:
 - Every bucket uses a supported `region` and numeric `order`.
 - Every bucket category has a count rule in both Practice and Exam policies.
 - Fixed counts are positive; ranged counts have `min <= max`.
-- `dropArea.visibleTokens` is `1` for the current plugin version.
+- `dropArea.visibleTokens` is a positive integer.
 - Response, assessment, and feedback values use the supported capability names.
 - No profile configuration was added inside the plugin directory.
 

@@ -77,7 +77,7 @@ function installFakeDom(ctx){
 function testScriptManifestParses(){
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   assert(html.includes('<title>CodeScope</title>'));
-  assert(html.includes('assets/codescope-icon.svg'));
+  assert(!html.includes('assets/codescope-icon.svg'));
   assert(!html.includes('<h1>Precedify</h1>'));
   const names = [...html.matchAll(/<script src="js\/([^"]+)"/g)].map(m=>m[1]);
   const bundle = names.map(name=>fs.readFileSync(path.join(ROOT, 'js', name), 'utf8')).join('\n');
@@ -101,7 +101,7 @@ function testScriptManifestParses(){
   assert(tokenRenderer.includes("?'checked-wrong':'checked-correct'"));
   assert(!tokenRenderer.includes('renderContextHelp(tcTokenInstruction(profile))'));
   assert(tokenStyles.includes('.tc-answer-wrong'));
-  assert(tokenStyles.includes('.token-classification-workspace .program-progress-visual{display:none}'));
+  assert(!tokenStyles.includes('.token-classification-workspace .program-progress-visual{display:none}'));
   assert(!tokenRenderer.includes("class:'tc-activity'"));
   assert(!tokenRenderer.includes("h('h2',{},profile.name"));
   assert(tokenFeedback.includes("class:'solution-toggle'"));
@@ -1195,6 +1195,7 @@ function testExamSettingsAndSubmissionPolicy(){
 function run(){
   testScriptManifestParses();
   testTokenClassificationPlugin();
+  testFallingTokenSortMultiple();
   testInlineEvaluationActions();
   testLegacyUnaryMutationCards();
   testInvalidExecutionAlertIsStatementScoped();
@@ -1224,12 +1225,11 @@ function testTokenClassificationPlugin(){
     'declaration-statement-plugin.js','assignment-statement-plugin.js','unary-update-statement-plugin.js','program-item-builder.js']);
   loadRelative(ctx,[
     'plugins/token-classification/manifest.js','plugins/token-classification/languages/c.js',
-    'plugins/token-classification/languages/java.js','plugins/token-classification/classifier.js',
+    'plugins/token-classification/languages/java.js','plugins/token-classification/identifier-generator.js',
+    'plugins/token-classification/classifier.js',
     'plugins/token-classification/generator.js','plugins/token-classification/actions.js',
     'plugins/token-classification/modal.js','plugins/token-classification/feedback.js',
-    'plugins/token-classification/renderer.js','plugins/token-classification/profiles/identifier-position.js',
-    'plugins/token-classification/profiles/declaration-tokens.js',
-    'plugins/token-classification/profiles/chained-statement-tokens.js','plugins/token-classification/plugin.js'
+    'plugins/token-classification/renderer.js','plugins/token-classification/plugin.js'
   ]);
   load(ctx,['state.js']);
   const result=JSON.parse(evaluate(ctx,`(()=>{
@@ -1246,11 +1246,11 @@ function testTokenClassificationPlugin(){
     const classifyResult=tcApplyAction({item:first,profile:identifierProfile,action:{type:'CLASSIFY_TOKEN',tokenId:firstTarget.id,category:'invalid-identifier'},state});
     const checked=tcCheck({item:first,profile:identifierProfile,state});
     const retried=tcRetry({item:first});
-    const preservedAfterRetry=tcResponseFor(first,firstTarget.id).category;
+    const preservedAfterRetry=tcResponseFor(first,firstTarget.id)?.category||null;
     const changed=tcApplyAction({item:first,profile:identifierProfile,action:{type:'CLASSIFY_TOKEN',tokenId:firstTarget.id,category:'valid-identifier'},state});
     const changedCategory=tcResponseFor(first,firstTarget.id).category;
     const changeUndo=tcUndo({item:first});
-    const restoredCategory=tcResponseFor(first,firstTarget.id).category;
+    const restoredCategory=tcResponseFor(first,firstTarget.id)?.category||null;
     tcApplyAction({item:first,profile:identifierProfile,action:{type:'CLASSIFY_TOKEN',tokenId:firstTarget.id,category:'invalid-identifier'},state});
     const rechecked=tcCheck({item:first,profile:identifierProfile,state});
     const complete=generateItemsForProfile('token-declaration-complete')[0];
@@ -1294,9 +1294,9 @@ function testTokenClassificationPlugin(){
   assert.strictEqual(result.firstLanguage,'java');assert.strictEqual(result.targetPosition,'declaration-name');
   assert.strictEqual(result.contextualIdentifier,'invalid-identifier');assert.strictEqual(result.lexicalIdentifier,'reserved-word');
   assert.strictEqual(result.selectApplied,true);assert.strictEqual(result.classifyApplied,true);
-  assert.strictEqual(result.retried,true);assert.strictEqual(result.preservedAfterRetry,'invalid-identifier');
+  assert.strictEqual(result.retried,true);assert.strictEqual(result.preservedAfterRetry,null);
   assert.strictEqual(result.changed,true);assert.strictEqual(result.changedCategory,'valid-identifier');
-  assert.strictEqual(result.changeUndo,true);assert.strictEqual(result.restoredCategory,'invalid-identifier');assert.strictEqual(result.rechecked,true);
+  assert.strictEqual(result.changeUndo,true);assert.strictEqual(result.restoredCategory,null);assert.strictEqual(result.rechecked,true);
   assert.strictEqual(result.firstChecked,true);assert.strictEqual(result.firstCorrect,true);assert.strictEqual(result.firstPoints,3);
   assert.strictEqual(result.firstChecks,2);assert.strictEqual(result.bonus,1);
   assert(result.completeTargets>=5);assert.strictEqual(result.completeHasSeparatorTarget,true);assert.strictEqual(result.separatorCategory,'separator');
@@ -1307,6 +1307,107 @@ function testTokenClassificationPlugin(){
   assert.strictEqual(result.blocked,true);assert.strictEqual(result.undoApplied,true);assert.strictEqual(result.blockCleared,true);
   assert.strictEqual(result.terminal,true);assert.strictEqual(result.terminalChecked,true);assert.strictEqual(result.terminalPoints,1);
   assert.strictEqual(result.excludedSeparator,true);
+}
+
+function testFallingTokenSortMultiple(){
+  const ctx=context();
+  installFakeDom(ctx);
+  load(ctx,['dom-helpers.js']);
+  loadRelative(ctx,['plugins/falling-token-sort/manifest.js','plugins/falling-token-sort/generator.js',
+    'plugins/falling-token-sort/actions.js','plugins/falling-token-sort/feedback.js',
+    'plugins/falling-token-sort/renderer.js']);
+  ctx.roundPoints=value=>Math.round(value*100)/100;
+  ctx.state={mode:'practice',examSubmitted:false};
+  ctx.tcValidateIdentifierGeneration=()=>{};
+  ctx.registerActivityPlugin=plugin=>plugin;
+  ctx.TC_CATEGORY_DEFS={
+    'valid-identifier':{label:'Valid Identifier',tone:'valid',icon:'fa-check'},
+    'invalid-identifier':{label:'Invalid Identifier',tone:'invalid',icon:'fa-xmark'},
+    'reserved-word':{label:'Reserved Word',tone:'reserved',icon:'fa-lock'}
+  };
+  loadRelative(ctx,['plugins/falling-token-sort/plugin.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const profile={id:'multi-test',pointsPerItem:3,activity:{dropArea:{visibleTokens:3},buckets:[
+      {id:'valid',category:'valid-identifier',region:'left',order:1},
+      {id:'invalid',category:'invalid-identifier',region:'left',order:2},
+      {id:'reserved',category:'reserved-word',region:'left',order:3}
+    ],generator:{capability:'analyzed-token-generation',identifierGeneration:{},policies:{
+      practice:{counts:{'valid-identifier':1,'invalid-identifier':1,'reserved-word':1}},
+      exam:{counts:{'valid-identifier':1,'invalid-identifier':1,'reserved-word':1}}
+    }},assessment:{action:'SORT_TOKEN',cardinality:'per-token',scoreAttempt:'first',completion:'all-tokens-placed'},response:{policies:{
+      practice:{incorrectPlacement:'return-token'},exam:{incorrectPlacement:'accept'}
+    }},feedback:{practice:'immediate-return',exam:'deferred-until-submit'}}};
+    ftsValidateProfile(profile);
+    const invalidProfile=JSON.parse(JSON.stringify(profile));invalidProfile.activity.dropArea.visibleTokens=0;
+    let invalidRejected=false;try{ftsValidateProfile(invalidProfile)}catch(error){invalidRejected=true}
+    const tokens=[
+      {id:'t1',text:'alpha',category:'valid-identifier'},
+      {id:'t2',text:'2bad',category:'invalid-identifier'},
+      {id:'t3',text:'class',category:'reserved-word'},
+      {id:'t4',text:'beta',category:'valid-identifier'}
+    ];
+    const makeItem=()=>({tokens:JSON.parse(JSON.stringify(tokens)),cursor:0,selectedTokenId:null,
+      placements:[],attempts:[],scoreResults:[],history:[],nextAttemptNumber:1,
+      bucketCounts:{valid:0,invalid:0,reserved:0},lastResult:null,examActionLog:[],checked:false});
+    const item=makeItem(),initial=ftsVisibleTokens(item,profile).map(token=>token.id);
+    const before=ftsRenderTokenLane(item,profile);
+    const needsSelection=!ftsApplyAction({item,profile,action:{type:'SORT_TOKEN',bucketId:'valid'},state}).applied;
+    const hiddenRejected=!ftsApplyAction({item,profile,action:{type:'SELECT_TOKEN',tokenId:'t4'},state}).applied;
+    const selected=ftsApplyAction({item,profile,action:{type:'SELECT_TOKEN',tokenId:'t3'},state});
+    const selectedBucket=ftsRenderBucket(item,profile,profile.activity.buckets[0]);
+    const mismatchRejected=!ftsApplyAction({item,profile,action:{type:'SORT_TOKEN',tokenId:'t2',bucketId:'reserved'},state}).applied;
+    const outOfOrder=ftsApplyAction({item,profile,action:{type:'SORT_TOKEN',tokenId:'t3',bucketId:'reserved'},state});
+    const after=ftsVisibleTokens(item,profile).map(token=>token.id);
+    const progress=ftsProgressSteps(item).map(step=>step.status);
+    const undo=ftsUndo({item}),restored=ftsVisibleTokens(item,profile).map(token=>token.id);
+    ftsApplyAction({item,profile,action:{type:'SELECT_TOKEN',tokenId:'t2'},state});
+    const wrong=ftsApplyAction({item,profile,action:{type:'SORT_TOKEN',bucketId:'valid'},state});
+    const returned=item.cursor===0&&item.selectedTokenId==='t2'&&item.bucketCounts.valid===0;
+    const corrected=ftsApplyAction({item,profile,action:{type:'SORT_TOKEN',bucketId:'invalid'},state});
+    const firstScore=ftsScoreResult(item,'t2').wasCorrect;
+    const remaining=ftsRemainingTokens(item).map(token=>token.id);
+    const checkIncomplete=ftsCheck({item,profile,state}).reason;
+    const saved=JSON.parse(JSON.stringify(item));
+    const resumed=ftsVisibleTokens(saved,profile).map(token=>token.id);
+    const single=JSON.parse(JSON.stringify(profile));single.activity.dropArea.visibleTokens=1;
+    const singleItem=makeItem();
+    const singleApplied=ftsApplyAction({item:singleItem,profile:single,action:{type:'SORT_TOKEN',bucketId:'valid'},state}).applied;
+    const complete=makeItem();
+    for(const token of complete.tokens){
+      ftsApplyAction({item:complete,profile,action:{type:'SELECT_TOKEN',tokenId:token.id},state});
+      const bucket=profile.activity.buckets.find(candidate=>candidate.category===token.category);
+      ftsApplyAction({item:complete,profile,action:{type:'SORT_TOKEN',bucketId:bucket.id},state});
+    }
+    const checked=ftsCheck({item:complete,profile,state});
+    const completedScore=complete.points,completedSteps=complete.correctSteps;
+    const retry=ftsRetry({item:complete});
+    ftsApplyAction({item:complete,profile,action:{type:'SELECT_TOKEN',tokenId:'t1'},state});
+    const resetSelection=ftsReset({item:complete});
+    state.mode='exam';const exam=makeItem();
+    ftsApplyAction({item:exam,profile,action:{type:'SELECT_TOKEN',tokenId:'t2'},state});
+    const examWrong=ftsApplyAction({item:exam,profile,action:{type:'SORT_TOKEN',bucketId:'valid'},state});
+    const examRestored=JSON.parse(JSON.stringify(exam));
+    return JSON.stringify({initial,invalidRejected,choiceCount:countNodesWithClass(before,'fts-token-choice'),needsSelection,
+      hiddenRejected,selected:selected.applied,bucketEnabled:!('disabled' in selectedBucket.attributes),
+      mismatchRejected,outOfOrder:outOfOrder.applied,after,progress,undo:undo.applied,restored,
+      wrongAccepted:wrong.accepted,returned,corrected:corrected.accepted,firstScore,remaining,
+      checkIncomplete,resumed,singleApplied,examAccepted:examWrong.accepted,
+      checked:checked.applied,completedScore,completedSteps,retry:retry.applied,
+      resetSelection:resetSelection.applied,selectionCleared:complete.selectedTokenId===null,
+      examCursor:examRestored.cursor,examPlaced:examRestored.placements[0].tokenId,
+      examVisible:ftsVisibleTokens(examRestored,profile).map(token=>token.id)});
+  })()`));
+  assert.deepStrictEqual(result,{
+    initial:['t1','t2','t3'],invalidRejected:true,choiceCount:3,needsSelection:true,hiddenRejected:true,
+    selected:true,bucketEnabled:true,mismatchRejected:true,outOfOrder:true,
+    after:['t1','t2','t4'],progress:['current','waiting','complete','waiting'],
+    undo:true,restored:['t1','t2','t3'],wrongAccepted:false,returned:true,
+    corrected:true,firstScore:false,remaining:['t1','t3','t4'],checkIncomplete:'incomplete',
+    resumed:['t1','t3','t4'],singleApplied:true,examAccepted:true,
+    checked:true,completedScore:3,completedSteps:4,retry:true,resetSelection:true,selectionCleared:true,
+    examCursor:1,
+    examPlaced:'t2',examVisible:['t1','t3','t4']
+  });
 }
 
 function testManualResponseProfilesAndPropagation(){

@@ -40,7 +40,9 @@ function ftsBuildConsoleContent(item,profile){
   const categories=new Set(profile.activity.buckets.map(bucket=>bucket.category));
   const hasIdentifierBuckets=['valid-identifier','invalid-identifier'].some(category=>categories.has(category));
   root.appendChild(h('h3',{},`${rules.label.toUpperCase()} IDENTIFIER GUIDE`));
-  root.appendChild(h('p',{class:'fts-guide-intro'},'Read the current token, then choose the bucket that matches its form.'));
+  root.appendChild(h('p',{class:'fts-guide-intro'},profile.activity.dropArea.visibleTokens===1
+    ?'Read the current token, then choose the bucket that matches its form.'
+    :'Select a visible token, then choose the bucket that matches its form.'));
 
   if(hasIdentifierBuckets){
     const ruleSection=h('section',{class:'fts-guide-section'});
