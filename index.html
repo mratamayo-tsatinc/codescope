@@ -204,7 +204,7 @@
 <div id="scoreSummaryModal" class="modal" style="display: none;" role="dialog" aria-labelledby="scoreSummaryTitle">
   <div class="modal-content">
     <div class="modal-header">
-      <h2 id="scoreSummaryTitle">Score Summary</h2>
+      <h2 id="scoreSummaryTitle">Overall Score Summary</h2>
       <button class="modal-close" onclick="closeScoreSummaryModal()" aria-label="Close score summary">
         <i class="fa-solid fa-xmark"></i>
       </button>
@@ -217,7 +217,7 @@
       </div>
       <div class="score-summary-total">
         <div id="scoreSummaryTotal" class="sst-value">0 / 0</div>
-        <div class="sst-label">Total score across all profiles</div>
+        <div id="scoreSummaryScopeLabel" class="sst-label">Total score across all profiles</div>
       </div>
             <div class="qr-share-section">
         <div id="scoreQrCodeBox" class="qr-code-box" aria-label="QR code linking to a shareable results page"></div>
@@ -320,8 +320,8 @@
       </button>
       
       <div class="sidebar-header">
-        <div class="sidebar-title">Profiles</div>
-        <div class="sidebar-subtitle">Select an exercise profile</div>
+        <div class="sidebar-title">Categories</div>
+        <div class="sidebar-subtitle">Expand a category to select a profile</div>
       </div>
 
       <ul id="profileList" class="profile-list" role="list">
@@ -358,7 +358,7 @@
               <i class="fa-solid fa-table-cells"></i> <span id="varFloatToggleText">Vars</span>
             </button>
             <button id="scoreSummaryBtn" class="score-summary-btn" onclick="openScoreSummaryModal()" title="View score summary">
-              <i class="fa-solid fa-chart-simple"></i> Scores
+              <i class="fa-solid fa-chart-simple"></i> Overall Scores
             </button>
             <button id="submitExamBtn" class="submit-exam-btn" onclick="submitExam(false)" title="Submit and lock the examination" style="display:none;">
               <i class="fa-solid fa-paper-plane"></i> Submit exam

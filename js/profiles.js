@@ -507,7 +507,53 @@ const PROFILES_RAW = [
   },
 ];
 
+// Categories are authored here alongside the profiles. A profile belongs to
+// exactly one category; removing a category or profile ID is validated at load.
+const PROFILE_CATEGORIES = [
+  {id:'expressions',name:'Expressions',profileIds:[
+    'direct-ltr','mult-precedence','same-precedence-assoc','full-basic-precedence','modulus',
+    'parens-override','parens-override-multi','parens-override-dual','variables-arithmetic',
+    'mixed-variables-literals','variables-constants','literals-variables-constants',
+    'mixed-mastery','unary-only','unary-mix','relational-simple','relational-variables',
+    'relational-boolean-mix'
+  ]},
+  {id:'program-statements',name:'Program Statements',profileIds:[
+    'declaration-chain','assignment-basic','assignment-add-sub','assignment-multiply',
+    'assignment-div-mod','assignment-rhs-expression','assignment-sequential',
+    'assignment-dependent','assignment-advanced-chain','unary-update-sequence',
+    'assignment-unary-advanced-chain','relational-logical-student-derived'
+  ]},
+  // The three Token Classification profiles are currently dormant in
+  // PROFILES_RAW; keep their membership for deployments that enable them.
+  {id:'identifier-activities',name:'Identifier Activities',profileIds:[
+    'token-identifier-position','token-declaration-complete','token-program-chain',
+    'falling-identifier-sort'
+  ]},
+  {id:'c-program-output',name:'C Program Output',profileIds:['c-simulate-output']}
+];
+
 const FINALIZED_PROFILES = PROFILES_RAW.map(finalizeProfile);
+const categoryByProfileId = new Map();
+PROFILE_CATEGORIES.forEach(category=>{
+  if(!category.id||!category.name||!Array.isArray(category.profileIds)) throw new Error('Invalid profile category');
+  category.profileIds.forEach(id=>{
+    if(categoryByProfileId.has(id)) throw new Error(`Profile '${id}' belongs to multiple categories`);
+    categoryByProfileId.set(id,category.id);
+  });
+});
+FINALIZED_PROFILES.forEach(profile=>{
+  const categoryId=categoryByProfileId.get(profile.id);
+  if(!categoryId) throw new Error(`Profile '${profile.id}' has no category`);
+  profile.categoryId=categoryId;
+});
+categoryByProfileId.forEach((categoryId,id)=>{
+  if(!FINALIZED_PROFILES.some(profile=>profile.id===id)
+    &&!['token-identifier-position','token-declaration-complete','token-program-chain'].includes(id))
+    throw new Error(`Category '${categoryId}' references unknown profile '${id}'`);
+});
+function profilesForCategory(categoryId){
+  return PROFILES.filter(profile=>profile.categoryId===categoryId);
+}
 const PROFILES = FINALIZED_PROFILES.filter(profile=>!profile.activity);
 const ACTIVITY_PROFILES = FINALIZED_PROFILES.filter(profile=>profile.activity);
 validateProfiles(FINALIZED_PROFILES);

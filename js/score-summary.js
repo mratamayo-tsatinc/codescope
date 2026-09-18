@@ -17,9 +17,9 @@
 // so `max` always reflects every profile's full point budget even for a
 // profile the student hasn't opened yet; `earned` only counts points from
 // items that have actually been checked.
-function computeGrandTotalScore(){
+function computeScoreForProfiles(profiles){
   let earned = 0, max = 0;
-  PROFILES.forEach(p=>{
+  profiles.forEach(p=>{
     const items = state.itemsByProfile[p.id];
     if(!items || items.length===0) return;
     // pointsPerItem is per-profile now (generator.js's PROFILES) — each
@@ -36,9 +36,17 @@ function computeGrandTotalScore(){
   // so the noise can't re-accumulate across the outer sum.
   return {earned: roundPoints(earned), max};
 }
+function computeGrandTotalScore(){ return computeScoreForProfiles(PROFILES); }
+function computeCategoryScore(categoryId){
+  if(!PROFILE_CATEGORIES.some(category=>category.id===categoryId)) return null;
+  return computeScoreForProfiles(profilesForCategory(categoryId));
+}
 
-function openScoreSummaryModal(){
+let scoreSummaryCategoryId = null;
+
+function openScoreSummaryModal(categoryId){
   if(!examResultsVisible()) return;
+  scoreSummaryCategoryId=PROFILE_CATEGORIES.some(category=>category.id===categoryId)?categoryId:null;
   // .modal is centered via CSS display:flex + align-items/justify-content —
   // setting display:'block' here would silently defeat that centering and
   // drop the modal into the page's normal top-left flow instead.
@@ -61,7 +69,8 @@ let scoreSummaryDownloadInProgress = false;
 function scoreSummaryPngFilename(now){
   const pad=value=>String(value).padStart(2,'0');
   const stamp=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-  return `${DEFAULT_APP_SETTINGS.shell.scoreSummary.filenamePrefix}-${stamp}.png`;
+  const scope=scoreSummaryCategoryId||'overall';
+  return `${DEFAULT_APP_SETTINGS.shell.scoreSummary.filenamePrefix}-${scope}-${stamp}.png`;
 }
 
 function scoreSummaryCanvasBlob(canvas){
@@ -132,9 +141,14 @@ function toggleScoreSummaryDetails(){
 }
 
 function renderScoreSummaryContent(){
+  const category=PROFILE_CATEGORIES.find(entry=>entry.id===scoreSummaryCategoryId);
+  const title=document.getElementById('scoreSummaryTitle');
+  if(title) title.textContent=category?`${category.name} Score Summary`:'Overall Score Summary';
+  const scopeLabel=document.getElementById('scoreSummaryScopeLabel');
+  if(scopeLabel) scopeLabel.textContent=category?`Total score for ${category.name}`:'Total score across all profiles';
   const totalEl = document.getElementById('scoreSummaryTotal');
   if(totalEl){
-    const {earned, max} = computeGrandTotalScore();
+    const {earned, max} = category?computeCategoryScore(category.id):computeGrandTotalScore();
     totalEl.textContent = `${earned} / ${max}`;
   }
 
@@ -147,7 +161,7 @@ function renderScoreSummaryContent(){
   if(!scoreSummaryDetailsOpen) return;
 
   detailsEl.innerHTML = '';
-  PROFILES.forEach(p=>{
+  (category?profilesForCategory(category.id):PROFILES).forEach(p=>{
     const items = state.itemsByProfile[p.id];
     const row = document.createElement('div');
     row.className = 'score-summary-row';

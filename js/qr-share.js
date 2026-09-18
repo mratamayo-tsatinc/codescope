@@ -65,7 +65,7 @@ function getActivityName(){ return document.title; }
 // score/maxScore here are CodeScope's grand-total points across every
 // profile (see score-summary.js's computeGrandTotalScore), not a per-item
 // or per-profile figure.
-async function buildResultsShareUrl(score, maxScore){
+async function buildResultsShareUrl(score, maxScore, activityName){
   const payload = {
     e: state.userEmail,
     t: Math.floor(Date.now()/1000),
@@ -76,7 +76,7 @@ async function buildResultsShareUrl(score, maxScore){
   const url = new URL(QR_RESULTS_VIEWER_URL);
   url.searchParams.set('d', token);
   url.searchParams.set('a', getCleanSourceUrl());
-  url.searchParams.set('n', getActivityName());
+  url.searchParams.set('n', activityName||getActivityName());
   return url.toString();
 }
 
@@ -103,7 +103,10 @@ function renderQrInto(boxId, shareUrl, size){
 // the modal opens.
 async function renderScoreSummaryQr(){
   if(!state.userEmail) return;
-  const {earned, max} = computeGrandTotalScore();
-  const shareUrl = await buildResultsShareUrl(earned, max);
+  const category=PROFILE_CATEGORIES.find(entry=>entry.id===scoreSummaryCategoryId);
+  const {earned, max} = category?computeCategoryScore(category.id):computeGrandTotalScore();
+  const shareUrl = await buildResultsShareUrl(earned, max,
+    category?`${getActivityName()} — ${category.name}`:undefined);
+  if(scoreSummaryCategoryId!==(category?category.id:null)) return;
   renderQrInto('scoreQrCodeBox', shareUrl, 190);
 }

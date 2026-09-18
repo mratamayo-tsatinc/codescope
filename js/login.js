@@ -490,6 +490,7 @@ function expandDesktopSidebar() {
 }
 
 function selectProfile(profileId) {
+  if(!PROFILES.some(profile=>profile.id===profileId)) return;
   // Update active state in sidebar
   document.querySelectorAll('.profile-nav-btn').forEach(btn => {
     btn.classList.remove('active');
@@ -509,6 +510,7 @@ function selectProfile(profileId) {
 
   // Set profile ID
   state.profileId = profileId;
+  openCategoryIds.add(currentProfile().categoryId);
 
   // startSession() already ran exactly once at login and generated every
   // profile's items up front (see handleLogin) — a profile switch never
@@ -541,27 +543,84 @@ function computeProfileScore(profileId){
   return {earned, max};
 }
 
+const openCategoryIds = new Set();
 function populateProfileSidebar() {
   const profileList = document.getElementById('profileList');
   profileList.innerHTML = '';
-  
-  PROFILES.forEach(profile => {
-    const li = document.createElement('li');
-    const btn = document.createElement('button');
-    btn.className = 'profile-nav-btn' + (state.profileId === profile.id ? ' active' : '');
-    btn.setAttribute('data-profile-id', profile.id);
-    btn.onclick = () => selectProfile(profile.id);
+  if(openCategoryIds.size===0 && currentProfile()) openCategoryIds.add(currentProfile().categoryId);
 
-    const score = computeProfileScore(profile.id);
-    const pillHtml = score ? `<span class="profile-score-pill">${score.earned}/${score.max}</span>` : '';
-
-    btn.innerHTML = `
-      <span class="profile-nav-name">${profile.name}${pillHtml}</span>
-      <span class="profile-nav-desc">${profile.description}</span>
-    `;
-    
-    li.appendChild(btn);
-    profileList.appendChild(li);
+  PROFILE_CATEGORIES.forEach(category=>{
+    const profiles=profilesForCategory(category.id);
+    if(!profiles.length) return;
+    const li=document.createElement('li');
+    li.className='category-nav-item';
+    const heading=document.createElement('div');
+    heading.className='category-nav-heading';
+    const expand=document.createElement('button');
+    expand.type='button';
+    expand.className='category-expand-btn';
+    expand.setAttribute('aria-expanded',String(openCategoryIds.has(category.id)));
+    expand.setAttribute('aria-controls',`category-profiles-${category.id}`);
+    expand.setAttribute('aria-label',`${openCategoryIds.has(category.id)?'Collapse':'Expand'} ${category.name}`);
+    const chevron=document.createElement('i');
+    chevron.className=`fa-solid fa-chevron-${openCategoryIds.has(category.id)?'down':'right'}`;
+    chevron.setAttribute('aria-hidden','true');
+    expand.appendChild(chevron);
+    const name=document.createElement('span');
+    name.textContent=category.name;
+    expand.appendChild(name);
+    const categoryScore=examResultsVisible()?computeCategoryScore(category.id):null;
+    if(categoryScore){
+      const pill=document.createElement('span');
+      pill.className='profile-score-pill';
+      pill.textContent=`${categoryScore.earned}/${categoryScore.max}`;
+      expand.appendChild(pill);
+    }
+    heading.appendChild(expand);
+    if(examResultsVisible()){
+      const scoreLink=document.createElement('button');
+      scoreLink.type='button';
+      scoreLink.className='category-score-link';
+      scoreLink.textContent='Score / QR';
+      scoreLink.setAttribute('aria-label',`View ${category.name} score summary and QR code`);
+      scoreLink.onclick=()=>openScoreSummaryModal(category.id);
+      heading.appendChild(scoreLink);
+    }
+    const children=document.createElement('ul');
+    children.id=`category-profiles-${category.id}`;
+    children.className='category-profile-list';
+    children.hidden=!openCategoryIds.has(category.id);
+    expand.onclick=()=>{
+      if(openCategoryIds.has(category.id)) openCategoryIds.delete(category.id);
+      else openCategoryIds.add(category.id);
+      children.hidden=!openCategoryIds.has(category.id);
+      expand.setAttribute('aria-expanded',String(!children.hidden));
+      expand.setAttribute('aria-label',`${children.hidden?'Expand':'Collapse'} ${category.name}`);
+      chevron.className=`fa-solid fa-chevron-${children.hidden?'right':'down'}`;
+    };
+    profiles.forEach(profile=>{
+      const row=document.createElement('li');
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.className='profile-nav-btn'+(state.profileId===profile.id?' active':'');
+      btn.setAttribute('data-profile-id',profile.id);
+      btn.onclick=()=>selectProfile(profile.id);
+      const title=document.createElement('span');
+      title.className='profile-nav-name';
+      title.textContent=profile.name;
+      const score=computeProfileScore(profile.id);
+      if(score){
+        const pill=document.createElement('span');
+        pill.className='profile-score-pill';
+        pill.textContent=`${score.earned}/${score.max}`;
+        title.appendChild(pill);
+      }
+      const desc=document.createElement('span');
+      desc.className='profile-nav-desc';
+      desc.textContent=profile.description;
+      btn.appendChild(title);btn.appendChild(desc);row.appendChild(btn);children.appendChild(row);
+    });
+    li.appendChild(heading);li.appendChild(children);profileList.appendChild(li);
   });
 }
 

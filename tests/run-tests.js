@@ -1671,4 +1671,52 @@ function testManualResponseResolvedUnaryOperands(){
     incrementText:'x22',incrementCards:1,pendingText:'yfalse',pendingCards:1});
 }
 
+function testProfileCategoriesAndScopedScores(){
+  const ctx=context();
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js',
+    'program-ir.js','program-core.js','legacy-expression-plugin.js',
+    'declaration-statement-plugin.js','assignment-statement-plugin.js','program-item-builder.js',
+    'state.js','score-summary.js']);
+  installFakeDom(ctx);
+  const nodes=new Map();
+  ['profileList','scoreSummaryTitle','scoreSummaryScopeLabel','scoreSummaryTotal'].forEach(id=>nodes.set(id,new ctx.FakeNode('div')));
+  ctx.document.getElementById=id=>nodes.get(id)||null;
+  load(ctx,['login.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const assigned=PROFILES.every(profile=>PROFILE_CATEGORIES.some(category=>category.id===profile.categoryId));
+    const unique=PROFILES.every(profile=>PROFILE_CATEGORIES.filter(category=>category.profileIds.includes(profile.id)).length===1);
+    const expression=PROFILES.find(profile=>profile.id==='direct-ltr');
+    const falling=ACTIVITY_PROFILES.find(profile=>profile.id==='falling-identifier-sort');
+    PROFILES.push(falling);
+    PROFILES.push(ACTIVITY_PROFILES.find(profile=>profile.id==='c-simulate-output'));
+    state.itemsByProfile={
+      [expression.id]:[{checked:true,points:0.6,wasCorrectFinal:false}],
+      [falling.id]:[{checked:true,points:12,wasCorrectFinal:false}]
+    };
+    const expressionScore=computeCategoryScore('expressions');
+    const identifierScore=computeCategoryScore('identifier-activities');
+    const overall=computeGrandTotalScore();
+    scoreSummaryCategoryId='identifier-activities';
+    renderScoreSummaryContent();
+    const scopedModal=document.getElementById('scoreSummaryTitle').textContent==='Identifier Activities Score Summary'
+      &&document.getElementById('scoreSummaryTotal').textContent==='12 / 30';
+    const scopedFilename=scoreSummaryPngFilename(new Date(2026,0,2)).includes('-identifier-activities-');
+    scoreSummaryCategoryId=null;
+    renderScoreSummaryContent();
+    const overallModal=document.getElementById('scoreSummaryTitle').textContent==='Overall Score Summary'
+      &&document.getElementById('scoreSummaryTotal').textContent==='12.6 / 31';
+    populateProfileSidebar();
+    const categories=document.getElementById('profileList').children;
+    const grouped=categories.length===4 && categories.every(category=>category.children.length===2);
+    return JSON.stringify({assigned,unique,expressionScore,identifierScore,overall,
+      scopedModal,scopedFilename,overallModal,grouped});
+  })()`));
+  assert.deepStrictEqual(result,{
+    assigned:true,unique:true,expressionScore:{earned:0.6,max:1},
+    identifierScore:{earned:12,max:30},overall:{earned:12.6,max:31},
+    scopedModal:true,scopedFilename:true,overallModal:true,grouped:true
+  });
+}
+
+testProfileCategoriesAndScopedScores();
 run();

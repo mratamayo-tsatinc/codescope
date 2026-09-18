@@ -6,6 +6,13 @@ logic in it. Expression generation lives in `js/generator.js`; activity-specific
 generation lives in its matching `plugins/<plugin-id>/` directory. You never
 need to add profile configuration inside a plugin directory.
 
+After adding a profile, put its `meta.id` in exactly one category's
+`profileIds` array in `PROFILE_CATEGORIES`, also in `js/profiles.js`.
+Categories determine the expandable sidebar groups and the scope of each
+category's score summary and QR code. To create a new category, add an object
+with a stable `id`, visible `name`, and `profileIds` array. A profile without
+a category, or listed in two categories, fails validation at load time.
+
 This guide covers expression and statement-sequence profiles. Activity profiles
 use the same global catalog and the same `meta` and `scoring` conventions, but
 replace expression fields with an `activity` block:

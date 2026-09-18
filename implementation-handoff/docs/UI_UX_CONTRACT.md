@@ -112,6 +112,10 @@ New activities must look like members of the existing application.
 
 ## Score Summary
 
+- The profile sidebar groups profiles under expandable categories. Each
+  profile belongs to exactly one category configured in `js/profiles.js`.
+- Category score links open a score summary and QR code for that category's
+  profiles. The header opens the overall summary across all active profiles.
 - The visible score is mandatory in both the dialog and its downloaded image.
 - The PNG is a mirror of the capture element; export-specific styling must not
   hide or replace score text.
