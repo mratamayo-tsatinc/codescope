@@ -38,10 +38,16 @@ contract; it does not maintain a second answer list.
 
 ## Reference implementation
 
-`plugins/falling-token-sort/` and `plugins/token-classification/` are reference
+`plugins/falling-token-sort/`, `plugins/token-classification/`, and
+`plugins/simulate-output/` are reference
 directory boundaries for activity plugins. Their profiles are declared
 globally in `js/profiles.js`; their plugin directories contain only the
 behavior and presentation needed to execute those configurations.
+
+Simulate Output owns a static C exercise bank with answer metadata, a synchronous
+catalog for seeded item selection, answer comparison, and its response UI. It
+uses the shell's login, navigation, Practice/Exam policy, persistence, scoring
+summary, and drawers. See `docs/how-to-create-a-simulate-output-profile.md`.
 
 The four existing statement plugins in `js/` are intentionally unchanged.
 Their migration will be handled by a separate refactoring plan.

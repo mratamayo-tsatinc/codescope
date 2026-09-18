@@ -495,6 +495,16 @@ const PROFILES_RAW = [
       feedback:{practice:'immediate-return',exam:'deferred-until-submit'},
     },
   },
+  {
+    meta:{id:'c-simulate-output',name:'C Program Output',
+      description:'Read C programs, predict their printed output, and give final variable values.'},
+    scoring:{itemCount:19,pointsPerItem:10},
+    activity:{
+      kind:'simulate-output',language:'c',
+      instructions:'Read the C source, then predict its console output and final variable values. Check when ready.',
+      generator:{bank:'it3-midterm-a',shuffle:true}
+    }
+  },
 ];
 
 const FINALIZED_PROFILES = PROFILES_RAW.map(finalizeProfile);

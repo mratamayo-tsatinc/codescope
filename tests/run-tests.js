@@ -93,6 +93,13 @@ function testScriptManifestParses(){
   new vm.Script(localScripts.map(name=>fs.readFileSync(path.join(ROOT,name),'utf8')).join('\n'),{filename:'complete-local-script-order.js'});
   assert(localScripts.includes('js/activity-core.js'));
   assert(localScripts.includes('plugins/token-classification/plugin.js'));
+  assert(html.includes('plugins/simulate-output/styles.css'));
+  assert(localScripts.indexOf('plugins/simulate-output/catalog.js')
+    <localScripts.indexOf('plugins/simulate-output/generator.js'));
+  assert(localScripts.indexOf('plugins/simulate-output/generator.js')
+    <localScripts.indexOf('plugins/simulate-output/plugin.js'));
+  assert(localScripts.indexOf('plugins/simulate-output/plugin.js')
+    <localScripts.indexOf('js/state.js'));
   const tokenRenderer=fs.readFileSync(path.join(ROOT,'plugins','token-classification','renderer.js'),'utf8');
   const tokenFeedback=fs.readFileSync(path.join(ROOT,'plugins','token-classification','feedback.js'),'utf8');
   const tokenStyles=fs.readFileSync(path.join(ROOT,'plugins','token-classification','styles.css'),'utf8');
@@ -1196,6 +1203,7 @@ function run(){
   testScriptManifestParses();
   testTokenClassificationPlugin();
   testFallingTokenSortMultiple();
+  testSimulateOutputPlugin();
   testInlineEvaluationActions();
   testLegacyUnaryMutationCards();
   testInvalidExecutionAlertIsStatementScoped();
@@ -1220,7 +1228,15 @@ function run(){
 
 function testTokenClassificationPlugin(){
   const ctx=context();
-  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js']);
+  const profilesFile=path.join(ROOT,'js','profiles.js');
+  const profileSource=fs.readFileSync(profilesFile,'utf8')
+    // Keep the hidden lessons out of the live catalog while exercising their
+    // original integration coverage in this isolated VM.
+    .replace(/,\s*\/\*\s*(?=\{\s*meta:\{id:'token-identifier-position')/,',\n')
+    .replace(/,\s*\*\/\s*(?=\{\s*meta:\{id:'falling-identifier-sort')/,',\n');
+  vm.runInContext(profileSource,ctx,{filename:profilesFile});
+  load(ctx,['language.js',
     'program-ir.js','program-core.js','activity-core.js','legacy-expression-plugin.js',
     'declaration-statement-plugin.js','assignment-statement-plugin.js','unary-update-statement-plugin.js','program-item-builder.js']);
   loadRelative(ctx,[
@@ -1307,6 +1323,71 @@ function testTokenClassificationPlugin(){
   assert.strictEqual(result.blocked,true);assert.strictEqual(result.undoApplied,true);assert.strictEqual(result.blockCleared,true);
   assert.strictEqual(result.terminal,true);assert.strictEqual(result.terminalChecked,true);assert.strictEqual(result.terminalPoints,1);
   assert.strictEqual(result.excludedSeparator,true);
+}
+
+function testSimulateOutputPlugin(){
+  const ctx=context();
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','activity-core.js']);
+  loadRelative(ctx,[
+    'plugins/simulate-output/manifest.js','plugins/simulate-output/catalog.js',
+    'plugins/simulate-output/generator.js','plugins/simulate-output/actions.js',
+    'plugins/simulate-output/feedback.js','plugins/simulate-output/renderer.js',
+    'plugins/simulate-output/plugin.js'
+  ]);
+  load(ctx,['state.js']);
+  const catalog=JSON.parse(evaluate(ctx,'JSON.stringify(SO_EXERCISES)'));
+  assert.strictEqual(catalog.length,19);
+  catalog.forEach(exercise=>{
+    const source=fs.readFileSync(path.join(ROOT,'plugins','simulate-output','exercises',exercise.filename),'utf8')
+      .replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
+    assert.strictEqual(exercise.raw,source);
+  });
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const profile=PROFILES.find(candidate=>candidate.id==='c-simulate-output');
+    state.mode='practice';initializeSeededRandom(1234);
+    const contextA={},items=Array.from({length:profile.itemCount},(_,index)=>
+      soGenerateItem({profile,index,generationContext:contextA}));
+    initializeSeededRandom(1234);
+    const contextB={},repeat=Array.from({length:profile.itemCount},(_,index)=>
+      soGenerateItem({profile,index,generationContext:contextB}));
+    const item=items.find(candidate=>candidate.variables.length>0);
+    const metadataHidden=!item.source.includes('@output')&&!item.source.includes('@variables');
+    soApplyAction({item,action:{type:'SET_OUTPUT',value:item.expectedLines.join('\\n')}});
+    item.variables.forEach((variable,index)=>{
+      if(Array.isArray(variable.expected))variable.expected.forEach((value,part)=>
+        soApplyAction({item,action:{type:'SET_VARIABLE',index,element:part,value}}));
+      else soApplyAction({item,action:{type:'SET_VARIABLE',index,value:variable.expected}});
+    });
+    const full=soCheck({item,profile,state});
+    const fullScore=item.points;
+    const traceMatches=soCanonicalTrace({item}).length===item.totalOpSteps;
+    item._feedbackAnimated=true;
+    const retry=soRetry({item});
+    const resetClean=!soHasResponse(item)&&!item.checked&&item.points===null
+      &&item._feedbackAnimated===false;
+    soApplyAction({item,action:{type:'SET_OUTPUT',value:item.expectedLines.join('\\n')+'\\nEXTRA'}});
+    const extra=soScoreResponse(item);
+    state.mode='exam';state.examPolicy={feedbackRelease:'after-submit'};
+    const restored=JSON.parse(JSON.stringify(item));
+    const snapshotStable=restored.response.output===item.response.output
+      &&restored.source===item.source&&restored.expectedLines.length===item.expectedLines.length;
+    soCheck({item:restored,profile,state});
+    const withheld=!soFeedbackReleased(restored);state.examSubmitted=true;
+    const released=soFeedbackReleased(restored);
+    resetRandomGenerator();
+    return JSON.stringify({profileActive:!!profile,count:items.length,
+      unique:new Set(items.map(candidate=>candidate.exerciseId)).size,
+      deterministic:items.map(candidate=>candidate.exerciseId).join(',')
+        ===repeat.map(candidate=>candidate.exerciseId).join(','),
+      allC:items.every(candidate=>candidate.language==='c'),metadataHidden,
+      full:full.applied,fullScore,traceMatches,retry:retry.applied,resetClean,
+      extraPenalty:extra.outputCorrect===item.expectedLines.length-1,
+      snapshotStable,withheld,released});
+  })()`));
+  assert.deepStrictEqual(result,{profileActive:true,count:19,unique:19,deterministic:true,
+    allC:true,metadataHidden:true,full:true,fullScore:10,traceMatches:true,
+    retry:true,resetClean:true,
+    extraPenalty:true,snapshotStable:true,withheld:true,released:true});
 }
 
 function testFallingTokenSortMultiple(){
