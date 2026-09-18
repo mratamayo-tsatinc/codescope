@@ -1,3 +1,9 @@
+# Codex Operational Constraints
+
+## File Access & Synchronization
+- **Mandatory Read:** You must execute a fresh read on a file immediately before executing any code changes, `apply_patch`, or file-write routines. Do not trust cached files from previous prompt loops.
+- **User Preference Conflict Prevention:** If you detect that the file on disk has changed compared to your session memory, pause execution immediately and ask the user for confirmation before overwriting.
+
 # CodeScope Agent Contract
 
 This file is the mandatory starting point for every AI agent working in this
