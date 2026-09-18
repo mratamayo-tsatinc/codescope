@@ -454,16 +454,16 @@ const PROFILES_RAW = [
   {
     meta:{id:'falling-identifier-sort',name:'Falling Identifier Sort',
       description:'Sort standalone names as valid identifiers, invalid identifiers, or reserved words.'},
-    scoring:{itemCount:5,pointsPerItem:3},
+    scoring:{itemCount:1,pointsPerItem:30},
     activity:{
       kind:'falling-token-sort',
-      instructions:'Select a token, then send it to the bucket that correctly classifies it.',
+      instructions:'Drag a token into its matching bucket. Keyboard: select a token, then choose a bucket.',
       buckets:[
         {id:'valid',category:'valid-identifier',region:'left',order:1},
         {id:'invalid',category:'invalid-identifier',region:'left',order:2},
         {id:'reserved',category:'reserved-word',region:'left',order:3},
       ],
-      dropArea:{visibleTokens:3},
+      dropArea:{visibleTokens:10,landingBehavior:'pass-through'},
       generator:{capability:'analyzed-token-generation',identifierGeneration:{
         templates:['modifier-measurement','entity-measurement','entity-technical'],
         styles:['camel-case','snake-case','constant-case','pascal-case','underscore-prefix','digit-suffix','dollar-prefix','case-mutated-reserved'],
@@ -476,15 +476,15 @@ const PROFILES_RAW = [
         length:{min:3,max:32},
         uniqueness:{scope:'profile-session',reuse:'avoid-until-exhausted'}
       },policies:{
-        practice:{counts:{
-          'valid-identifier':{min:3,max:5},
-          'invalid-identifier':{min:3,max:5},
-          'reserved-word':{min:3,max:5},
+        practice:{totalTokens:{target:30},counts:{
+          'valid-identifier':{min:5,max:13},
+          'invalid-identifier':{min:5,max:13},
+          'reserved-word':{min:5,max:13},
         },shuffle:true},
-        exam:{counts:{
-          'valid-identifier':{exact:5},
-          'invalid-identifier':{exact:5},
-          'reserved-word':{exact:5},
+        exam:{totalTokens:{exact:30},counts:{
+          'valid-identifier':{exact:10},
+          'invalid-identifier':{exact:10},
+          'reserved-word':{exact:10},
         },shuffle:true},
       }},
       assessment:{action:'SORT_TOKEN',cardinality:'per-token',scoreAttempt:'first',completion:'all-tokens-placed'},

@@ -50,9 +50,14 @@ Last consolidated: 2026-09-17
 ### Falling Token Sort
 
 - Current profile uses Valid Identifier, Invalid Identifier, and Reserved Word
-  buckets in the left region with one current token.
-- Practice uses 3–5 per category; Exam uses 5 per category.
-- Uses clickable buckets and the shared trailing connector language.
+  buckets in the left region with three visible tokens.
+- A mode policy sets one token target per item: a fixed target, an exact rule,
+  or a seeded choice from min/max when no target is given. It then
+  allocates the target within the category limits. Current Practice
+  targets exactly 12 with 3–5 per category; Exam targets exactly 15 with 5 per
+  category.
+- Uses drag and drop for pointer input, with clickable buckets as a keyboard
+  path and the shared trailing connector for that click path.
 - Console drawer now contains concise C/Java rules, naming styles, category
   guidance, and the complete active-language reserved-word list.
 
@@ -68,9 +73,13 @@ Last consolidated: 2026-09-17
 ## Deliberate limitations and deferred work
 
 - Falling Token Sort supports profile-configured visible token counts and
-  selection of any arrived token before choosing a bucket. Tokens enter the
-  fitted drop area one at a time and remain selectable during their slow fall;
-  they bounce and stack at varied landing positions when motion is enabled.
+  direct dragging of any arrived token into a bucket. Keyboard users select a
+  token before choosing a bucket. Tokens enter the fitted drop area one at a
+  time and can be dragged during their slow fall; they bounce and stack at
+  varied landing positions when motion is enabled. A profile may choose
+  pass-through instead, making unsorted tokens exit below the lane and restart
+  from new horizontal positions. A token released outside a bucket continues
+  falling from its release point, including after a rejected Practice drop.
 - Current statement plugins are not yet moved into plugin directories.
 - C and Java identifier analysis intentionally follows the app's documented
   supported character patterns; advanced Unicode and implementation-reserved

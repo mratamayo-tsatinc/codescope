@@ -46,6 +46,7 @@ function render(){
 
   const container = document.getElementById('app');
   const expressionScrollPositions=captureExpressionScrollPositions(container);
+  if(typeof ftsCaptureBeforeRender==='function') ftsCaptureBeforeRender(container,currentItem());
   container.innerHTML = '';
   if(state.screen==='done'){
     renderDone(container);

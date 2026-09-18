@@ -20,7 +20,29 @@ function ftsShuffle(values){
 function ftsResolveCount(rule){
   if(Number.isInteger(rule))return rule;
   if(Number.isInteger(rule.exact))return rule.exact;
+  if(Number.isInteger(rule.target))return rule.target;
   return ftsRandomInt(rule.min,rule.max);
+}
+
+function ftsCountBounds(rule){
+  const exact=Number.isInteger(rule)?rule:rule?.exact??(
+    rule?.min===undefined&&rule?.max===undefined?rule?.target:undefined);
+  return Number.isInteger(exact)?{min:exact,max:exact}:{min:rule.min,max:rule.max};
+}
+
+function ftsResolveTokenCounts(policy,buckets){
+  const categories=buckets.map(bucket=>bucket.category);
+  const limits=Object.fromEntries(categories.map(category=>[category,ftsCountBounds(policy.counts[category])]));
+  const counts=Object.fromEntries(categories.map(category=>[category,limits[category].min]));
+  const target=ftsResolveCount(policy.totalTokens);
+  let remaining=target-Object.values(counts).reduce((sum,count)=>sum+count,0);
+  while(remaining>0){
+    const available=categories.filter(category=>counts[category]<limits[category].max);
+    if(!available.length)throw new Error(`Cannot allocate ${target} tokens within category count limits`);
+    counts[available[Math.floor(seededRandom()*available.length)]]++;
+    remaining--;
+  }
+  return {target,counts};
 }
 
 // Non-identifier categories remain finite canonical vocabularies. Identifier
@@ -87,10 +109,10 @@ function ftsGenerateItem({profile,index,language,generationContext}){
   const languageSnapshot=language==='c'?'c':'java';
   const modeSnapshot=state.mode==='exam'?'exam':'practice';
   const policy=ftsGenerationPolicy(profile,modeSnapshot);
-  const tokens=[],counts={},itemUsed=new Set(),identifierGeneration=profile.activity.generator.identifierGeneration||{};
+  const tokens=[],itemUsed=new Set(),identifierGeneration=profile.activity.generator.identifierGeneration||{};
+  const {target,counts}=ftsResolveTokenCounts(policy,profile.activity.buckets);
   profile.activity.buckets.forEach(bucket=>{
-    const count=ftsResolveCount(policy.counts[bucket.category]);
-    counts[bucket.category]=count;
+    const count=counts[bucket.category];
     tokens.push(...ftsGenerateCategoryTokens(bucket.category,count,languageSnapshot,identifierGeneration,generationContext||{},itemUsed));
   });
   const orderedTokens=policy.shuffle===false?tokens:ftsShuffle(tokens);
@@ -100,6 +122,7 @@ function ftsGenerateItem({profile,index,language,generationContext}){
     itemNumber:index+1,
     language:languageSnapshot,
     generationMode:modeSnapshot,
+    generatedTokenTarget:target,
     generatedCounts:counts,
     tokens:orderedTokens,
     cursor:0,

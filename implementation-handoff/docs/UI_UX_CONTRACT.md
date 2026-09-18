@@ -88,8 +88,16 @@ New activities must look like members of the existing application.
 - Falling Token Sort uses the available vertical space for its token area.
   Tokens drop one at a time at varied horizontal positions, bounce, and stack
   when their landing positions overlap. Each token keeps its seeded text on one
-  line at its natural width and remains selectable while falling. Animation Off
-  and reduced motion show the tokens at rest.
+  line at its natural width and can be dragged into a bucket while falling.
+  Touch and mouse gestures use the same drop targets; keyboard selection and
+  bucket activation remain available. Animation Off and reduced motion show
+  the tokens at rest.
+- Bucket regions use the available vertical span on the left or right and the
+  available horizontal span on the top or bottom. Releasing a token outside a
+  bucket, including a rejected Practice drop, continues its fall from there.
+- The profile may instead use pass-through motion: a token leaves below the
+  area and starts another fall at a new horizontal position. It remains
+  draggable on every pass.
 
 ## Actions and lifecycle
 

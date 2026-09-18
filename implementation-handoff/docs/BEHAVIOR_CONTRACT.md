@@ -119,21 +119,32 @@ Canonical classification is contextual, not merely lexical.
 
 ## Falling Token Sort
 
-- Buckets, categories, regions, order, counts, mode policies, and scoring are
+- Buckets, categories, regions, order, item token targets, category limits,
+  mode policies, and scoring are
   profile configuration rather than plugin-name conditions.
-- The current profile shows three tokens at a time. Students select a visible
-  token, then choose a bucket; a newly available token appears after placement.
+- The current profile shows three tokens at a time. Students drag an arrived
+  token directly into a bucket; a newly available token appears after placement.
+  Keyboard users can select a token, then choose a bucket.
 - Profiles configured with one visible token retain direct bucket selection.
 - Current buckets are Valid Identifier, Invalid Identifier, and Reserved Word,
   all in the left region.
-- Practice generates 3–5 tokens per category. Exam generates exactly 5 per
-  category.
+- Each item receives one seeded token target before category counts are
+  allocated within their configured limits. Current Practice targets exactly
+  12 per item with 3–5 per category; Exam targets exactly 15 with 5 per category.
 - The count badge reports tokens already placed into each bucket.
 - The transfer uses the shared curved trailing-line visual language.
 - Newly visible tokens enter one at a time from varied horizontal positions,
   fall slowly, and bounce on landing. Unsorted tokens pile where their landing
   positions overlap. A falling token can be selected and sorted before landing;
   scoring does not wait for the animation.
+- Other scheduled tokens keep entering while one token is dragged. A drop
+  outside a bucket or a rejected Practice placement continues the token's
+  fall from its release point.
+- Sorting one token preserves the positions and fall phases of the other
+  visible tokens.
+- The profile chooses `stack` or `pass-through` landing behavior. Stack leaves
+  unsorted tokens at the bottom; pass-through repeats the fall from a new
+  horizontal position until the token is sorted. Omitted behavior means stack.
 - The Console drawer presents neutral C/Java identifier guidance and the actual
   reserved-word catalog without revealing the current token's answer.
 

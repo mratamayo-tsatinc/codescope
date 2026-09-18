@@ -1332,14 +1332,54 @@ function testFallingTokenSortMultiple(){
       {id:'invalid',category:'invalid-identifier',region:'left',order:2},
       {id:'reserved',category:'reserved-word',region:'left',order:3}
     ],generator:{capability:'analyzed-token-generation',identifierGeneration:{},policies:{
-      practice:{counts:{'valid-identifier':1,'invalid-identifier':1,'reserved-word':1}},
-      exam:{counts:{'valid-identifier':1,'invalid-identifier':1,'reserved-word':1}}
+      practice:{totalTokens:{target:4},counts:{'valid-identifier':{min:1,max:2},'invalid-identifier':{min:1,max:2},'reserved-word':{min:1,max:2}}},
+      exam:{totalTokens:{exact:3},counts:{'valid-identifier':1,'invalid-identifier':1,'reserved-word':1}}
     }},assessment:{action:'SORT_TOKEN',cardinality:'per-token',scoreAttempt:'first',completion:'all-tokens-placed'},response:{policies:{
       practice:{incorrectPlacement:'return-token'},exam:{incorrectPlacement:'accept'}
     }},feedback:{practice:'immediate-return',exam:'deferred-until-submit'}}};
     ftsValidateProfile(profile);
     const invalidProfile=JSON.parse(JSON.stringify(profile));invalidProfile.activity.dropArea.visibleTokens=0;
     let invalidRejected=false;try{ftsValidateProfile(invalidProfile)}catch(error){invalidRejected=true}
+    const invalidLanding=JSON.parse(JSON.stringify(profile));invalidLanding.activity.dropArea.landingBehavior='float';
+    let invalidLandingRejected=false;try{ftsValidateProfile(invalidLanding)}catch(error){invalidLandingRejected=true}
+    const invalidTotal=JSON.parse(JSON.stringify(profile));invalidTotal.activity.generator.policies.practice.totalTokens={exact:7};
+    let invalidTotalRejected=false;try{ftsValidateProfile(invalidTotal)}catch(error){invalidTotalRejected=true}
+    const invalidRange=JSON.parse(JSON.stringify(profile));invalidRange.activity.generator.policies.practice.totalTokens={min:2,max:4};
+    let invalidRangeRejected=false;try{ftsValidateProfile(invalidRange)}catch(error){invalidRangeRejected=true}
+    const invalidSpecifiedTarget=JSON.parse(JSON.stringify(profile));invalidSpecifiedTarget.activity.generator.policies.practice.totalTokens.target=7;
+    let invalidSpecifiedTargetRejected=false;try{ftsValidateProfile(invalidSpecifiedTarget)}catch(error){invalidSpecifiedTargetRejected=true}
+    const invalidZeroTarget=JSON.parse(JSON.stringify(profile));invalidZeroTarget.activity.generator.policies.practice.totalTokens.target=0;
+    let invalidZeroTargetRejected=false;try{ftsValidateProfile(invalidZeroTarget)}catch(error){invalidZeroTargetRejected=true}
+    const invalidCategoryTarget=JSON.parse(JSON.stringify(profile));invalidCategoryTarget.activity.generator.policies.practice.counts['valid-identifier'].target=2;
+    let invalidCategoryTargetRejected=false;try{ftsValidateProfile(invalidCategoryTarget)}catch(error){invalidCategoryTargetRejected=true}
+    const rangedProfile=JSON.parse(JSON.stringify(profile));rangedProfile.activity.generator.policies.practice.totalTokens={min:3,max:6};
+    ftsValidateProfile(rangedProfile);
+    const boundedTargetProfile=JSON.parse(JSON.stringify(profile));boundedTargetProfile.activity.generator.policies.practice.totalTokens={min:3,max:6,target:4};
+    ftsValidateProfile(boundedTargetProfile);
+    seededRandom=()=>0;
+    const lowCounts=ftsResolveTokenCounts(rangedProfile.activity.generator.policies.practice,profile.activity.buckets);
+    seededRandom=()=>.999999;
+    const highCounts=ftsResolveTokenCounts(rangedProfile.activity.generator.policies.practice,profile.activity.buckets);
+    const fixedLast=ftsResolveTokenCounts(profile.activity.generator.policies.practice,profile.activity.buckets);
+    seededRandom=()=>0;
+    const fixedFirst=ftsResolveTokenCounts(profile.activity.generator.policies.practice,profile.activity.buckets);
+    seededRandom=()=>.5;
+    const fixedCounts=ftsResolveTokenCounts(profile.activity.generator.policies.practice,profile.activity.buckets);
+    const targetAllocation=lowCounts.target===3&&highCounts.target===6&&fixedCounts.target===4
+      &&Object.values(lowCounts.counts).reduce((sum,count)=>sum+count,0)===3
+      &&Object.values(highCounts.counts).reduce((sum,count)=>sum+count,0)===6
+      &&Object.values(fixedCounts.counts).reduce((sum,count)=>sum+count,0)===4
+      &&Object.values(fixedCounts.counts).every(count=>count>=1&&count<=2)
+      &&fixedFirst.counts['valid-identifier']===2&&fixedLast.counts['reserved-word']===2;
+    const generateCategoryTokens=ftsGenerateCategoryTokens;
+    ftsGenerateCategoryTokens=(category,count)=>Array.from({length:count},(_,index)=>({id:category+index,text:category+index,category}));
+    state.mode='practice';const generatedPractice=ftsGenerateItem({profile,index:0,language:'c',generationContext:{}});
+    state.mode='exam';const generatedExam=ftsGenerateItem({profile,index:1,language:'java',generationContext:{}});
+    state.mode='practice';ftsGenerateCategoryTokens=generateCategoryTokens;
+    const generatedTargets=generatedPractice.generatedTokenTarget===4&&generatedPractice.tokens.length===4
+      &&generatedExam.generatedTokenTarget===3&&generatedExam.tokens.length===3;
+    const passProfile=JSON.parse(JSON.stringify(profile));passProfile.activity.dropArea.landingBehavior='pass-through';
+    ftsValidateProfile(passProfile);
     const tokens=[
       {id:'t1',text:'alpha',category:'valid-identifier'},
       {id:'t2',text:'2bad',category:'invalid-identifier'},
@@ -1353,16 +1393,33 @@ function testFallingTokenSortMultiple(){
     const fittedHeight=ftsStageHeightFromBounds(873,315,0,16,24,340);
     const fittedAfterScroll=ftsStageHeightFromBounds(873,-85,400,16,24,340);
     const compactMinimum=ftsStageHeightFromBounds(500,315,0,16,24,340);
-    const scheduled=ftsDropPlan(makeItem(),tokens.slice(0,3),1000,true);
+    const scheduledItem=makeItem(),scheduled=ftsDropPlan(scheduledItem,tokens.slice(0,3),1000,true);
     const sequential=scheduled.get('t2').startAt>scheduled.get('t1').startAt+scheduled.get('t1').duration
       &&scheduled.get('t3').startAt>scheduled.get('t2').startAt+scheduled.get('t2').duration;
+    const releaseLane={left:100,bottom:500};
+    const leftRelease=ftsReleasePlan(releaseLane,400,100,50,80,220,false);
+    const rightRelease=ftsReleasePlan(releaseLane,400,100,50,600,220,true);
+    const freeReleaseClamped=leftRelease.position===0&&rightRelease.position===1
+      &&leftRelease.duration>320&&rightRelease.duration>leftRelease.duration;
     const variedPositions=new Set([...scheduled.values()].map(entry=>entry.position)).size>1;
     const slowEnough=[...scheduled.values()].every(entry=>entry.duration>=3200);
+    const passItem=makeItem(),passBefore=ftsRenderTokenLane(passItem,passProfile);
+    const passEntry=ftsDropStateByItem.get(passItem).get('t1');
+    const passPositionChanges=ftsPassPosition(passEntry,1)!==ftsPassPosition(passEntry,0)
+      &&ftsPassCycle(passEntry,passEntry.startAt+passEntry.duration*2)===2;
+    const passAnimating=countNodesWithClass(passBefore,'fts-token-passing')===1;
     const before=ftsRenderTokenLane(item,profile);
     const firstDrops=countNodesWithClass(before,'fts-token-dropping');
     const selectionRerenderDrops=countNodesWithClass(ftsRenderTokenLane(item,profile),'fts-token-dropping');
     flyAnimEnabled=false;
     const motionOffCount=countNodesWithClass(ftsRenderTokenLane(makeItem(),profile),'fts-token-choice');
+    const passMotionOffCount=countNodesWithClass(ftsRenderTokenLane(makeItem(),passProfile),'fts-token-passing');
+    const staticPassItem=makeItem();ftsRenderTokenLane(staticPassItem,passProfile);
+    const staticPassEntry=ftsDropStateByItem.get(staticPassItem).get('t1');
+    const staticPassPosition=staticPassEntry.position;
+    staticPassEntry.startAt=Date.now()-staticPassEntry.duration*3;
+    ftsRenderTokenLane(staticPassItem,passProfile);
+    const staticPassStable=staticPassEntry.position===staticPassPosition;
     flyAnimEnabled=true;
     const needsSelection=!ftsApplyAction({item,profile,action:{type:'SORT_TOKEN',bucketId:'valid'},state}).applied;
     const hiddenRejected=!ftsApplyAction({item,profile,action:{type:'SELECT_TOKEN',tokenId:'t4'},state}).applied;
@@ -1402,10 +1459,27 @@ function testFallingTokenSortMultiple(){
     ftsApplyAction({item:exam,profile,action:{type:'SELECT_TOKEN',tokenId:'t2'},state});
     const examWrong=ftsApplyAction({item:exam,profile,action:{type:'SORT_TOKEN',bucketId:'valid'},state});
     const examRestored=JSON.parse(JSON.stringify(exam));
-    return JSON.stringify({initial,invalidRejected,fittedHeight,fittedAfterScroll,compactMinimum,
-      sequential,variedPositions,slowEnough,
+    state.mode='practice';
+    const dragged=makeItem();let dragRenders=0;
+    currentItem=()=>dragged;currentProfile=()=>profile;
+    applyActivityAction=(target,action)=>ftsApplyAction({item:target,profile,action,state});
+    render=()=>{dragRenders++};
+    const dragAccepted=ftsCommitDraggedToken({item:dragged,tokenId:'t2'},
+      {getAttribute:()=> 'invalid'});
+    const dragResult={accepted:dragAccepted?.accepted,placed:dragged.placements[0]?.tokenId,
+      selected:dragged.selectedTokenId,score:dragged.scoreResults[0]?.wasCorrect,renders:dragRenders};
+    const rejectedDrag=makeItem();currentItem=()=>rejectedDrag;
+    const rejectedDrop=ftsCommitDraggedToken({item:rejectedDrag,tokenId:'t2'},
+      {getAttribute:()=> 'valid'});
+    const rejectedResult={accepted:rejectedDrop?.accepted,placed:rejectedDrag.placements.length,
+      score:rejectedDrag.scoreResults[0]?.wasCorrect,renders:dragRenders};
+    return JSON.stringify({initial,invalidRejected,invalidLandingRejected,invalidTotalRejected,invalidRangeRejected,
+      invalidSpecifiedTargetRejected,invalidZeroTargetRejected,invalidCategoryTargetRejected,
+      targetAllocation,generatedTargets,fittedHeight,fittedAfterScroll,compactMinimum,
+      sequential,freeReleaseClamped,variedPositions,slowEnough,passPositionChanges,passAnimating,
       choiceCount:countNodesWithClass(before,'fts-token-choice'),
-      firstDrops,selectionRerenderDrops,motionOffCount,refillQueued,resetDrops,needsSelection,
+      firstDrops,selectionRerenderDrops,motionOffCount,passMotionOffCount,staticPassStable,
+      refillQueued,resetDrops,needsSelection,
       hiddenRejected,selected:selected.applied,bucketEnabled:!('disabled' in selectedBucket.attributes),
       mismatchRejected,outOfOrder:outOfOrder.applied,after,progress,undo:undo.applied,restored,
       wrongAccepted:wrong.accepted,returned,corrected:corrected.accepted,firstScore,remaining,
@@ -1413,12 +1487,19 @@ function testFallingTokenSortMultiple(){
       checked:checked.applied,completedScore,completedSteps,retry:retry.applied,
       resetSelection:resetSelection.applied,selectionCleared:complete.selectedTokenId===null,
       examCursor:examRestored.cursor,examPlaced:examRestored.placements[0].tokenId,
-      examVisible:ftsVisibleTokens(examRestored,profile).map(token=>token.id)});
+      examVisible:ftsVisibleTokens(examRestored,profile).map(token=>token.id),dragResult,rejectedResult});
   })()`));
   assert.deepStrictEqual(result,{
-    initial:['t1','t2','t3'],invalidRejected:true,fittedHeight:518,fittedAfterScroll:518,compactMinimum:340,
-    sequential:true,variedPositions:true,slowEnough:true,choiceCount:1,
-    firstDrops:1,selectionRerenderDrops:1,motionOffCount:3,refillQueued:true,resetDrops:1,
+    initial:['t1','t2','t3'],invalidRejected:true,invalidLandingRejected:true,
+    invalidTotalRejected:true,invalidRangeRejected:true,invalidSpecifiedTargetRejected:true,
+    invalidZeroTargetRejected:true,
+    invalidCategoryTargetRejected:true,
+    targetAllocation:true,generatedTargets:true,
+    fittedHeight:518,fittedAfterScroll:518,compactMinimum:340,
+    sequential:true,freeReleaseClamped:true,variedPositions:true,slowEnough:true,
+    passPositionChanges:true,passAnimating:true,choiceCount:1,
+    firstDrops:1,selectionRerenderDrops:1,motionOffCount:3,passMotionOffCount:0,staticPassStable:true,
+    refillQueued:true,resetDrops:1,
     needsSelection:true,hiddenRejected:true,
     selected:true,bucketEnabled:true,mismatchRejected:true,outOfOrder:true,
     after:['t1','t2','t4'],progress:['current','waiting','complete','waiting'],
@@ -1427,7 +1508,9 @@ function testFallingTokenSortMultiple(){
     resumed:['t1','t3','t4'],singleApplied:true,examAccepted:true,
     checked:true,completedScore:3,completedSteps:4,retry:true,resetSelection:true,selectionCleared:true,
     examCursor:1,
-    examPlaced:'t2',examVisible:['t1','t3','t4']
+    examPlaced:'t2',examVisible:['t1','t3','t4'],
+    dragResult:{accepted:true,placed:'t2',selected:null,score:true,renders:0},
+    rejectedResult:{accepted:false,placed:0,score:false,renders:0}
   });
 }
 

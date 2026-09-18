@@ -62,8 +62,13 @@ coverage, then run the full suite.
 
 ## Falling Token Sort scenarios
 
-- [ ] Practice produces 3–5 tokens for each configured category.
-- [ ] Exam produces exactly 5 tokens for each configured category.
+- [ ] Each seeded item has one stored token target, and its generated category
+      counts sum to that target while staying within their configured limits.
+- [ ] Current Practice targets exactly 12 tokens with 3–5 per category; Exam targets
+      exactly 15 tokens with 5 per category.
+- [ ] Profile validation rejects targets whose exact value or min/max range
+      cannot be allocated within the category limits, or whose explicit target
+      falls outside its declared min/max bounds.
 - [ ] A fresh Practice session changes the permutation.
 - [ ] An Exam refresh restores the exact token order and placements.
 - [ ] Bucket counts increase after accepted placements.
@@ -71,6 +76,16 @@ coverage, then run the full suite.
       the visible area; Undo restores the selected token and its place in it.
 - [ ] Tokens enter one at a time at varied positions, fall slowly, bounce and
       stack on overlap; a falling token remains selectable and sortable.
+- [ ] Mouse and touch drags sort with one gesture, including midfall. Releasing
+      outside a bucket leaves scoring unchanged; keyboard selection still works.
+- [ ] Another token appears on schedule during a long drag; releasing anywhere
+      outside an accepted bucket continues falling from the release point.
+- [ ] Sorting or rejecting one token does not jump, restart, or reposition the
+      other visible falling or stacked tokens.
+- [ ] Left/right buckets fill their lane height, while top/bottom buckets
+      divide the available width.
+- [ ] Stack mode leaves tokens at the bottom; pass-through mode moves them
+      below the lane and restarts at new horizontal positions until sorted.
 - [ ] Seeded token text stays on one line at content width. Selecting a token
       does not restart its fall; Animation Off and reduced motion show the
       visible tokens at rest.

@@ -13,7 +13,7 @@ A profile may declare:
 - off-target outcomes by mode;
 - offered response categories;
 - assessment actions, cardinality, weights, and bonus status;
-- bucket category, region, order, and per-mode counts;
+- bucket category, region, order, per-mode item token targets, and category limits;
 - feedback and retry policy.
 
 A profile must not contain trusted canonical answers for generated content.
@@ -124,4 +124,3 @@ maintain a competing identifier validator.
 7. Add canonical-trace, persistence, Practice, Exam, and accessibility tests.
 8. Add script/style tags in dependency order.
 9. Run the complete suite and the manual checklist.
-
