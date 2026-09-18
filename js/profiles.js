@@ -344,7 +344,7 @@ const PROFILES_RAW = [
     template:'(operand:lit cmp operand:lit) and operand:var:bool:unary or operand:var:bool:unary',
     scoring:{itemCount:5,pointsPerItem:4},
     manualResponses:{enabled:true,namedValueRate:50,operatorRate:50},
-  },
+  },/*
   {
     meta:{id:'token-identifier-position',name:'Identifier Position',
       description:'Locate the declaration name and decide whether it is a valid identifier.'},
@@ -450,7 +450,7 @@ const PROFILES_RAW = [
       ]},
       response:{mode:'classify',categories:['valid-identifier','invalid-identifier','reserved-word','operator','literal','separator']}
     }
-  },
+  },*/
   {
     meta:{id:'falling-identifier-sort',name:'Falling Identifier Sort',
       description:'Sort standalone names as valid identifiers, invalid identifiers, or reserved words.'},
