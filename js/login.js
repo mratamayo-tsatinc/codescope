@@ -433,8 +433,6 @@ function handleTimerExpired() {
 
 function toggleSidebar() {
   const sidebar = document.getElementById('profileSidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  const btn = document.getElementById('sidebarToggleBtn');
   
   if (window.innerWidth <= 768) {
     // Mobile: toggle overlay
@@ -458,7 +456,6 @@ function openSidebar() {
   const backdrop = document.getElementById('sidebarBackdrop');
   sidebar.classList.add('sidebar-open');
   backdrop.classList.add('show');
-  document.getElementById('sidebarToggleBtn').setAttribute('aria-expanded', 'true');
   if(typeof syncSidebarShellState==='function') syncSidebarShellState();
 }
 
@@ -467,7 +464,6 @@ function closeSidebar() {
   const backdrop = document.getElementById('sidebarBackdrop');
   sidebar.classList.remove('sidebar-open');
   backdrop.classList.remove('show');
-  document.getElementById('sidebarToggleBtn').setAttribute('aria-expanded', 'false');
   if(typeof syncSidebarShellState==='function') syncSidebarShellState();
 }
 
@@ -480,7 +476,6 @@ function closeSidebarIfMobile() {
 function collapseDesktopSidebar() {
   const sidebar = document.getElementById('profileSidebar');
   sidebar.classList.add('sidebar-collapsed');
-  document.getElementById('sidebarToggleBtn').setAttribute('aria-expanded', 'false');
   if(typeof closeAccountMenu==='function') closeAccountMenu();
   if(typeof syncSidebarShellState==='function') syncSidebarShellState();
 }
@@ -488,7 +483,6 @@ function collapseDesktopSidebar() {
 function expandDesktopSidebar() {
   const sidebar = document.getElementById('profileSidebar');
   sidebar.classList.remove('sidebar-collapsed');
-  document.getElementById('sidebarToggleBtn').setAttribute('aria-expanded', 'true');
   if(typeof syncSidebarShellState==='function') syncSidebarShellState();
 }
 

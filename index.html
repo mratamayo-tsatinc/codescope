@@ -305,11 +305,6 @@
 <div id="mainContent" style="display: none;">
   <!-- Main layout with sidebar navigation and content area -->
   <div class="main-layout">
-    <!-- Hamburger menu button (visible on mobile and desktop) -->
-    <button id="sidebarToggleBtn" class="sidebar-hamburger" onclick="toggleSidebar()" title="Toggle profile sidebar" aria-label="Toggle profile sidebar" aria-expanded="false">
-      <i class="fa-solid fa-bars"></i>
-    </button>
-
     <!-- Sidebar backdrop (mobile overlay) -->
     <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="closeSidebarIfMobile()" aria-hidden="true"></div>
 
@@ -319,10 +314,14 @@
         <i class="fa-solid fa-xmark"></i>
       </button>
 
-      <div class="sidebar-brand" aria-label="CodeScope">
-        <span class="login-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+      <button id="sidebarBrandToggle" type="button" class="sidebar-brand shell-brand-trigger" onclick="toggleSidebar()"
+        title="Hide navigation" aria-label="Hide navigation" aria-controls="profileSidebar" aria-expanded="true">
+        <span class="brand-mark" aria-hidden="true">
+          <span class="login-icon"><i class="fa-solid fa-layer-group"></i></span>
+          <span class="brand-toggle-cue"><i class="fa-solid fa-chevron-right"></i></span>
+        </span>
         <span class="sidebar-brand-name">CodeScope</span>
-      </div>
+      </button>
       
       <div class="sidebar-header">
         <div class="sidebar-title">Categories</div>
@@ -349,10 +348,14 @@
     <!-- Main content area -->
     <main class="content-area" role="main">
       <header class="app-header">
-        <div class="header-brand" aria-label="CodeScope">
-          <span class="login-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+        <button id="headerBrandToggle" type="button" class="header-brand shell-brand-trigger" onclick="toggleSidebar()"
+          title="Show navigation" aria-label="Show navigation" aria-controls="profileSidebar" aria-expanded="false">
+          <span class="brand-mark" aria-hidden="true">
+            <span class="login-icon"><i class="fa-solid fa-layer-group"></i></span>
+            <span class="brand-toggle-cue"><i class="fa-solid fa-chevron-right"></i></span>
+          </span>
           <span class="header-brand-name">CodeScope</span>
-        </div>
+        </button>
         <div id="headerSessionContext" class="header-session-context">
           <span id="headerProfileName" class="header-profile-name"></span>
           <span class="header-context-divider" aria-hidden="true">·</span>

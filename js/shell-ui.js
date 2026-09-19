@@ -99,10 +99,12 @@ function syncSidebarShellState(){
   const sidebarVisible=window.innerWidth<=768?sidebar.classList.contains('sidebar-open'):!collapsed;
   sidebar.toggleAttribute('inert',!sidebarVisible);
   sidebar.setAttribute('aria-hidden',String(!sidebarVisible));
-  const toggle=document.getElementById('sidebarToggleBtn');
-  if(toggle){
+  document.querySelectorAll('.shell-brand-trigger').forEach(toggle=>{
     toggle.setAttribute('aria-expanded',String(sidebarVisible));
-  }
+    const opensSidebar=!sidebarVisible;
+    toggle.setAttribute('aria-label',opensSidebar?'Show navigation':'Hide navigation');
+    toggle.title=opensSidebar?'Show navigation':'Hide navigation';
+  });
 }
 
 document.addEventListener('pointerdown',event=>{
