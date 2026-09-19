@@ -112,6 +112,7 @@ let floatWasMounted = false;
 // why it doesn't belong in the global app header.
 // ----------------------------------------------------------------------------
 function toggleVarFinalFloatVisible(){
+  if(!MEMORY_PANEL_SETTINGS.userControlVisible) return;
   floatVisible = !floatVisible;
   syncVarFinalFloatToggleUI();
   render();
@@ -227,8 +228,22 @@ function animateVarFinalMemoryToExpression(item, action, applyAction){
 function syncVarFinalFloatToggleUI(){
   const vBtn = document.getElementById('varFloatToggle');
   const vText = document.getElementById('varFloatToggleText');
-  if(vBtn) vBtn.classList.toggle('active', floatVisible);
+  if(vBtn){
+    vBtn.classList.toggle('active', floatVisible);
+    vBtn.setAttribute('aria-pressed',String(!!floatVisible));
+    vBtn.setAttribute('aria-label',floatVisible?'Hide variable panel':'Show variable panel');
+  }
   if(vText) vText.textContent = floatVisible ? 'Vars on' : 'Vars off';
+}
+
+function varFinalPanelHasCompatibleContent(item){
+  return !!(item&&!item.activityKind&&(item.program||item.workingFlat||item.originalFlat));
+}
+
+function varFinalPanelShouldRender(item){
+  if(!MEMORY_PANEL_SETTINGS.visible||MEMORY_PANEL_SETTINGS.displayPolicy==='hidden') return false;
+  if(MEMORY_PANEL_SETTINGS.displayPolicy==='content-aware') return varFinalPanelHasCompatibleContent(item);
+  return false;
 }
 
 // ----------------------------------------------------------------------------
@@ -237,7 +252,7 @@ function syncVarFinalFloatToggleUI(){
 function renderVariableFinalFloat(item){
   const stale = document.querySelector('.var-final-float');
   if(stale) stale.remove();
-  if(!floatVisible || !item){
+  if(!floatVisible || !varFinalPanelShouldRender(item)){
     floatWasMounted = false; // next time it opens, it should re-enter
     return;
   }
@@ -415,6 +430,11 @@ function mountVarFinalFloatPanel(sectionEl, flights, playEntrance){
 
 function floatPositionStyle(){
   if(floatPos) return `left:${floatPos.left}px; top:${floatPos.top}px; right:auto; bottom:auto;`;
+  if(window.innerWidth<=768){
+    const header=document.querySelector('.app-header');
+    const top=header?Math.ceil(header.getBoundingClientRect().bottom+8):100;
+    return `top:${top}px;`;
+  }
   return ''; // default anchored corner position comes from the injected CSS
 }
 

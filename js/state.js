@@ -8,10 +8,13 @@
 const DEFAULT_SHELL_SETTINGS = Object.freeze({
   connectors: Object.freeze({
     visible: true,
+    userControlVisible: false,
     maxLeadPx: 18
   }),
   memoryPanel: Object.freeze({
     visible: true,
+    displayPolicy: 'content-aware', // content-aware | hidden
+    userControlVisible: false,
     transferAnimation: Object.freeze({
       enabled: true,
       durationMs: 1000,
@@ -37,6 +40,7 @@ const DEFAULT_SHELL_SETTINGS = Object.freeze({
     windowSize: 5
   }),
   scoreSummary: Object.freeze({
+    overallVisible: false,
     pngScale: 2,
     filenamePrefix: 'codescope-score-summary'
   }),

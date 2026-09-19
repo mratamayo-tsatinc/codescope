@@ -318,6 +318,11 @@
       <button id="sidebarCloseBtn" class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close sidebar">
         <i class="fa-solid fa-xmark"></i>
       </button>
+
+      <div class="sidebar-brand" aria-label="CodeScope">
+        <span class="login-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+        <span class="sidebar-brand-name">CodeScope</span>
+      </div>
       
       <div class="sidebar-header">
         <div class="sidebar-title">Categories</div>
@@ -329,51 +334,80 @@
       </ul>
 
       <div class="sidebar-footer">
-        <button onclick="logout()" class="sidebar-logout-btn" title="Log out">
-          <i class="fa-solid fa-sign-out-alt"></i> Logout
+        <button type="button" class="account-trigger sidebar-account-trigger" onclick="toggleAccountMenu(this)"
+          aria-label="Open student account menu" aria-haspopup="menu" aria-expanded="false">
+          <span id="sidebarAccountAvatar" class="account-avatar" aria-hidden="true">S</span>
+          <span class="sidebar-account-copy">
+            <span class="account-role">Student account</span>
+            <span id="sidebarAccountEmail" class="account-email"></span>
+          </span>
+          <i class="fa-solid fa-chevron-up account-chevron" aria-hidden="true"></i>
         </button>
       </div>
     </nav>
 
     <!-- Main content area -->
     <main class="content-area" role="main">
-      <div class="app-header">
-        <div class="app-header-left">
-          <div class="brand"><span class="login-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span><h1>CodeScope</h1></div>
-          <p class="tagline">Explore programming concepts through interactive, step-by-step activities.</p>
+      <header class="app-header">
+        <div class="header-brand" aria-label="CodeScope">
+          <span class="login-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+          <span class="header-brand-name">CodeScope</span>
+        </div>
+        <div id="headerSessionContext" class="header-session-context">
+          <span id="headerProfileName" class="header-profile-name"></span>
+          <span class="header-context-divider" aria-hidden="true">·</span>
+          <span id="headerItemPosition" class="header-item-position"></span>
         </div>
         <div class="user-status">
           <div id="globalControls" class="global-controls">
             <div id="timerContainer" class="timer-container" style="display: none;">
-              <span class="timer-label">Time remaining:</span>
+              <span class="timer-label">Time:</span>
               <span id="timerDisplay" class="timer-display">00:00</span>
             </div>
             <span id="headerModeTag" class="mode-tag"></span>
-            <button id="headerLinksToggle" class="link-toggle" onclick="toggleConnectors()"
-              title="Toggle the connector line between an operator and the value it produces">
-              <i class="fa-solid fa-arrow-turn-down"></i> <span id="headerLinksToggleText">Links on</span>
+            <button id="headerLinksToggle" class="link-toggle" onclick="toggleConnectors()" hidden
+              title="Toggle connector lines" aria-label="Show connector lines" aria-pressed="true">
+              <i class="fa-solid fa-arrow-turn-down" aria-hidden="true"></i>
+              <span id="headerLinksToggleText" class="control-label">Links on</span>
             </button>
-            <button id="varFloatToggle" class="link-toggle" onclick="toggleVarFinalFloatVisible()"
-              title="Show/hide the floating variable final-state panel">
-              <i class="fa-solid fa-table-cells"></i> <span id="varFloatToggleText">Vars</span>
+            <button id="varFloatToggle" class="link-toggle" onclick="toggleVarFinalFloatVisible()" hidden
+              title="Toggle variable panel" aria-label="Show variable panel" aria-pressed="true">
+              <i class="fa-solid fa-table-cells" aria-hidden="true"></i>
+              <span id="varFloatToggleText" class="control-label">Vars on</span>
             </button>
-            <button id="scoreSummaryBtn" class="score-summary-btn" onclick="openScoreSummaryModal()" title="View score summary">
-              <i class="fa-solid fa-chart-simple"></i> Overall Scores
+            <button id="scoreSummaryBtn" class="score-summary-btn" onclick="openScoreSummaryModal()" hidden
+              title="View overall scores" aria-label="View overall scores">
+              <i class="fa-solid fa-chart-simple" aria-hidden="true"></i>
+              <span class="control-label score-control-label">Scores</span>
             </button>
             <button id="submitExamBtn" class="submit-exam-btn" onclick="submitExam(false)" title="Submit and lock the examination" style="display:none;">
-              <i class="fa-solid fa-paper-plane"></i> Submit exam
+              <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> <span>Submit exam</span>
+            </button>
+            <button type="button" class="account-trigger header-account-trigger" onclick="toggleAccountMenu(this)"
+              aria-label="Open student account menu" aria-haspopup="menu" aria-expanded="false" title="Student account">
+              <span id="headerAccountAvatar" class="account-avatar" aria-hidden="true">S</span>
             </button>
           </div>
-          <div id="userStatusText" class="user-status-text">
-            <div id="userStatusName"></div>
-            <div id="headerClock" class="header-clock"></div>
-          </div>
         </div>
-      </div>
+      </header>
       <div id="app"></div>
       <!-- Item pagination bar for session navigation -->
       <div id="itemPaginationContainer" class="item-pagination-container" style="display: none;"></div>
     </main>
+  </div>
+
+  <div id="accountMenu" class="account-menu" role="menu" aria-label="Student account" hidden>
+    <div class="account-menu-identity">
+      <span id="accountMenuAvatar" class="account-avatar account-menu-avatar" aria-hidden="true">S</span>
+      <span class="account-menu-copy">
+        <span class="account-role">Signed in as</span>
+        <span id="accountMenuEmail" class="account-menu-email"></span>
+      </span>
+    </div>
+    <button type="button" class="account-menu-logout" role="menuitem" onclick="closeAccountMenu(); logout();">
+      <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+      <span>Logout</span>
+    </button>
   </div>
 </div>
 
@@ -428,6 +462,7 @@
 <script src="js/settings-persistence.js"></script>
 <script src="js/manual-response.js"></script>
 <script src="js/live-clock.js"></script>
+<script src="js/shell-ui.js"></script>
 <script src="js/qr-share.js"></script>
 <script src="js/score-summary.js"></script>
 <script src="js/moment-feedback.js"></script>

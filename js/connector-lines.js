@@ -67,6 +67,7 @@
 // ============================================================================
 
 function toggleConnectors(){
+  if(!DEFAULT_APP_SETTINGS.shell.connectors.userControlVisible) return;
   state.showConnectors = !state.showConnectors;
   render();
 }

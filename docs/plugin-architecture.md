@@ -30,6 +30,27 @@ drawers, persistence, Undo, Check, scoring aggregation, and design tokens. A
 plugin must not import another plugin's private files. Future inter-plugin
 dependencies must be declared against public capabilities.
 
+### Shared Practice retry placement
+
+Checked Practice items place **Try again** outside and directly below the
+activity workspace, aligned to the workspace's left edge. This keeps retry as
+a page-level action instead of making it look like part of the submitted
+answer surface.
+
+Renderers must append the shell-owned retry bar to their outer `container`:
+
+```js
+if (item.checked && state.mode === 'practice') {
+  appendPracticeRetryBar(container);
+}
+```
+
+The helper detects when a statement renderer received the inner workspace
+`flow` and promotes the retry bar to the workspace's outer container. Do not
+construct or append a retry button directly. The shared placement helper owns
+the hierarchy, markup, accessibility attributes, spacing, and alignment so
+legacy activities and plugins follow the same UI standard.
+
 The token-classification plugin exposes the shared identifier-language
 capability used by Falling Token Sort: seeded candidate construction, C/Java
 language definitions, and canonical lexical/contextual analysis. Falling Token

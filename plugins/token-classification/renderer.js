@@ -68,6 +68,6 @@ function tcRender({container,item,profile}){
   const invalid=tcRenderInvalidSelection(item);if(invalid)flow.appendChild(invalid);
   if(item.checked&&state.mode==='exam'&&!state.examSubmitted&&!item.invalidSelection)container.appendChild(h('div',{class:'exam-answer-recorded'},h('i',{class:'fa-solid fa-lock'}),h('span',{},h('b',{},'Answer recorded and locked.'),' Correctness and score are withheld until the exam is submitted.')));
   tcSyncDrawers(item,profile);
-  if(item.checked&&state.mode==='practice')container.appendChild(h('div',{class:'action-bar'},h('div',{class:'btn-group'},h('button',{class:'btn',onclick:handleRetrySameItem},h('i',{class:'fa-solid fa-rotate-right'}),' Try again'))));
+  if(item.checked&&state.mode==='practice')appendPracticeRetryBar(container);
   if(typeof renderVariableFinalFloat==='function')renderVariableFinalFloat(null);
 }

@@ -103,6 +103,8 @@ function testScriptManifestParses(){
   const tokenRenderer=fs.readFileSync(path.join(ROOT,'plugins','token-classification','renderer.js'),'utf8');
   const tokenFeedback=fs.readFileSync(path.join(ROOT,'plugins','token-classification','feedback.js'),'utf8');
   const tokenStyles=fs.readFileSync(path.join(ROOT,'plugins','token-classification','styles.css'),'utf8');
+  const fallingRenderer=fs.readFileSync(path.join(ROOT,'plugins','falling-token-sort','renderer.js'),'utf8');
+  const simulateRenderer=fs.readFileSync(path.join(ROOT,'plugins','simulate-output','renderer.js'),'utf8');
   assert(tokenRenderer.includes('renderProgramWorkspaceShell(container,item,'));
   assert(tokenRenderer.includes('renderInlineEvaluationActions({'));
   assert(tokenRenderer.includes("?'checked-wrong':'checked-correct'"));
@@ -117,6 +119,10 @@ function testScriptManifestParses(){
   assert(!tokenStyles.includes('#8b5cf6'));
   assert(!tokenStyles.includes('#7c3aed'));
   assert(tokenStyles.includes('var(--op)'));
+  assert(tokenRenderer.includes('appendPracticeRetryBar(container)'));
+  assert(fallingRenderer.includes('appendPracticeRetryBar(container)'));
+  assert(simulateRenderer.includes('appendPracticeRetryBar(container)'));
+  assert(!simulateRenderer.includes('flow.appendChild(renderPracticeRetryBar())'));
 
   const declarationRenderer = fs.readFileSync(path.join(ROOT,'js','render-declaration.js'),'utf8');
   const assignmentRenderer = fs.readFileSync(path.join(ROOT,'js','render-assignment.js'),'utf8');
@@ -137,6 +143,12 @@ function testScriptManifestParses(){
   assert(sessionRenderer.includes("class:'continuation-equals'"));
   assert(sessionRenderer.includes("class:'source-assignment-equals'"));
   assert(sessionRenderer.includes("class:'context-help'"));
+  assert(sessionRenderer.includes('function renderPracticeRetryBar()'));
+  assert(sessionRenderer.includes('function appendPracticeRetryBar(container)'));
+  assert(sessionRenderer.includes("parent.classList.contains('program-workspace')"));
+  assert(sessionRenderer.includes('const host=insideWorkspaceFlow&&parent.parentNode?parent.parentNode:container'));
+  assert(sessionRenderer.includes('appendPracticeRetryBar(container)'));
+  assert(styles.includes('.practice-retry-bar{justify-content:flex-start;}'));
   assert(sessionRenderer.includes('function renderInvalidExecutionAlert('));
   assert(sessionRenderer.includes("role:'alert','aria-live':'assertive'"));
   assert(sessionRenderer.includes("fa-triangle-exclamation"));
@@ -189,6 +201,23 @@ function testScriptManifestParses(){
   assert(assignmentRenderer.includes('strict-sequence-candidate'));
   assert(html.includes('id="examFeedbackRelease"'));
   assert(html.includes('id="submitExamBtn"'));
+  assert(html.includes('id="headerSessionContext"'));
+  assert(html.includes('id="accountMenu"'));
+  assert(html.includes('class="account-trigger sidebar-account-trigger"'));
+  assert(html.includes('js/shell-ui.js'));
+  assert(!html.includes('class="sidebar-logout-btn"'));
+  assert(styles.includes('.main-layout.sidebar-is-collapsed .header-brand'));
+  assert(styles.includes('env(safe-area-inset-bottom)'));
+  assert(styles.includes('.item-page-first,.item-page-last{display:none;}'));
+  assert(bundle.includes("sidebar.toggleAttribute('inert',!sidebarVisible)"));
+  assert(bundle.includes("linksToggle.setAttribute('aria-pressed'"));
+  assert(bundle.includes('userControlVisible: false'));
+  assert(bundle.includes("displayPolicy: 'content-aware'"));
+  assert(bundle.includes('overallVisible: false'));
+  assert(bundle.includes('if(!DEFAULT_APP_SETTINGS.shell.connectors.userControlVisible) return;'));
+  assert(bundle.includes('state.showConnectors=connectorSettings.visible'));
+  assert(bundle.includes('scoreButton.hidden=!DEFAULT_APP_SETTINGS.shell.scoreSummary.overallVisible'));
+  assert(bundle.includes('function varFinalPanelShouldRender(item)'));
   assert(html.includes('handleClearAllLocalData()'));
   assert(!login.includes('clearExamProgress(email);'));
   assert(!declarationRenderer.includes("class:'action-bar declaration-actions'"));
@@ -204,6 +233,37 @@ function testScriptManifestParses(){
   assert(bundle.includes("label='Evaluate'"));
   assert(!bundle.includes('manualResponseMirrorText'));
   assert(memoryFloatRenderer.includes('function runVarFinalComet('));
+}
+
+function testPracticeRetryPlacement(){
+  const ctx=context();
+  installFakeDom(ctx);
+  ctx.handleRetrySameItem=()=>{};
+  ctx.registerStatementRenderer=()=>{};
+  load(ctx,['dom-helpers.js','render-session.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const outer=new FakeNode('div');
+    const workspace=new FakeNode('section');
+    workspace.className='program-workspace';
+    workspace.classList={contains:name=>name==='program-workspace'};
+    const flow=new FakeNode('div');
+    flow.className='program-statement-flow';
+    workspace.parentNode=outer;
+    flow.parentNode=workspace;
+    outer.appendChild(workspace);
+    workspace.appendChild(flow);
+    const nestedBar=appendPracticeRetryBar(flow);
+
+    const directHost=new FakeNode('div');
+    const directBar=appendPracticeRetryBar(directHost);
+    return JSON.stringify({
+      nestedOutside:outer.children.includes(nestedBar)&&!workspace.children.includes(nestedBar),
+      nestedImmediatelyAfter:outer.children[1]===nestedBar,
+      directInside:directHost.children.includes(directBar),
+      sharedClass:nestedBar.className==='action-bar practice-retry-bar'
+    });
+  })()`));
+  assert.deepStrictEqual(result,{nestedOutside:true,nestedImmediatelyAfter:true,directInside:true,sharedClass:true});
 }
 
 function testStrictExamSequencePolicy(){
@@ -1201,6 +1261,7 @@ function testExamSettingsAndSubmissionPolicy(){
 
 function run(){
   testScriptManifestParses();
+  testPracticeRetryPlacement();
   testTokenClassificationPlugin();
   testFallingTokenSortMultiple();
   testSimulateOutputPlugin();

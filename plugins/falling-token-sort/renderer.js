@@ -600,8 +600,7 @@ function ftsRender({container,item,profile}){
       h('span',{},h('b',{},'Answer recorded and locked.'),' Correctness and score are withheld until the exam is submitted.')));
   }
   if(item.checked&&state.mode==='practice'){
-    container.appendChild(h('div',{class:'action-bar'},h('div',{class:'btn-group'},
-      h('button',{class:'btn',onclick:handleRetrySameItem},h('i',{class:'fa-solid fa-rotate-right'}),' Try again'))));
+    appendPracticeRetryBar(container);
   }
   ftsFitStageToApp(middle,stage);
   ftsRestoreTokenMotion(stage,item,tokenSnapshots);

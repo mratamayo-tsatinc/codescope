@@ -205,6 +205,27 @@ function renderProgramWorkspaceShell(container,item,program){
   return flow;
 }
 
+// Checked Practice items use one shell-owned retry placement: outside and
+// directly below the activity/workspace card, aligned with its left edge.
+// Renderers append this bar to their outer container, never to the workspace
+// flow itself, so every activity gets the same visual hierarchy.
+function renderPracticeRetryBar(){
+  return h('div',{class:'action-bar practice-retry-bar'},
+    h('div',{class:'btn-group'},
+      h('button',{class:'btn',type:'button',onclick:handleRetrySameItem},
+        h('i',{class:'fa-solid fa-rotate-right','aria-hidden':'true'}),' Try again')));
+}
+
+function appendPracticeRetryBar(container){
+  if(!container) return null;
+  const parent=container.parentNode;
+  const insideWorkspaceFlow=parent&&parent.classList&&parent.classList.contains('program-workspace');
+  const host=insideWorkspaceFlow&&parent.parentNode?parent.parentNode:container;
+  const bar=renderPracticeRetryBar();
+  host.appendChild(bar);
+  return bar;
+}
+
 function toggleProgramStatementDetails(statement){
   if(!statement || statement.status!=='complete') return;
   const isOpen=!!(statement._uiExpanded||statement._uiJustCompleted);
@@ -489,12 +510,7 @@ function renderSession(container){
     }
 
     if(state.mode==='practice'){
-      const bottomBar = h('div',{class:'action-bar'},
-        h('div',{class:'btn-group'},
-          h('button',{class:'btn', onclick:handleRetrySameItem}, h('i',{class:'fa-solid fa-rotate-right'}), ' Try again')
-        )
-      );
-      container.appendChild(bottomBar);
+      appendPracticeRetryBar(container);
     }
   } else if(typeof clearFeedbackDrawerContent === 'function'){
     // This item hasn't been checked yet — make sure feedback left over

@@ -436,6 +436,7 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
 
 /* ---------- action bar ---------- */
 .action-bar{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:10px;flex-wrap:wrap;}
+.practice-retry-bar{justify-content:flex-start;}
 .btn-group{display:flex;gap:8px;}
 .btn{
   font-family:var(--ui);font-size:13px;font-weight:600;padding:9px 15px;border-radius:7px;
@@ -1972,6 +1973,193 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
     border-radius: 14px;
     padding: 8px 12px;
   }
+}
+
+/* ============================================================================
+   RESPONSIVE APPLICATION SHELL
+   Keeps application identity, session context, account actions, and item
+   navigation compact without changing profile or activity presentation.
+   ============================================================================ */
+
+.sidebar-brand,
+.header-brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  color:var(--text);
+  font-weight:700;
+  letter-spacing:-.2px;
+}
+.sidebar-hamburger{z-index:1200;}
+.sidebar-brand{
+  min-height:44px;
+  margin:-.5rem 0 1.35rem;
+  padding-left:56px;
+  flex-shrink:0;
+}
+.sidebar-brand-name,.header-brand-name{font-size:18px;white-space:nowrap;}
+.sidebar-brand .login-icon,.header-brand .login-icon{
+  width:32px;height:32px;border-radius:8px;font-size:15px;animation:none;flex:0 0 auto;
+}
+.header-brand{display:none;}
+
+@media (min-width:769px){
+  .profile-sidebar{padding-top:1.5rem;}
+  .profile-sidebar.sidebar-collapsed{padding-top:1.5rem;}
+  .main-layout.sidebar-is-collapsed .header-brand{display:flex;}
+  .main-layout.sidebar-is-collapsed .app-header{padding-left:72px;}
+}
+
+.sidebar-footer{
+  position:relative;
+  padding-top:12px;
+  margin-top:12px;
+}
+.account-trigger{
+  border:1px solid var(--line);
+  background:var(--panel-alt);
+  color:var(--text);
+  cursor:pointer;
+}
+.sidebar-account-trigger{
+  width:100%;min-height:52px;padding:7px 8px;border-radius:9px;
+  display:grid;grid-template-columns:36px minmax(0,1fr) 18px;align-items:center;gap:9px;
+  text-align:left;
+}
+.account-trigger:hover{border-color:#3a4353;background:#20252f;}
+.account-avatar{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:50%;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--op),#ff8f3d);color:#1a0e02;
+  font-weight:800;font-size:14px;text-transform:uppercase;
+}
+.sidebar-account-copy,.account-menu-copy{display:flex;flex-direction:column;min-width:0;gap:2px;}
+.account-role{color:var(--text-mute);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
+.account-email{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-dim);font-size:11.5px;}
+.account-chevron{color:var(--text-mute);font-size:10px;}
+.header-account-trigger{
+  display:none;width:40px;height:40px;padding:1px;border:0;border-radius:50%;background:transparent;
+}
+.header-account-trigger .account-avatar{width:36px;height:36px;}
+.main-layout.sidebar-is-collapsed .header-account-trigger{display:inline-flex;align-items:center;justify-content:center;}
+
+.account-menu{
+  position:fixed;z-index:1400;padding:8px;border:1px solid #343b49;border-radius:12px;
+  background:var(--panel);box-shadow:0 16px 40px rgba(0,0,0,.48);
+}
+.account-menu[hidden]{display:none;}
+.account-menu-identity{display:flex;align-items:center;gap:10px;padding:8px 8px 12px;border-bottom:1px solid var(--line);}
+.account-menu-avatar{width:40px;height:40px;}
+.account-menu-email{overflow-wrap:anywhere;color:var(--text);font-size:12px;line-height:1.4;}
+.account-menu-logout{
+  width:100%;min-height:42px;margin-top:6px;padding:8px 10px;border:0;border-radius:8px;
+  display:flex;align-items:center;gap:10px;background:transparent;color:#ff9292;text-align:left;
+}
+.account-menu-logout:hover{background:rgba(255,115,115,.1);}
+
+.app-header{
+  min-height:72px;padding:12px 20px;
+  align-items:center;gap:18px;
+}
+.header-session-context{
+  min-width:0;display:flex;align-items:baseline;gap:8px;flex:1;
+  font-family:var(--mono);font-size:12px;color:var(--text-mute);
+}
+.header-session-context[hidden]{display:none;}
+.header-profile-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-weight:650;}
+.header-context-divider{color:var(--line);}
+.header-item-position{white-space:nowrap;color:var(--text-dim);}
+.user-status{display:flex;align-items:center;min-width:0;}
+.global-controls{margin:0;gap:7px;flex-wrap:nowrap;}
+.global-controls button[hidden]{display:none!important;}
+.link-toggle,.score-summary-btn{
+  min-width:40px;height:40px;padding:0 10px;border:1px solid transparent;border-radius:8px;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  text-decoration:none;background:transparent;color:var(--text-mute);
+}
+.link-toggle:hover,.link-toggle.active,.score-summary-btn:hover{
+  border-color:var(--line);background:var(--panel-alt);text-decoration:none;
+}
+.link-toggle.active{color:var(--op-glow);}
+.score-summary-btn{color:var(--text-dim);}
+.mode-tag{display:inline-flex;align-items:center;min-height:30px;white-space:nowrap;}
+.timer-container{height:36px;white-space:nowrap;}
+.submit-exam-btn{min-height:40px;white-space:nowrap;}
+
+/* Session context now belongs to the persistent shell header. */
+#app>.session-bar{display:none;}
+
+.item-pagination-container{
+  padding:8px 12px max(8px,env(safe-area-inset-bottom));
+  box-shadow:0 -6px 18px rgba(0,0,0,.18);
+}
+.item-pagination{padding:6px 10px;gap:5px;}
+.item-page-nav-btn,.item-page-btn{min-width:44px;width:44px;height:44px;}
+.item-page-numbers{width:236px;gap:4px;}
+.item-page-btn.item-page-correct::after,
+.item-page-btn.item-page-incorrect::after,
+.item-page-btn.item-page-attempted::after,
+.item-page-btn.item-page-locked::after,
+.item-page-btn.item-page-flagged::after{
+  top:-2px;right:-2px;width:15px;height:15px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--panel-alt);color:#101319;font:800 9px/1 var(--ui);
+}
+.item-page-btn.item-page-correct::after{content:'\2713';}
+.item-page-btn.item-page-incorrect::after{content:'\00d7';}
+.item-page-btn.item-page-attempted::after{content:'\2022';}
+.item-page-btn.item-page-locked::after{content:'\2022';}
+.item-page-btn.item-page-flagged::after{content:'\2691';font-size:8px;}
+
+@media (max-width:1100px){
+  .global-controls .control-label{display:none;}
+  .link-toggle,.score-summary-btn{width:40px;padding:0;}
+}
+
+@media (max-width:768px){
+  .sidebar-hamburger{top:10px;left:10px;width:40px;height:40px;box-shadow:none;z-index:1200;}
+  .profile-sidebar{padding-top:1rem;}
+  .sidebar-brand{margin:0 40px 1.25rem 0;padding-left:0;}
+  .app-header{
+    min-height:0;padding:10px 10px 9px 62px;
+    display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;
+  }
+  .header-brand{display:flex;order:1;}
+  .header-brand-name{font-size:17px;}
+  .user-status{order:2;margin-left:auto;max-width:100%;}
+  .header-session-context{order:3;flex:1 0 100%;gap:6px;font-size:11.5px;}
+  .global-controls{gap:5px;justify-content:flex-end;}
+  .header-account-trigger{display:inline-flex;align-items:center;justify-content:center;}
+  .link-toggle,.score-summary-btn,.header-account-trigger{width:40px;height:40px;min-width:40px;padding:0;}
+  .timer-container{height:34px;padding:0 8px;gap:5px;}
+  .timer-label{display:none;}
+  .timer-display{min-width:44px;font-size:14px;}
+  .mode-tag{min-height:28px;padding:3px 7px;font-size:10px;}
+  .submit-exam-btn{min-height:40px;padding:7px 9px;}
+  #app{padding-top:1rem;}
+  .item-pagination-container{padding:7px 10px max(7px,env(safe-area-inset-bottom));}
+  .item-pagination{max-width:420px;padding:6px 8px;gap:6px;flex-wrap:nowrap;}
+  .item-page-first,.item-page-last{display:none;}
+  .item-page-mobile-indicator{min-width:0;flex:1;justify-content:center;}
+  .item-page-jump-select{min-height:44px;max-width:150px;padding:7px 10px;}
+  .item-page-nav-btn{width:44px;height:44px;}
+}
+
+@media (max-width:420px){
+  .header-brand-name{display:none;}
+  .app-header{column-gap:6px;}
+  .header-context-divider{display:none;}
+  .header-session-context{align-items:flex-start;flex-direction:column;gap:2px;}
+  .header-profile-name{max-width:100%;}
+  .submit-exam-btn span{display:none;}
+  .submit-exam-btn{width:40px;padding:0;justify-content:center;}
+  .item-page-mobile-total{font-size:11px;}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .timer-display.critical{animation:none;}
+  .sidebar-hamburger:hover{transform:none;}
 }
 
 /* --------------------------------------------------------------------------

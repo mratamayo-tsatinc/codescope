@@ -123,10 +123,13 @@ browser settings do not override them.
 
 | Setting | Default | Effect |
 |---|---:|---|
-| `connectors.visible` | `true` | Initial state of operator/result connector lines. |
+| `connectors.visible` | `true` | Authoritative connector-line state when the user control is hidden; otherwise the initial state. |
+| `connectors.userControlVisible` | `false` | Shows the student-facing Links toggle when `true`. When `false`, students cannot override `connectors.visible`. |
 | `connectors.maxLeadPx` | `18` | Maximum straight lead used by connector curves. |
-| `memoryPanel.visible` | `true` | Initial visibility of the floating memory panel. |
-| `memoryPanel.transferAnimation.enabled` | `false` | Initial state of the memory transfer animation. |
+| `memoryPanel.visible` | `true` | Enables the floating memory panel. It is also the initial state when the user control is available. |
+| `memoryPanel.displayPolicy` | `content-aware` | `content-aware` shows the panel only for compatible program items; `hidden` disables it for every item. |
+| `memoryPanel.userControlVisible` | `false` | Shows the student-facing Vars toggle when `true`. When `false`, panel visibility follows the deployment configuration and active content. |
+| `memoryPanel.transferAnimation.enabled` | `true` | Initial state of the memory transfer animation. |
 | `memoryPanel.transferAnimation.durationMs` | `1000` | Initial transfer duration. Must match a speed level. |
 | `memoryPanel.transferAnimation.speedLevelsMs` | `[1000, 2000, 3000]` | Durations cycled by the memory header control. |
 | `memoryPanel.entranceDurationMs` | `220` | Memory-panel entrance duration. |
@@ -137,6 +140,7 @@ browser settings do not override them.
 | `liveStepScroll.maxWaitMs` | `900` | Maximum wait for guided auto-scroll to settle. |
 | `liveStepScroll.bottomInsetPx` | `28` | Bottom breathing room for the active evaluation row. |
 | `pagination.windowSize` | `5` | Maximum number of item buttons in the pagination window. |
+| `scoreSummary.overallVisible` | `false` | Shows the header-level summary across every category. Category score and QR actions remain available when this is `false`. |
 | `scoreSummary.pngScale` | `2` | Resolution multiplier used by the Score Summary PNG download. |
 | `scoreSummary.filenamePrefix` | `codescope-score-summary` | Prefix used for downloaded Score Summary filenames. |
 | `celebrations.enabled` | `true` | Master switch for shared celebration badges/effects. |
@@ -145,6 +149,47 @@ browser settings do not override them.
 The remaining values in `memoryPanel` and `celebrations` are timing safety
 margins and burst counts. They are centralized beside the visible controls so
 the shell no longer hides behavioral defaults inside renderer files.
+
+### Removing student access without removing behavior
+
+The default deployment keeps connector lines enabled, selects the variable
+panel automatically from the active content, and removes the three global
+header controls that students do not need:
+
+```js
+connectors: Object.freeze({
+  visible: true,
+  userControlVisible: false,
+  maxLeadPx: 18,
+}),
+memoryPanel: Object.freeze({
+  visible: true,
+  displayPolicy: 'content-aware',
+  userControlVisible: false,
+  // animation settings...
+}),
+scoreSummary: Object.freeze({
+  overallVisible: false,
+  pngScale: 2,
+  filenamePrefix: 'codescope-score-summary',
+}),
+```
+
+This has the following effects:
+
+- Connector lines remain on and the Links control is unavailable. Set
+  `connectors.userControlVisible` to `true` to restore the control.
+- The variable panel appears only for program items that provide compatible
+  memory data. Activity plugins without that data do not receive an empty or
+  ineffective panel. Set `memoryPanel.userControlVisible` to `true` to restore
+  the Vars control, or set `memoryPanel.displayPolicy` to `hidden` to disable
+  the panel completely.
+- The header-level overall score action is unavailable. Category score links,
+  category totals, PNG export, and category QR generation are unchanged. Set
+  `scoreSummary.overallVisible` to `true` to restore the header action.
+
+These are deployment-owned shell values. They are not exposed in the login
+Settings modal and browser-saved settings cannot override them.
 
 ## Evaluation interaction
 

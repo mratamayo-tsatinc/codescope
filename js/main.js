@@ -34,6 +34,7 @@ function render(){
     
     // Populate sidebar when showing main content
     populateProfileSidebar();
+    if(typeof syncSidebarShellState==='function') syncSidebarShellState();
   }
 
   // Global app-header controls (mode tag, links toggle, exam timer) live in
@@ -79,7 +80,7 @@ function render(){
 
   // Mount at the program boundary so this authoritative panel refreshes for
   // legacy expressions and for every declaration in a statement chain.
-  if(typeof renderVariableFinalFloat === 'function') renderVariableFinalFloat(activeItem&&activeItem.activityKind?null:activeItem);
+  if(typeof renderVariableFinalFloat === 'function') renderVariableFinalFloat(activeItem);
 
   if(state.screen==='session'){
     // Save the current mode only when its deployment switch is enabled.
@@ -124,15 +125,32 @@ function render(){
 // timer already running keeps showing its live value across any render()
 // call instead of momentarily resetting.
 function syncGlobalHeaderUI(){
+  if(typeof syncShellSessionContext==='function') syncShellSessionContext();
+  if(typeof syncShellAccountUI==='function') syncShellAccountUI();
+
   const modeTag = document.getElementById('headerModeTag');
   if(modeTag){
     modeTag.textContent = state.mode;
     modeTag.className = 'mode-tag ' + state.mode;
   }
+  const connectorSettings=DEFAULT_APP_SETTINGS.shell.connectors;
+  if(!connectorSettings.userControlVisible) state.showConnectors=connectorSettings.visible;
   const linksToggle = document.getElementById('headerLinksToggle');
-  if(linksToggle) linksToggle.classList.toggle('active', state.showConnectors);
+  const activeItem=typeof currentItem==='function'?currentItem():null;
+  const supportsProgramViews=state.screen==='session'&&activeItem&&!activeItem.activityKind;
+  if(linksToggle){
+    linksToggle.hidden=!connectorSettings.userControlVisible||!supportsProgramViews;
+    linksToggle.classList.toggle('active', state.showConnectors);
+    linksToggle.setAttribute('aria-pressed',String(!!state.showConnectors));
+    linksToggle.setAttribute('aria-label',state.showConnectors?'Hide connector lines':'Show connector lines');
+  }
   const linksToggleText = document.getElementById('headerLinksToggleText');
   if(linksToggleText) linksToggleText.textContent = state.showConnectors ? 'Links on' : 'Links off';
+
+  const varsToggle=document.getElementById('varFloatToggle');
+  if(varsToggle){
+    varsToggle.hidden=!DEFAULT_APP_SETTINGS.shell.memoryPanel.userControlVisible||!supportsProgramViews;
+  }
 
   const timerContainer = document.getElementById('timerContainer');
   if(timerContainer){
@@ -140,8 +158,7 @@ function syncGlobalHeaderUI(){
   }
   const scoreButton=document.getElementById('scoreSummaryBtn');
   if(scoreButton){
-    const hideExamScore=!examResultsVisible();
-    scoreButton.style.display=hideExamScore?'none':'';
+    scoreButton.hidden=!DEFAULT_APP_SETTINGS.shell.scoreSummary.overallVisible||!examResultsVisible();
   }
   const submitButton=document.getElementById('submitExamBtn');
   if(submitButton) submitButton.style.display=(state.mode==='exam'&&state.screen==='session'&&!state.examSubmitted)?'inline-flex':'none';

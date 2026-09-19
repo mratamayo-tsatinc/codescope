@@ -117,9 +117,7 @@ function soRender({container,item,profile}){
     controls.appendChild(renderInlineEvaluationActions({canCheck:true}));
     flow.appendChild(controls);
   }else if(state.mode==='practice'){
-    flow.appendChild(h('div',{class:'action-bar'},h('div',{class:'btn-group'},
-      h('button',{class:'btn',type:'button',onclick:handleRetrySameItem},
-        h('i',{class:'fa-solid fa-rotate-right','aria-hidden':'true'}),' Try again'))));
+    appendPracticeRetryBar(container);
   }
   soSyncDrawers(item,profile);
 }

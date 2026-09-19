@@ -118,6 +118,7 @@ function showLoginError(message) {
 }
 
 function logout() {
+  if(typeof closeAccountMenu==='function') closeAccountMenu();
   stopTimer();
   localStorage.removeItem('precedifyLogin');
   state.screen = 'login';
@@ -458,6 +459,7 @@ function openSidebar() {
   sidebar.classList.add('sidebar-open');
   backdrop.classList.add('show');
   document.getElementById('sidebarToggleBtn').setAttribute('aria-expanded', 'true');
+  if(typeof syncSidebarShellState==='function') syncSidebarShellState();
 }
 
 function closeSidebar() {
@@ -466,6 +468,7 @@ function closeSidebar() {
   sidebar.classList.remove('sidebar-open');
   backdrop.classList.remove('show');
   document.getElementById('sidebarToggleBtn').setAttribute('aria-expanded', 'false');
+  if(typeof syncSidebarShellState==='function') syncSidebarShellState();
 }
 
 function closeSidebarIfMobile() {
@@ -478,12 +481,15 @@ function collapseDesktopSidebar() {
   const sidebar = document.getElementById('profileSidebar');
   sidebar.classList.add('sidebar-collapsed');
   document.getElementById('sidebarToggleBtn').setAttribute('aria-expanded', 'false');
+  if(typeof closeAccountMenu==='function') closeAccountMenu();
+  if(typeof syncSidebarShellState==='function') syncSidebarShellState();
 }
 
 function expandDesktopSidebar() {
   const sidebar = document.getElementById('profileSidebar');
   sidebar.classList.remove('sidebar-collapsed');
   document.getElementById('sidebarToggleBtn').setAttribute('aria-expanded', 'true');
+  if(typeof syncSidebarShellState==='function') syncSidebarShellState();
 }
 
 function selectProfile(profileId) {
