@@ -10,8 +10,8 @@ approved.
 
 The application is intentionally implemented with vanilla HTML, CSS, and
 classic JavaScript. It is served as static files and currently has no backend.
-Student lookup uses `data/students.csv`; session settings and exam attempts are
-stored in the browser.
+Student lookup uses `data/students.csv`; session settings and enabled mode
+snapshots are stored in the browser.
 
 ## Product goals
 
@@ -51,7 +51,7 @@ stored in the browser.
 | Activity orchestration | `js/activity-core.js` | Activity-plugin registry and shell lifecycle dispatch. |
 | Token Classification | `plugins/token-classification/` | Language rules, identifier generation/analysis, syntax-position classification, modal, renderer, and feedback. |
 | Falling Token Sort | `plugins/falling-token-sort/` | Configurable bucket sorting using Token Classification's public identifier capabilities. |
-| Persistence | `js/settings-persistence.js`, `exam-persistence.js` | Device settings and per-student Exam snapshots. |
+| Persistence | `js/settings-persistence.js`, `exam-persistence.js` | Device settings and independently configurable per-student Practice/Exam snapshots. |
 | Verification | `tests/run-tests.js` | Full compatibility and extension suite. |
 
 ## Profile families
@@ -87,10 +87,9 @@ Activity plugins may use these shell capabilities without reimplementing them:
 - scoring aggregation and Score Summary;
 - Console and Feedback drawers;
 - modal shell and connector conventions;
-- exam persistence;
+- mode-scoped session persistence;
 - Undo, Check, Try again, and solution disclosure policy;
 - shared design tokens, accessibility primitives, and animation services.
 
 See `docs/plugin-architecture.md`, `docs/statement-plugin-guide.md`, and
 `docs/how-to-use-app-settings.md` for implementation detail.
-

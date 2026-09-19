@@ -6,7 +6,7 @@
 // device/browser-level "what mode is this station in" setting, the same
 // way a physical exam-mode switch would work. It is the source of truth in
 // local-configurable deployments. In state-only deployments, state.js is the
-// source and this record is ignored; student exam records remain separate.
+// source and this record is ignored; student session records remain separate.
 // ============================================================================
 
 // Keep the original storage namespace so the CodeScope rename does not erase
@@ -106,7 +106,8 @@ function clearAllPrecedifyLocalData(){
     for(let i=0;i<localStorage.length;i++){
       const key=localStorage.key(i);
       if(key&&(key==='precedifyLogin'||key===APP_SETTINGS_KEY
-        ||key.indexOf('precedifyExamProgress:')===0)) keys.push(key);
+        ||key.indexOf('precedifyExamProgress:')===0
+        ||key.indexOf('precedifyPracticeProgress:')===0)) keys.push(key);
     }
     keys.forEach(key=>{localStorage.removeItem(key);removed++;});
   }catch(e){ /* return whatever was removed before the failure */ }

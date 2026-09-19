@@ -1335,6 +1335,9 @@ function testSimulateOutputPlugin(){
     'plugins/simulate-output/plugin.js'
   ]);
   load(ctx,['state.js']);
+  ctx.document={querySelector:()=>null};
+  ctx.savedEdits=0;
+  ctx.saveSessionProgress=()=>{ctx.savedEdits++;};
   const catalog=JSON.parse(evaluate(ctx,'JSON.stringify(SO_EXERCISES)'));
   assert.strictEqual(catalog.length,19);
   catalog.forEach(exercise=>{
@@ -1352,6 +1355,9 @@ function testSimulateOutputPlugin(){
       soGenerateItem({profile,index,generationContext:contextB}));
     const item=items.find(candidate=>candidate.variables.length>0);
     const metadataHidden=!item.source.includes('@output')&&!item.source.includes('@variables');
+    state.profileId=profile.id;
+    soEdit(item,{type:'SET_OUTPUT',value:'typing'});
+    const typingSaved=savedEdits===1&&item.response.output==='typing';
     soApplyAction({item,action:{type:'SET_OUTPUT',value:item.expectedLines.join('\\n')}});
     item.variables.forEach((variable,index)=>{
       if(Array.isArray(variable.expected))variable.expected.forEach((value,part)=>
@@ -1379,13 +1385,13 @@ function testSimulateOutputPlugin(){
       unique:new Set(items.map(candidate=>candidate.exerciseId)).size,
       deterministic:items.map(candidate=>candidate.exerciseId).join(',')
         ===repeat.map(candidate=>candidate.exerciseId).join(','),
-      allC:items.every(candidate=>candidate.language==='c'),metadataHidden,
+      allC:items.every(candidate=>candidate.language==='c'),metadataHidden,typingSaved,
       full:full.applied,fullScore,traceMatches,retry:retry.applied,resetClean,
       extraPenalty:extra.outputCorrect===item.expectedLines.length-1,
       snapshotStable,withheld,released});
   })()`));
   assert.deepStrictEqual(result,{profileActive:true,count:19,unique:19,deterministic:true,
-    allC:true,metadataHidden:true,full:true,fullScore:10,traceMatches:true,
+    allC:true,metadataHidden:true,typingSaved:true,full:true,fullScore:10,traceMatches:true,
     retry:true,resetClean:true,
     extraPenalty:true,snapshotStable:true,withheld:true,released:true});
 }
@@ -1708,15 +1714,103 @@ function testProfileCategoriesAndScopedScores(){
     populateProfileSidebar();
     const categories=document.getElementById('profileList').children;
     const grouped=categories.length===4 && categories.every(category=>category.children.length===2);
+    const professionalHierarchy=categories.every(category=>{
+      const heading=category.children[0],expand=heading.children[0],results=heading.children[1];
+      return expand.children[1].className==='category-nav-label'
+        &&results.className==='category-score-link'
+        &&results.children.length===1&&results.children[0].className.includes('fa-qrcode');
+    });
     return JSON.stringify({assigned,unique,expressionScore,identifierScore,overall,
-      scopedModal,scopedFilename,overallModal,grouped});
+      scopedModal,scopedFilename,overallModal,grouped,professionalHierarchy});
   })()`));
   assert.deepStrictEqual(result,{
     assigned:true,unique:true,expressionScore:{earned:0.6,max:1},
     identifierScore:{earned:12,max:30},overall:{earned:12.6,max:31},
-    scopedModal:true,scopedFilename:true,overallModal:true,grouped:true
+    scopedModal:true,scopedFilename:true,overallModal:true,grouped:true,professionalHierarchy:true
   });
 }
 
+function testModeScopedPersistence(){
+  const dependencies=[
+    'engine.js','flat-model.js','template-engine.js','generator.js','profiles.js',
+    'program-ir.js','program-core.js','legacy-expression-plugin.js',
+    'declaration-statement-plugin.js','assignment-statement-plugin.js',
+    'program-item-builder.js'
+  ];
+  function sessionContext(practice,exam){
+    const ctx=context();
+    load(ctx,dependencies);
+    const filename=path.join(ROOT,'js','state.js');
+    const source=fs.readFileSync(filename,'utf8').replace(
+      'persistence: Object.freeze({practice:false, exam:true})',
+      `persistence: Object.freeze({practice:${practice}, exam:${exam}})`);
+    vm.runInContext(source,ctx,{filename});
+    load(ctx,['exam-persistence.js','settings-persistence.js']);
+    return ctx;
+  }
+
+  const disabledPractice=sessionContext(false,true);
+  const defaults=JSON.parse(evaluate(disabledPractice,`(()=>{
+    state.userEmail='student@example.edu';state.mode='practice';state.screen='session';
+    appSettings.mode='practice';saveSessionProgress();
+    const practiceSkipped=localStorage.getItem(practiceProgressKey(state.userEmail))===null;
+    state.mode='exam';appSettings.mode='exam';saveSessionProgress();
+    const examSaved=localStorage.getItem(examProgressKey(state.userEmail))!==null;
+    const modeSeparated=localStorage.getItem(practiceProgressKey(state.userEmail))===null;
+    return JSON.stringify({practiceSkipped,examSaved,modeSeparated});
+  })()`));
+  assert.deepStrictEqual(defaults,{practiceSkipped:true,examSaved:true,modeSeparated:true});
+
+  const enabledPractice=sessionContext(true,false);
+  const practiceRecord=evaluate(enabledPractice,`(()=>{
+    const profile=PROFILES[0];
+    initializeSeededRandom(24680);
+    const items=generateItemsForProfile(profile.id);
+    resetRandomGenerator();
+    items[2].points=0.6;items[2].checked=true;
+    state.userEmail='student@example.edu';state.userStudentId='ST-1';
+    state.mode='practice';appSettings.mode='practice';state.screen='session';
+    state.profileId=profile.id;state.itemIndex=2;state.itemIndexByProfile={[profile.id]:2};
+    state.sessionSeed=24680;state.items=items;state.itemsByProfile={[profile.id]:items};
+    state.practicePolicy=snapshotPracticePolicy({practice:{interactionMode:'strict-sequence'}});
+    saveSessionProgress();
+    return localStorage.getItem(practiceProgressKey(state.userEmail));
+  })()`);
+  assert(practiceRecord);
+  const examWriteBlocked=evaluate(enabledPractice,`(()=>{
+    state.mode='exam';appSettings.mode='exam';saveSessionProgress();
+    return localStorage.getItem(examProgressKey('student@example.edu'))===null;
+  })()`);
+  assert.strictEqual(examWriteBlocked,true);
+  disabledPractice.localStorage.setItem('precedifyPracticeProgress:student@example.edu',practiceRecord);
+  assert.strictEqual(evaluate(disabledPractice,
+    "tryResumePracticeSession('student@example.edu')"),false);
+  assert.strictEqual(enabledPractice.localStorage.getItem('precedifyExamProgress:student@example.edu'),null);
+  const examRecord=disabledPractice.localStorage.getItem('precedifyExamProgress:student@example.edu');
+  const restored=sessionContext(true,false);
+  restored.localStorage.setItem('precedifyPracticeProgress:student@example.edu',practiceRecord);
+  restored.localStorage.setItem('precedifyExamProgress:student@example.edu',examRecord);
+  const resumed=JSON.parse(evaluate(restored,`(()=>{
+    localStorage.setItem(APP_SETTINGS_KEY,JSON.stringify({persistence:{practice:false,exam:true}}));
+    loadPersistedAppSettings();
+    const deploymentOwned=modePersistenceEnabled('practice')
+      &&!modePersistenceEnabled('exam')&&appSettings.persistence.practice===true;
+    const examBlocked=tryResumeSession('exam','student@example.edu')===false;
+    const practiceResumed=tryResumePracticeSession('student@example.edu');
+    const sameItem=state.profileId==='direct-ltr'&&state.itemIndex===2
+      &&state.items[2].points===0.6&&state.items[2].checked===true;
+    const samePolicy=activePracticePolicy().interactionMode==='strict-sequence';
+    const sameSeed=state.sessionSeed===24680;
+    const noTimer=state.examTimerMinutes===null&&state.examSubmitted===false;
+    clearAllPrecedifyLocalData();
+    const cleared=localStorage.getItem(practiceProgressKey('student@example.edu'))===null
+      &&localStorage.getItem(examProgressKey('student@example.edu'))===null;
+    return JSON.stringify({deploymentOwned,examBlocked,practiceResumed,sameItem,samePolicy,sameSeed,noTimer,cleared});
+  })()`));
+  assert.deepStrictEqual(resumed,{deploymentOwned:true,examBlocked:true,practiceResumed:true,sameItem:true,
+    samePolicy:true,sameSeed:true,noTimer:true,cleared:true});
+}
+
 testProfileCategoriesAndScopedScores();
+testModeScopedPersistence();
 run();

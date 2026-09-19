@@ -7,6 +7,9 @@ unless the user explicitly approves a change.
 
 ### Practice
 
+- Practice progress resumes from the same per-student generated snapshot when
+  deployment configuration enables Practice persistence. With persistence
+  disabled, refresh or login starts a newly seeded Practice session.
 - Guided and strict-sequence interaction are available.
 - Guided exposes only the profile-defined intended targets/actions.
 - Practice strict may expose a broader profile-defined scope. An invalid
@@ -20,10 +23,11 @@ unless the user explicitly approves a change.
 
 ### Exam
 
-- Exam policy is snapshotted when the attempt starts and restored with it.
-- An active attempt persists its original generated items, item language,
+- Exam policy is snapshotted when the attempt starts. When Exam persistence is
+  enabled, it is restored with the saved attempt.
+- When enabled, Exam persistence saves original generated items, item language,
   actions, responses, score state, current location, flags, and deadline.
-- Reload or login resume must not regenerate seeded content.
+- A resumed saved attempt must not regenerate seeded content.
 - A terminal strict-sequence error ends the affected item, retains credit from
   earlier valid actions, and reveals no corrective teaching during the attempt.
 - Correct solutions are never available during Exam.
@@ -33,10 +37,11 @@ unless the user explicitly approves a change.
 ## Seed and language
 
 - A fresh Practice session receives a fresh session seed and therefore a new
-  permutation of generated items.
+  permutation of generated items. A persisted Practice resume retains its seed.
 - Seeded generation is deterministic: the same seed and profile configuration
   reproduce the same item.
-- Exam saves the generated item snapshot, not just the seed or progress.
+- When Exam persistence is enabled, it saves the generated item snapshot, not
+  just the seed or progress.
 - `state.language` selects C or Java at generation time.
 - Every item captures its language. Changing the live setting must not alter an
   already-generated or restored item.

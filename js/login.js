@@ -101,13 +101,10 @@ function handleLogin(event) {
   loginOverlay.style.pointerEvents = 'none';
   
   setTimeout(() => {
-    // appSettings.mode is now globally persisted (settings-persistence.js)
-    // and re-loaded on app boot / whenever Settings is opened, so it's a
-    // reliable, disk-backed signal here — not something that merely
-    // happens to still be sitting in memory. Resume only if that persisted
-    // mode is currently 'exam'. Practice sessions never delete a stored
-    // exam; only an explicit Danger Zone action may purge an attempt.
-    if (appSettings.mode === 'exam' && tryResumeExamSession(email)) {
+    // Each mode has its own deployment-controlled persistence switch and
+    // storage key. A disabled mode always starts fresh without deleting an
+    // existing snapshot from the other mode.
+    if (tryResumeSession(appSettings.mode,email)) {
       return;
     }
     startSession();
@@ -552,21 +549,23 @@ function populateProfileSidebar() {
   PROFILE_CATEGORIES.forEach(category=>{
     const profiles=profilesForCategory(category.id);
     if(!profiles.length) return;
+    const categoryOpen=openCategoryIds.has(category.id);
     const li=document.createElement('li');
-    li.className='category-nav-item';
+    li.className='category-nav-item'+(categoryOpen?' expanded':'');
     const heading=document.createElement('div');
     heading.className='category-nav-heading';
     const expand=document.createElement('button');
     expand.type='button';
     expand.className='category-expand-btn';
-    expand.setAttribute('aria-expanded',String(openCategoryIds.has(category.id)));
+    expand.setAttribute('aria-expanded',String(categoryOpen));
     expand.setAttribute('aria-controls',`category-profiles-${category.id}`);
-    expand.setAttribute('aria-label',`${openCategoryIds.has(category.id)?'Collapse':'Expand'} ${category.name}`);
+    expand.setAttribute('aria-label',`${categoryOpen?'Collapse':'Expand'} ${category.name}`);
     const chevron=document.createElement('i');
-    chevron.className=`fa-solid fa-chevron-${openCategoryIds.has(category.id)?'down':'right'}`;
+    chevron.className=`fa-solid fa-chevron-${categoryOpen?'down':'right'}`;
     chevron.setAttribute('aria-hidden','true');
     expand.appendChild(chevron);
     const name=document.createElement('span');
+    name.className='category-nav-label';
     name.textContent=category.name;
     expand.appendChild(name);
     const categoryScore=examResultsVisible()?computeCategoryScore(category.id):null;
@@ -581,19 +580,24 @@ function populateProfileSidebar() {
       const scoreLink=document.createElement('button');
       scoreLink.type='button';
       scoreLink.className='category-score-link';
-      scoreLink.textContent='Score / QR';
+      scoreLink.title=`View ${category.name} results and QR code`;
       scoreLink.setAttribute('aria-label',`View ${category.name} score summary and QR code`);
+      const scoreIcon=document.createElement('i');
+      scoreIcon.className='fa-solid fa-qrcode';
+      scoreIcon.setAttribute('aria-hidden','true');
+      scoreLink.appendChild(scoreIcon);
       scoreLink.onclick=()=>openScoreSummaryModal(category.id);
       heading.appendChild(scoreLink);
     }
     const children=document.createElement('ul');
     children.id=`category-profiles-${category.id}`;
     children.className='category-profile-list';
-    children.hidden=!openCategoryIds.has(category.id);
+    children.hidden=!categoryOpen;
     expand.onclick=()=>{
       if(openCategoryIds.has(category.id)) openCategoryIds.delete(category.id);
       else openCategoryIds.add(category.id);
       children.hidden=!openCategoryIds.has(category.id);
+      li.classList.toggle('expanded',!children.hidden);
       expand.setAttribute('aria-expanded',String(!children.hidden));
       expand.setAttribute('aria-label',`${children.hidden?'Expand':'Collapse'} ${category.name}`);
       chevron.className=`fa-solid fa-chevron-${children.hidden?'right':'down'}`;

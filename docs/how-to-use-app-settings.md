@@ -21,6 +21,7 @@ hardcoded configuration.
 const DEFAULT_APP_SETTINGS = Object.freeze({
   schemaVersion: 5,
   settingsPolicy: 'local-configurable', // or 'state-only'
+  persistence: Object.freeze({practice:false, exam:true}),
   // ...
 });
 ```
@@ -36,14 +37,35 @@ overwrite settings already saved on a student machine. Saved settings remain
 the device-level source until **Reset application settings** or **Clear all
 local application data** removes them.
 
-In `state-only` mode, saved settings are ignored immediately, but student exam
-progress remains available. Changing the settings policy never deletes an
-exam attempt.
+In `state-only` mode, saved settings are ignored immediately. Student progress
+remains in browser storage until explicitly cleared. Changing settings policy
+does not delete a saved attempt.
 
 Settings are captured as an immutable session policy when Practice starts or
 an Exam attempt begins. Changing the configuration affects the next session,
-not an already-running one. A resumed Exam restores the policy saved with that
-attempt.
+not an already-running one. A resumed session restores the policy saved with
+that attempt.
+
+## Per-mode session persistence
+
+Edit `DEFAULT_APP_SETTINGS.persistence` in `js/state.js`:
+
+```js
+persistence: Object.freeze({
+  practice: false, // set true to resume Practice after refresh or login
+  exam: true        // set false to start a fresh Exam after refresh or login
+}),
+```
+
+These two switches are independent and deployment-owned. Browser-saved app
+settings and the login Settings panel cannot override them. The defaults keep
+the previous behavior: Practice starts fresh; Exam resumes. When enabled, a
+mode stores each student's generated items, responses, scores, active profile,
+item position, seed, and policy in a mode-specific localStorage record. Exam
+also stores its deadline and submission state. Turning a switch off stops reads
+and writes for that mode; it does not delete its existing records. The other
+mode's records are unaffected. **Clear all local application data** deletes
+both modes' records.
 
 ## Complete configuration
 
@@ -51,6 +73,7 @@ attempt.
 const DEFAULT_APP_SETTINGS = Object.freeze({
   schemaVersion: 5,
   settingsPolicy: 'local-configurable',
+  persistence: Object.freeze({practice:false, exam:true}),
   mode: 'practice',
   timerMinutes: 15,
 
@@ -189,7 +212,7 @@ edited browser data says otherwise:
 - `lockItemAfterCheck` is always `true`.
 - `autoSubmitOnTimeout` is always `true`.
 
-Exam items are generated from a per-student seed and saved locally. Reloading,
+When Exam persistence is enabled, generated items are saved locally. Reloading,
 logging out, or logging back in on the same browser resumes the same attempt
 and original deadline; it does not regenerate questions or reset the timer.
 
@@ -211,11 +234,11 @@ and the page explains that the deployment controls them.
 
 ## Local data and the Danger Zone
 
-| Action | Settings | Saved login | All student Exam attempts |
-|---|---:|---:|---:|
-| Clear all exam progress | Keep | Keep | Delete |
-| Reset application settings | Reset to `state.js` defaults | Keep | Keep |
-| Clear all local application data | Delete/reset | Delete | Delete |
+| Action | Settings | Saved login | Exam attempts | Practice progress |
+|---|---:|---:|---:|---:|
+| Clear all exam progress | Keep | Keep | Delete | Keep |
+| Reset application settings | Reset to `state.js` defaults | Keep | Keep | Keep |
+| Clear all local application data | Delete/reset | Delete | Delete | Delete |
 
 These actions affect only the current browser/device. The application has no
 backend database or central dashboard, so clearing browser storage cannot be

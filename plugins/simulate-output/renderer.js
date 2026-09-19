@@ -30,7 +30,7 @@ function soEdit(item,action){
   const result=applyActivityAction(item,action);
   if(!result.applied)return;
   soSyncProgress(item);
-  if(state.mode==='exam'&&typeof saveExamProgress==='function')saveExamProgress();
+  if(typeof saveSessionProgress==='function') saveSessionProgress();
 }
 
 function soSourceFragments(line){

@@ -1,67 +1,73 @@
 // ============================================================================
-// EXAM-MODE PROGRESS PERSISTENCE (localStorage, keyed by student email)
+// MODE-SCOPED PROGRESS PERSISTENCE (localStorage, keyed by student email)
 // ----------------------------------------------------------------------------
-// Practice mode is intentionally NEVER persisted here — a practice refresh
-// or logout is expected to reseed everything and drop progress (see
-// state.js's startSession(), still called fresh in those cases). This file
-// only engages when appSettings.mode==='exam', and saves enough to resume
-// an exam session EXACTLY where the student left off: which seed generated
-// every profile's items, each item's live trace/history/checked state, the
-// student's current profile/item position, and the timer's absolute
-// deadline (so time actually keeps counting down while the student is away
-// — a refresh never grants extra time).
+// state.js controls persistence independently for Practice and Exam. Both
+// modes save generated items and progress; Exam additionally saves its
+// deadline and submission state. Separate keys prevent cross-mode restores.
 //
-// Storage key is per-student (precedifyExamProgress:<email>), so logging
-// out never has to special-case exam mode to "preserve" anything: logout()
-// only ever removes the separate 'precedifyLogin' remember-me record, never
-// this key, so the record is simply still there — untouched — the next
-// time that same email logs back in, however much later that is.
+// Both storage keys are per-student. Logging out removes only the separate
+// 'precedifyLogin' record, so an enabled mode can resume on the next login.
 // ============================================================================
 
 function examProgressKey(email){ return 'precedifyExamProgress:' + email; }
+function practiceProgressKey(email){ return 'precedifyPracticeProgress:' + email; }
+function sessionProgressKey(mode,email){
+  return mode==='exam'?examProgressKey(email):practiceProgressKey(email);
+}
+
+function loadSessionProgress(mode,email){
+  if(!email||!modePersistenceEnabled(mode)) return null;
+  try{
+    const raw=localStorage.getItem(sessionProgressKey(mode,email));
+    return raw?JSON.parse(raw):null;
+  }catch(e){ return null; }
+}
 
 function loadExamProgress(email){
-  if(!email) return null;
-  try{
-    const raw = localStorage.getItem(examProgressKey(email));
-    return raw ? JSON.parse(raw) : null;
-  }catch(e){ return null; }
+  return loadSessionProgress('exam',email);
 }
 
 function clearExamProgress(email){
   if(!email) return;
   try{ localStorage.removeItem(examProgressKey(email)); }catch(e){ /* ignore */ }
 }
+function clearPracticeProgress(email){
+  if(!email) return;
+  try{ localStorage.removeItem(practiceProgressKey(email)); }catch(e){ /* ignore */ }
+}
 
-// No-op outside exam mode / outside the session screen, so this is safe to
-// call unconditionally from render() on every state change — the guard
-// itself is the only thing that matters for "practice is never persisted".
-function saveExamProgress(){
-  if(appSettings.mode !== 'exam' || !state.userEmail) return;
-  if(state.screen !== 'session' && !(state.screen==='done'&&state.examSubmitted)) return;
+// No-op when persistence for the active mode is disabled or no session is
+// active, so render() can call this after every state change.
+function saveSessionProgress(){
+  const mode=state.mode;
+  if(!modePersistenceEnabled(mode)||appSettings.mode!==mode||!state.userEmail) return;
+  if(state.screen!=='session'&&!(mode==='exam'&&state.screen==='done'&&state.examSubmitted)) return;
   try{
     const record = {
       schemaVersion: 5,
+      mode,
       email: state.userEmail,
       studentId: state.userStudentId,
       profileId: state.profileId,
       itemIndex: state.itemIndex,
       itemIndexByProfile: state.itemIndexByProfile,
       sessionSeed: state.sessionSeed,
-      // Persist the complete generated item snapshots—not only actions or
-      // scores—so an exam reload restores the first seeded statements exactly.
+      // Persist complete generated item snapshots so either mode restores the
+      // same seeded work, not just its action history or scores.
       itemsByProfile: state.itemsByProfile,
       showConnectors: state.showConnectors,
-      timerMinutes: state.examTimerMinutes || appSettings.timerMinutes,
-      examPolicy: activeExamPolicy(),
-      submitted: !!state.examSubmitted,
-      submittedAt: state.examSubmittedAt,
-      examEndTimestamp: examEndTimestamp,
+      practicePolicy: mode==='practice'?activePracticePolicy():null,
+      timerMinutes: mode==='exam'?(state.examTimerMinutes || appSettings.timerMinutes):null,
+      examPolicy: mode==='exam'?activeExamPolicy():null,
+      submitted: mode==='exam'&&!!state.examSubmitted,
+      submittedAt: mode==='exam'?state.examSubmittedAt:null,
+      examEndTimestamp: mode==='exam'?examEndTimestamp:null,
       savedAt: Date.now()
     };
-    localStorage.setItem(examProgressKey(state.userEmail), JSON.stringify(record));
+    localStorage.setItem(sessionProgressKey(mode,state.userEmail), JSON.stringify(record));
   }catch(e){ /* storage full/unavailable — silently skip persistence this time */ }
 }
+function saveExamProgress(){ if(state.mode==='exam') saveSessionProgress(); }
 
 // Generic recursive walk over the restored (plain-JSON) itemsByProfile tree
 // for the highest `id` value anywhere in it. Needed because engine.js's
@@ -86,31 +92,35 @@ function findMaxSerializedId(value, maxSoFar){
   return maxSoFar;
 }
 
-// Attempts to restore a previously-saved exam session for `email`. Returns
-// true (and leaves state/appSettings/the exam timer fully restored, session
-// screen rendered) if a record was found; returns false — caller should
-// fall back to a normal fresh startSession() — otherwise.
-function tryResumeExamSession(email){
-  const record = loadExamProgress(email);
-  if(!record) return false;
+// Restore a saved session for one mode and student. Returns false when its
+// switch is off or no matching snapshot exists, letting login start fresh.
+function tryResumeSession(mode,email){
+  if(!modePersistenceEnabled(mode)) return false;
+  const record=loadSessionProgress(mode,email);
+  if(!record||!record.itemsByProfile||typeof record.itemsByProfile!=='object'
+    ||(record.mode&&record.mode!==mode)) return false;
 
-  appSettings.mode = 'exam';
+  appSettings.mode = mode;
 
   state.userEmail = record.email;
   state.userStudentId = record.studentId;
-  state.mode = 'exam';
-  state.profileId = record.profileId;
+  state.mode = mode;
+  state.profileId = PROFILES.some(profile=>profile.id===record.profileId)
+    ?record.profileId:PROFILES[0].id;
   state.itemIndex = record.itemIndex || 0;
   state.itemIndexByProfile = record.itemIndexByProfile || {};
   state.sessionSeed = record.sessionSeed;
-  state.examPolicy = snapshotExamPolicy({exam:record.examPolicy||appSettings.exam});
-  state.examTimerMinutes = record.timerMinutes || appSettings.timerMinutes;
-  state.examSubmitted = !!record.submitted;
-  state.examSubmittedAt = record.submittedAt || null;
-  examEndTimestamp = record.examEndTimestamp || null;
+  state.practicePolicy = mode==='practice'
+    ?snapshotPracticePolicy({practice:record.practicePolicy||appSettings.practice}):null;
+  state.examPolicy = mode==='exam'
+    ?snapshotExamPolicy({exam:record.examPolicy||appSettings.exam}):null;
+  state.examTimerMinutes = mode==='exam'?(record.timerMinutes || appSettings.timerMinutes):null;
+  state.examSubmitted = mode==='exam'&&!!record.submitted;
+  state.examSubmittedAt = mode==='exam'?(record.submittedAt || null):null;
+  examEndTimestamp = mode==='exam'?(record.examEndTimestamp || null):null;
   state.itemsByProfile = record.itemsByProfile;
 
-  // A saved exam from an earlier release may not contain profiles added by
+  // A saved session from an earlier release may not contain profiles added by
   // this one. Replay the seeded generation sequence and retain only missing
   // profiles; existing student work is never regenerated or overwritten.
   const missingProfileIds = PROFILES.filter(p=>!state.itemsByProfile[p.id]).map(p=>p.id);
@@ -155,6 +165,11 @@ function tryResumeExamSession(email){
 
   itemPaginationHandlerAttached = false;
 
+  if(mode==='practice'){
+    render();
+    return true;
+  }
+
   if(state.examSubmitted){
     state.screen='done';
     render();
@@ -178,3 +193,5 @@ function tryResumeExamSession(email){
 
   return true;
 }
+function tryResumeExamSession(email){ return tryResumeSession('exam',email); }
+function tryResumePracticeSession(email){ return tryResumeSession('practice',email); }

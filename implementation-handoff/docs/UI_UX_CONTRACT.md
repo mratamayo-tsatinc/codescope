@@ -114,6 +114,10 @@ New activities must look like members of the existing application.
 
 - The profile sidebar groups profiles under expandable categories. Each
   profile belongs to exactly one category configured in `js/profiles.js`.
+- Category headers keep their names and score badges readable without breaking
+  words. Their compact QR action has an accessible label and tooltip.
+- Expanded profiles use an indented navigation rail. The current profile uses
+  a restrained background and left marker instead of a second bordered card.
 - Category score links open a score summary and QR code for that category's
   profiles. The header opens the overall summary across all active profiles.
 - The visible score is mandatory in both the dialog and its downloaded image.

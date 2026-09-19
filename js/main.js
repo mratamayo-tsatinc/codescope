@@ -82,10 +82,8 @@ function render(){
   if(typeof renderVariableFinalFloat === 'function') renderVariableFinalFloat(activeItem&&activeItem.activityKind?null:activeItem);
 
   if(state.screen==='session'){
-    // Keeps the saved exam-mode record current on every state change —
-    // no-op outside exam mode (see saveExamProgress's own guard), so this
-    // is safe to call unconditionally here.
-    if (typeof saveExamProgress === 'function') saveExamProgress();
+    // Save the current mode only when its deployment switch is enabled.
+    if (typeof saveSessionProgress === 'function') saveSessionProgress();
 
     // Render item pagination bar
     renderItemPaginationBar();
@@ -171,13 +169,9 @@ if(savedLogin){
   const login = JSON.parse(savedLogin);
   state.userEmail = login.email;
   state.userStudentId = login.studentId;
-  // Resume only if the persisted global mode is currently 'exam' — the
-  // SAME check login.js's logout->login path uses, so refresh and
-  // logout->login now behave identically instead of refresh resuming
-  // unconditionally while logout checked appSettings. If mode is 'exam'
-  // but this particular email has no saved record, tryResumeExamSession
-  // returns false and this falls through to a normal fresh startSession().
-  if (appSettings.mode === 'exam' && tryResumeExamSession(login.email)) {
+  // A mode resumes only if its deployment switch is enabled and this
+  // student has a snapshot for that same mode.
+  if (tryResumeSession(appSettings.mode,login.email)) {
     // resumed
   } else {
     state.mode = appSettings.mode;

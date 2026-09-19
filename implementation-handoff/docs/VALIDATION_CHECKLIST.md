@@ -25,6 +25,9 @@ coverage, then run the full suite.
 - [ ] Legacy expression generation and snapshot hashes remain unchanged unless
       the task explicitly changes them.
 - [ ] Practice and Exam settings are snapshotted at session start.
+- [ ] Practice and Exam persistence switches operate independently. Disabled
+      modes start fresh; enabled modes restore the same generated items,
+      responses, policy, and item position.
 - [ ] Existing saved Exam attempts resume without regenerated items.
 - [ ] Console guidance remains neutral during unreleased Exam work.
 - [ ] Correct solution remains unavailable in Exam.

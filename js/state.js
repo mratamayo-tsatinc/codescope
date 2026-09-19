@@ -82,6 +82,9 @@ const DEFAULT_APP_SETTINGS = Object.freeze({
   // local-configurable | state-only. This deployment switch is intentionally
   // read only: persisted browser data can never override it.
   settingsPolicy: 'local-configurable',
+  // Deployment-owned switches. Browser-saved settings cannot override these.
+  // Each mode keeps its own per-student snapshot when enabled.
+  persistence: Object.freeze({practice:false, exam:true}),
   mode: 'practice',
   timerMinutes: 15,
   shell: DEFAULT_SHELL_SETTINGS,
@@ -107,6 +110,7 @@ function cloneDefaultAppSettings(){
   return {
     schemaVersion:DEFAULT_APP_SETTINGS.schemaVersion,
     settingsPolicy:DEFAULT_APP_SETTINGS.settingsPolicy,
+    persistence:Object.assign({},DEFAULT_APP_SETTINGS.persistence),
     mode:DEFAULT_APP_SETTINGS.mode,
     timerMinutes:DEFAULT_APP_SETTINGS.timerMinutes,
     shell:{
@@ -130,6 +134,10 @@ function cloneDefaultAppSettings(){
 
 function settingsAreStateOnly(){
   return DEFAULT_APP_SETTINGS.settingsPolicy==='state-only';
+}
+
+function modePersistenceEnabled(mode){
+  return (mode==='practice'||mode==='exam') && DEFAULT_APP_SETTINGS.persistence[mode]===true;
 }
 
 function snapshotPracticePolicy(settings){
