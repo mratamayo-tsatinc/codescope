@@ -58,7 +58,7 @@ const state = {
   userEmail: null,
   userStudentId: null,
   language: 'c',
-  mode: 'practice',
+  mode: 'exam',
   profileId: PROFILES[0].id,
   itemIndex: 0,
   itemIndexByProfile: {}, // Remembers which item each profile was last viewing, so switching profiles via the sidebar returns to that exact item instead of resetting to Item 1
