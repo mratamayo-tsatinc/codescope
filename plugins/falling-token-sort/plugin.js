@@ -33,8 +33,10 @@ function ftsValidateProfile(profile){
     if(categories.has(bucket.category))throw new Error(`${profile.id}: duplicate category bucket '${bucket.category}'`);categories.add(bucket.category);
     if(!['left','right','top','bottom'].includes(bucket.region))throw new Error(`${profile.id}: invalid bucket region '${bucket.region}'`);
     if(!Number.isFinite(bucket.order))throw new Error(`${profile.id}: bucket order is required`);
-    if(!ftsIdentifierCategory(bucket.category)&&!ftsStaticPool(bucket.category).length)
-      throw new Error(`${profile.id}: category '${bucket.category}' has no canonical token source`);
+    if(!ftsIdentifierCategory(bucket.category)
+      &&(!ftsStaticPool(bucket.category,profile,'c').length
+        ||!ftsStaticPool(bucket.category,profile,'java').length))
+      throw new Error(`${profile.id}: category '${bucket.category}' needs a canonical token source for C and Java`);
   });
   tcValidateIdentifierGeneration(profile,activity.generator.identifierGeneration,'activity.generator.identifierGeneration');
   const policies=activity.generator&&activity.generator.policies;
@@ -62,6 +64,13 @@ function ftsValidateProfile(profile){
     if(target.min<minimum||target.max>maximum)
       throw new Error(`${profile.id}: ${mode}.totalTokens must stay within the category total ${minimum}-${maximum}`);
   });
+  const tokenPools=activity.generator.tokenPools||{};
+  Object.entries(tokenPools).forEach(([category,pool])=>{
+    const variants=Array.isArray(pool)?[pool]:Object.values(pool||{});
+    if(!TC_CATEGORY_DEFS[category]||!variants.length||variants.some(values=>!Array.isArray(values)||!values.length
+      ||values.some(value=>typeof value!=='string'||!value.length)))
+      throw new Error(`${profile.id}: tokenPools.${category} must contain non-empty token strings`);
+  });
   if(!activity.assessment||activity.assessment.action!=='SORT_TOKEN'||activity.assessment.cardinality!=='per-token')
     throw new Error(`${profile.id}: assessment must score SORT_TOKEN per token`);
   if(!['first','latest'].includes(activity.assessment.scoreAttempt))throw new Error(`${profile.id}: unsupported scoreAttempt`);
@@ -73,7 +82,7 @@ function ftsValidateProfile(profile){
       throw new Error(`${profile.id}: invalid ${mode} incorrectPlacement policy`);
   });
   if(!activity.feedback||!['immediate-return','deferred'].includes(activity.feedback.practice)
-    ||!['deferred-until-submit','never'].includes(activity.feedback.exam))
+    ||!['deferred-until-timeout','never'].includes(activity.feedback.exam))
     throw new Error(`${profile.id}: invalid feedback policy`);
 }
 

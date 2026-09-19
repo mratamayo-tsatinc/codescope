@@ -1,7 +1,7 @@
 function tcTokenInstruction(profile){return profile.activity.instructions||'Select a token and classify it.';}
 function tcStatementTargetIds(item,statement){return item.targetIds.filter(id=>{const token=tcTokenById(item,id);return token&&token.statementId===statement.id;});}
 function tcStatementIsComplete(item,statement){const ids=tcStatementTargetIds(item,statement);return ids.length>0&&ids.every(id=>!!tcResponseFor(item,id));}
-function tcCorrectnessIsVisible(item){return state.mode!=='exam'||state.examSubmitted;}
+function tcCorrectnessIsVisible(item){return examFeedbackVisible();}
 function tcStatementState(item,statement){
   const ids=tcStatementTargetIds(item,statement),answered=ids.filter(id=>!!tcResponseFor(item,id));
   if(item.checked&&tcCorrectnessIsVisible(item)){return answered.some(id=>{const response=tcResponseFor(item,id);return response&&!response.wasCorrect;})?'checked-wrong':'checked-correct';}
@@ -11,7 +11,7 @@ function tcStatementState(item,statement){
 function tcCurrentStatementIndex(item){const index=item.statements.findIndex(statement=>!tcStatementIsComplete(item,statement));return index<0?Math.max(0,item.statements.length-1):index;}
 function tcStatementSource(statement){return statement.tokens.map((token,index)=>token.text+(statement.tokens[index+1]&&statement.tokens[index+1].role!=='separator'?' ':'')).join('');}
 function tcHandleTokenClick(event,item,profile,token){
-  if(item.checked||state.examSubmitted||item.invalidSelection)return;
+  if(item.checked||state.examExpired||item.invalidSelection)return;
   if(!tcSelectableIds(item,profile).includes(token.id))return;
   if(!item.targetIds.includes(token.id)){
     const result=tcApplyOffTarget(item,profile,token);
@@ -32,7 +32,7 @@ function tcTokenShellClass(token,isSelectable,response,item){
   return classes.join(' ');
 }
 function tcRenderToken(item,profile,token,hasTrailingGap){
-  const response=tcResponseFor(item,token.id),selectable=!item.checked&&!item.invalidSelection&&tcSelectableIds(item,profile).includes(token.id);
+  const response=tcResponseFor(item,token.id),selectable=!item.checked&&!state.examExpired&&!item.invalidSelection&&tcSelectableIds(item,profile).includes(token.id);
   const attrs={class:`${tcTokenShellClass(token,selectable,response,item)}${hasTrailingGap?' tc-token-gap':''}`,'data-token-id':token.id,
     title:response?`Selected: ${TC_CATEGORY_DEFS[response.category].label}`:(selectable?'Select this token':'Reference token')};
   if(selectable){attrs.tabindex='0';attrs.role='button';attrs.onclick=event=>tcHandleTokenClick(event,item,profile,token);attrs.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();tcHandleTokenClick(event,item,profile,token);}};}
@@ -45,7 +45,7 @@ function tcRenderStatement(item,profile,statement,index,isLast){
   const code=h('div',{class:'code-out tc-source-code'});
   statement.tokens.forEach((token,tokenIndex)=>{const next=statement.tokens[tokenIndex+1],hasGap=!!(next&&next.role!=='separator');code.appendChild(tcRenderToken(item,profile,token,hasGap));if(hasGap)code.appendChild(document.createTextNode(' '));});
   const allComplete=item.targetIds.every(id=>!!tcResponseFor(item,id));
-  const actions=isLast&&!item.checked?renderInlineEvaluationActions({canUndo:examAllowsUndo()&&item.history.length>0,canCheck:allComplete&&!item.invalidSelection}):null;if(actions)code.appendChild(actions);
+  const actions=isLast&&!item.checked&&!state.examExpired?renderInlineEvaluationActions({canUndo:examAllowsUndo()&&item.history.length>0,canCheck:allComplete&&!item.invalidSelection}):null;if(actions)code.appendChild(actions);
   row.appendChild(code);card.appendChild(row);
   return card;
 }
@@ -66,7 +66,7 @@ function tcRender({container,item,profile}){
   if(flow.parentNode&&flow.parentNode.classList)flow.parentNode.classList.add('token-classification-workspace');
   item.statements.forEach((statement,index)=>flow.appendChild(tcRenderStatement(item,profile,statement,index,index===item.statements.length-1)));
   const invalid=tcRenderInvalidSelection(item);if(invalid)flow.appendChild(invalid);
-  if(item.checked&&state.mode==='exam'&&!state.examSubmitted&&!item.invalidSelection)container.appendChild(h('div',{class:'exam-answer-recorded'},h('i',{class:'fa-solid fa-lock'}),h('span',{},h('b',{},'Answer recorded and locked.'),' Correctness and score are withheld until the exam is submitted.')));
+  if(item.checked&&state.mode==='exam'&&!state.examExpired&&!item.invalidSelection)container.appendChild(h('div',{class:'exam-answer-recorded'},h('i',{class:'fa-solid fa-lock'}),h('span',{},h('b',{},'Answer recorded and locked.'),' Correctness and score are withheld until time expires.')));
   tcSyncDrawers(item,profile);
   if(item.checked&&state.mode==='practice')appendPracticeRetryBar(container);
   if(typeof renderVariableFinalFloat==='function')renderVariableFinalFloat(null);

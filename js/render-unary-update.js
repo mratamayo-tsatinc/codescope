@@ -43,7 +43,7 @@ function renderUnaryUpdateStatement(ctx){
     panelClass:'unary-update-eval-panel program-expression-panel',
     statementId:statement.id,statementNumber:statementIndex+1,
     continuationStyle:true,
-    interactive:isActive&&!runtime.checked&&!item.checked&&!item.practiceInvalidExecution,
+    interactive:isActive&&!runtime.checked&&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked(),
     revealCorrectness:runtime.checked&&state.mode!=='exam',
     isFullyResolved:()=>unaryUpdateRuntimeResolved(runtime),
     renderFinalValue:context=>renderUnaryUpdateStoredResult(statement,runtime,context),

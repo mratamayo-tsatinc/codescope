@@ -138,7 +138,7 @@ function renderItemResetControl(show){
 }
 
 function renderExamItemBar(item){
-  if(state.mode!=='exam'||state.examSubmitted) return null;
+  if(state.mode!=='exam'||state.examExpired) return null;
   const status=item.checked?'Answer locked':(item.flagged?'Flagged for review':(itemHasAttempt(item)?'In progress':'Unattempted'));
   const controls=[h('span',{class:'exam-item-status'+(item.checked?' locked':item.flagged?' flagged':'')},
     item.checked?h('i',{class:'fa-solid fa-lock'}):item.flagged?h('i',{class:'fa-solid fa-flag'}):h('i',{class:'fa-regular fa-circle'}),
@@ -368,12 +368,12 @@ function renderSession(container){
     statementId:embeddedProgram?'expression':null,
     statementNumber:embeddedProgram?item.program.cursor+1:null,
     continuationStyle:true,
-    interactive:!item.checked&&!item.practiceInvalidExecution,
+    interactive:!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked(),
     revealCorrectness:item.checked&&state.mode!=='exam',
     isFullyResolved:()=>itemFullyResolved(item),
     renderTrailingActions:()=>renderInlineEvaluationActions({
       canUndo:canUndoForCurrentMode(item)&&!item.practiceInvalidExecution,
-      canCheck:!item.checked&&itemFullyResolved(item)
+      canCheck:!item.checked&&!examInteractionLocked()&&itemFullyResolved(item)
     })
   });
   evaluationHost.appendChild(evalPanel);
@@ -395,12 +395,12 @@ function renderSession(container){
   }
 
   // feedback
-  const examFeedbackDeferred=state.mode==='exam'&&!state.examSubmitted;
+  const examFeedbackDeferred=state.mode==='exam'&&!examFeedbackVisible();
   if(item.checked&&examFeedbackDeferred){
     if(!(item.examSequenceFailure&&item.examSequenceFailure.terminal)){
       container.appendChild(h('div',{class:'exam-answer-recorded'},
         h('i',{class:'fa-solid fa-lock'}),
-        h('span',{},h('b',{},'Answer recorded and locked.'),' Correctness and score are withheld until the exam is submitted.')));
+        h('span',{},h('b',{},'Answer recorded and locked.'),' Correctness and score are withheld until time expires.')));
     }
     if(typeof clearFeedbackDrawerContent==='function'){
       try{

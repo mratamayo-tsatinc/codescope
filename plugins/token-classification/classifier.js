@@ -3,6 +3,11 @@ const TC_CATEGORY_DEFS=Object.freeze({
   'invalid-identifier':{label:'Invalid identifier',icon:'fa-circle-xmark',tone:'invalid'},
   'reserved-word':{label:'Reserved word',icon:'fa-lock',tone:'reserved'},
   operator:{label:'Operator',icon:'fa-code',tone:'operator'},
+  'arithmetic-operator':{label:'Arithmetic',icon:'fa-calculator',tone:'arithmetic'},
+  'relational-operator':{label:'Relational',icon:'fa-scale-balanced',tone:'relational'},
+  'boolean-operator':{label:'Boolean',icon:'fa-code-branch',tone:'boolean'},
+  'assignment-operator':{label:'Assignment',icon:'fa-arrow-right-to-bracket',tone:'assignment'},
+  'operator-distractor':{label:'Not an operator',icon:'fa-ban',tone:'distractor'},
   literal:{label:'Literal',icon:'fa-quote-left',tone:'literal'},
   separator:{label:'Separator',icon:'fa-grip-lines-vertical',tone:'separator'}
 });

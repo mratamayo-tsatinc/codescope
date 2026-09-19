@@ -326,6 +326,8 @@ function resolvedPointsPerItem(profile){
 // ----------------------------------------------------------------------------
 const DEFAULT_EXTRAS = { unaryWrap: {enabled:false, operators:[], forms:[], fraction:0} };
 function finalizeProfile(raw){
+  if(raw.enabled!==undefined&&typeof raw.enabled!=='boolean')
+    throw new Error(`Profile '${raw.meta&&raw.meta.id||'unknown'}': enabled must be a boolean`);
   // Activity profiles share the shell's global profile catalog and scoring
   // aliases, but their remaining configuration is owned by the activity
   // plugin rather than the legacy expression generator.
@@ -334,6 +336,7 @@ function finalizeProfile(raw){
       meta: Object.assign({},raw.meta),
       scoring: Object.assign({},raw.scoring),
       activity: Object.assign({},raw.activity),
+      enabled: raw.enabled!==false,
     };
     p.id = p.meta.id;
     p.name = p.meta.name;
@@ -355,6 +358,7 @@ function finalizeProfile(raw){
     program: raw.program ? Object.assign({}, raw.program) : null,
     manualResponses: raw.manualResponses ? Object.assign({}, raw.manualResponses) : null,
     template: raw.template,
+    enabled: raw.enabled!==false,
   };
   p._ast = parseTemplate(p.template);
   p.id = p.meta.id;

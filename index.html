@@ -152,14 +152,14 @@
           </label>
           <label class="setting-toggle">
             <input type="checkbox" id="examShowScoresDuringExam">
-            <span><b>Show running scores</b><small>Normally hidden until final submission.</small></span>
+            <span><b>Show running scores</b><small>Shows each category's current score and QR summary while the timer runs.</small></span>
           </label>
-          <label class="settings-field-label" for="examFeedbackRelease">Results after submission</label>
+          <label class="settings-field-label" for="examFeedbackRelease">Item results after time expires</label>
           <select id="examFeedbackRelease" class="settings-select">
-            <option value="after-submit">Show scores and item results</option>
-            <option value="never">Record submission only</option>
+            <option value="after-timeout">Show item correctness and feedback</option>
+            <option value="never">Keep item correctness hidden</option>
           </select>
-          <p class="exam-policy-note"><i class="fa-solid fa-lock"></i> Checked items lock permanently. The correct-solution playback is always unavailable in Exam mode, and timeout always submits the saved attempt.</p>
+          <p class="exam-policy-note"><i class="fa-solid fa-lock"></i> Checked items lock permanently. When time expires, all remaining answers lock at their current state while category Score/QR summaries remain available.</p>
         </div>
       </div>
       </fieldset>
@@ -382,9 +382,6 @@
               title="View overall scores" aria-label="View overall scores">
               <i class="fa-solid fa-chart-simple" aria-hidden="true"></i>
               <span class="control-label score-control-label">Scores</span>
-            </button>
-            <button id="submitExamBtn" class="submit-exam-btn" onclick="submitExam(false)" title="Submit and lock the examination" style="display:none;">
-              <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> <span>Submit exam</span>
             </button>
             <button type="button" class="account-trigger header-account-trigger" onclick="toggleAccountMenu(this)"
               aria-label="Open student account menu" aria-haspopup="menu" aria-expanded="false" title="Student account">

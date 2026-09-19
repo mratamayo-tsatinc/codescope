@@ -12,9 +12,9 @@
 // rebuild, so opening/closing/toggling it never touches the session view.
 // ============================================================================
 
-// Sums earned/max points across ALL profiles, not just the current one.
-// Every profile's items are generated up front at login (see startSession),
-// so `max` always reflects every profile's full point budget even for a
+// Sums earned/max points across the enabled profiles in this scope.
+// Every enabled profile's items are generated up front at login (see
+// startSession), so `max` reflects every visible profile's full point budget even for a
 // profile the student hasn't opened yet; `earned` only counts points from
 // items that have actually been checked.
 function computeScoreForProfiles(profiles){
@@ -36,9 +36,9 @@ function computeScoreForProfiles(profiles){
   // so the noise can't re-accumulate across the outer sum.
   return {earned: roundPoints(earned), max};
 }
-function computeGrandTotalScore(){ return computeScoreForProfiles(PROFILES); }
+function computeGrandTotalScore(){ return computeScoreForProfiles(enabledProfiles()); }
 function computeCategoryScore(categoryId){
-  if(!PROFILE_CATEGORIES.some(category=>category.id===categoryId)) return null;
+  if(!enabledCategories().some(category=>category.id===categoryId)) return null;
   return computeScoreForProfiles(profilesForCategory(categoryId));
 }
 
@@ -46,11 +46,14 @@ let scoreSummaryCategoryId = null;
 
 function openScoreSummaryModal(categoryId){
   if(!examResultsVisible()) return;
-  scoreSummaryCategoryId=PROFILE_CATEGORIES.some(category=>category.id===categoryId)?categoryId:null;
+  if(categoryId&&!enabledCategories().some(category=>category.id===categoryId)) return;
+  scoreSummaryCategoryId=categoryId||null;
+  const modal=document.getElementById('scoreSummaryModal');
+  modal.classList.toggle('score-summary-exam',state.mode==='exam');
   // .modal is centered via CSS display:flex + align-items/justify-content —
   // setting display:'block' here would silently defeat that centering and
   // drop the modal into the page's normal top-left flow instead.
-  document.getElementById('scoreSummaryModal').style.display = 'flex';
+  modal.style.display = 'flex';
   document.getElementById('scoreSummaryOverlay').style.display = 'block';
   renderScoreSummaryContent();
   // Encryption + QR draw is async — fire it and let the box fill in once
@@ -141,7 +144,7 @@ function toggleScoreSummaryDetails(){
 }
 
 function renderScoreSummaryContent(){
-  const category=PROFILE_CATEGORIES.find(entry=>entry.id===scoreSummaryCategoryId);
+  const category=enabledCategories().find(entry=>entry.id===scoreSummaryCategoryId);
   const title=document.getElementById('scoreSummaryTitle');
   if(title) title.textContent=category?`${category.name} Score Summary`:'Overall Score Summary';
   const scopeLabel=document.getElementById('scoreSummaryScopeLabel');
@@ -161,7 +164,7 @@ function renderScoreSummaryContent(){
   if(!scoreSummaryDetailsOpen) return;
 
   detailsEl.innerHTML = '';
-  (category?profilesForCategory(category.id):PROFILES).forEach(p=>{
+  (category?profilesForCategory(category.id):enabledProfiles()).forEach(p=>{
     const items = state.itemsByProfile[p.id];
     const row = document.createElement('div');
     row.className = 'score-summary-row';

@@ -31,8 +31,8 @@
 // ----------------------------------------------------------------------------
 const OPS = {
   ADD_SUB:     ['+','-'],
-  ARITH_BASIC: ['+','-','*'],
-  ARITH_ALL:   ['+','-','*','/'],
+  ARITH_BASIC: ['+','-','*','/'],
+  ARITH_ALL:   ['+','-','*','/','%'],
   COMPARISON:  ['<','>','<=','>=','==','!='],
   LOGICAL:     ['&&','||'],
   // NOTE: deliberately no '!' here or anywhere in OPS. '!' is never a binary
@@ -78,6 +78,7 @@ const OPS = {
 // ============================================================================
 const PROFILES_RAW = [
   {
+    enabled:false,
     meta: { id:'direct-ltr', name:'Direct Left-to-Right',
       description:'Establishes basic sequential evaluation. No precedence reasoning required.' },
     shape: { operandSources:{literal:4}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
@@ -86,6 +87,7 @@ const PROFILES_RAW = [
     scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:false,
     meta: { id:'mult-precedence', name:'Multiplication Precedence',
       description:'A higher-precedence operator must be evaluated before a lower one, regardless of position.' },
     shape: { operandSources:{literal:3}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
@@ -94,6 +96,7 @@ const PROFILES_RAW = [
     scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:false,
     meta: { id:'same-precedence-assoc', name:'Same-Precedence Associativity',
       description:'Equal-precedence operators resolve strictly left to right.' },
     shape: { operandSources:{literal:4}, operandRange:{min:2,max:12}, allowNegativeOperands:false },
@@ -102,46 +105,52 @@ const PROFILES_RAW = [
     scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:true,
     meta: { id:'full-basic-precedence', name:'Full Basic Precedence',
       description:'Combines +, -, *, / with genuine precedence and associativity requirements.' },
-    shape: { operandSources:{literal:5}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
+    shape: { operandSources:{literal:5}, operandRange:{min:1,max:12}, allowNegativeOperands:false },
     operators: { allowed: OPS.ARITH_ALL, constraints:{requireMultipleTiers:true} },
     template: 'operand op operand op operand op operand op operand',
-    scoring: { itemCount:5, pointsPerItem:2 },
+    scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:false,
     meta: { id:'modulus', name:'Modulus',
       description:'Introduces % and its precedence relationship with the other operators.' },
     shape: { operandSources:{literal:4}, operandRange:{min:2,max:12}, allowNegativeOperands:false },
     operators: { allowed: ['+','*','%'], constraints:{requireMultipleTiers:true} },
     template: 'operand op operand op operand op operand',
-    scoring: { itemCount:5, pointsPerItem:2 },
+    scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:false,
     meta: { id:'parens-override', name:'Parentheses Override',
       description:'Shows how explicit grouping overrides the normal precedence order.' },
-    shape: { operandSources:{literal:4}, operandRange:{min:1,max:15}, allowNegativeOperands:false },
+    shape: { operandSources:{literal:4}, operandRange:{min:2,max:12}, allowNegativeOperands:false },
     operators: { allowed: OPS.ARITH_ALL },
-    template: '(operand low operand) high operand high operand',
-    scoring: { itemCount:5, pointsPerItem:2 },
+    template: '(operand low operand) high operand low operand',
+    scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:false,
     meta: { id:'parens-override-multi', name:'Parentheses Override (Multi-Operator)',
       description:'The parenthesized region itself contains two operators from different precedence tiers.' },
-    shape: { operandSources:{literal:5}, operandRange:{min:1,max:15}, allowNegativeOperands:false },
+    shape: { operandSources:{literal:5}, operandRange:{min:2,max:15}, allowNegativeOperands:false },
     operators: { allowed: OPS.ARITH_ALL },
-    template: '(operand low (operand high operand)) high operand high operand',
-    scoring: { itemCount:5, pointsPerItem:3 },
+    template: '(operand high (operand low operand)) high operand high operand',
+    scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:true,
     meta: { id:'parens-override-dual', name:'Parentheses Override (Two Separate Groups)',
       description:'Two independent parenthesized groups appear side by side in the same expression.' },
     shape: { operandSources:{literal:5}, operandRange:{min:1,max:15}, allowNegativeOperands:false },
     operators: { allowed: OPS.ARITH_BASIC },
     template: '(operand low operand) high (operand low operand) high operand',
-    scoring: { itemCount:5, pointsPerItem:3 },
+    scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:false,
     meta: { id:'variables-arithmetic', name:'Variables + Arithmetic',
       description:'Introduces variable substitution before evaluation order becomes relevant.' },
     shape: { operandSources:{variable:3}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
@@ -150,56 +159,63 @@ const PROFILES_RAW = [
     scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:false,
     meta: { id:'mixed-variables-literals', name:'Mixed Variables + Literals',
       description:'Combines variable substitution with a mix of literal operands.' },
     shape: { operandSources:{literal:2,variable:2}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
     operators: { allowed: OPS.ARITH_BASIC, constraints:{requireMultipleTiers:true} },
     template: 'operand op operand op operand op operand',
-    scoring: { itemCount:5, pointsPerItem:2 },
+    scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:false,
     meta: { id:'variables-constants', name:'Variables + Constants',
       description:'Minimal exposure to declared constants alongside variables.' },
     shape: { operandSources:{variable:2,constant:2}, operandRange:{min:1,max:15}, allowNegativeOperands:false },
     operators: { allowed: OPS.ARITH_BASIC, constraints:{requireMultipleTiers:true} },
     template: 'operand op operand op operand op operand',
-    scoring: { itemCount:5, pointsPerItem:2 },
+    scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:true,
     meta: { id:'literals-variables-constants', name:'Literals + Variables + Constants',
       description:'Minimal exposure to literals with declared constants alongside variables.' },
     shape: { operandSources:{literal:1,variable:2,constant:2}, operandRange:{min:1,max:15}, allowNegativeOperands:false },
     operators: { allowed: OPS.ARITH_BASIC, constraints:{requireMultipleTiers:true} },
     template: 'operand op operand op operand op operand op operand',
-    scoring: { itemCount:5, pointsPerItem:2 },
+    scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:true,
     meta: { id:'mixed-mastery', name:'Mixed Mastery',
       description:'Controlled mixture of variables, literals, constants, multiple precedence levels, and parentheses.' },
     shape: { operandSources:{literal:1,variable:2,constant:2}, operandRange:{min:1,max:20}, allowNegativeOperands:true },
     operators: { allowed: [...OPS.ARITH_ALL, '%'] },
     template: '(operand low operand) high operand op operand op operand',
-    scoring: { itemCount:5, pointsPerItem:3 },
+    scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:false,
     meta: { id:'unary-only', name:'Unary ++ / -- Only',
       description:'Every operand is a variable carrying a prefix or postfix ++/-- that must be resolved before the remaining + / - operators run.' },
     shape: { operandSources:{variable:3}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
     operators: { allowed: OPS.ADD_SUB },
     extras: { unaryWrap:{enabled:true, operators:['++','--'], forms:['prefix','postfix'], fraction:1.0} },
     template: 'operand:unary op operand:unary op operand:unary',
-    scoring: { itemCount:5, pointsPerItem:2 },
+    scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:true,
     meta: { id:'unary-mix', name:'Unary Mixed with Literals, Variables & Constants',
       description:'++/-- appear only on some of the variable operands.' },
     shape: { operandSources:{literal:2,variable:2,constant:1}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
     operators: { allowed: OPS.ARITH_BASIC, constraints:{requireMultipleTiers:true} },
     extras: { unaryWrap:{enabled:true, operators:['++','--'], forms:['prefix','postfix'], fraction:0.6} },
     template: 'operand:unary op operand:unary op operand:unary op operand:unary op operand:unary',
-    scoring: { itemCount:5, pointsPerItem:3 },
+    scoring: { itemCount:5, pointsPerItem:2 },
   },
   {
+    enabled:true,
     meta: { id:'relational-simple', name:'Relational Operators (Simple)',
       description:'A comparison produces a boolean result — the arithmetic on either side still resolves first.' },
     shape: { operandSources:{literal:3}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
@@ -208,14 +224,16 @@ const PROFILES_RAW = [
     scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:true,
     meta: { id:'relational-variables', name:'Relational Operators with Variables',
       description:'A comparison\u2019s operands include variables and constants, not just literals.' },
     shape: { operandSources:{literal:1,variable:1,constant:1}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
     operators: { allowed: [...OPS.ADD_SUB, ...OPS.COMPARISON], constraints:{requireMultipleTiers:true, maxComparisons:1} },
     template: 'operand op operand op operand',
-    scoring: { itemCount:5, pointsPerItem:2 },
+    scoring: { itemCount:5, pointsPerItem:1 },
   },
   {
+    enabled:true,
     meta: { id:'relational-boolean-mix', name:'Relational + Boolean Mix (with !)',
       description:'A relational comparison is combined with boolean variables using && / ||, including one negated with a leading !.' },
     shape: { operandRange:{min:1,max:20}, allowNegativeOperands:false },
@@ -233,9 +251,10 @@ const PROFILES_RAW = [
     // ALWAYS produces required parens, every generated instance -- verified
     // in test-generator.js's structural check.
     template: '(operand:lit cmp operand:lit or operand:var:bool:unary) and operand:var:bool:unary',
-    scoring: { itemCount:5, pointsPerItem:3 },
+    scoring: { itemCount:5, pointsPerItem:2 },
   },
   {
+    enabled:false,
     meta: { id:'declaration-chain', name:'Declaration Chain',
       description:'Execute dependent variable and constant declarations before evaluating the final expression.' },
     // Every expression operand is named so it must first be initialized by
@@ -245,7 +264,7 @@ const PROFILES_RAW = [
     shape: { operandSources:{variable:3,constant:1}, operandRange:{min:2,max:15}, allowNegativeOperands:false },
     operators: { allowed: OPS.ARITH_BASIC, constraints:{requireMultipleTiers:true} },
     template: 'operand op operand op operand op operand',
-    scoring: { itemCount:5, pointsPerItem:4 },
+    scoring: { itemCount:5, pointsPerItem:2 },
     program: {
       declarations: 'interactive',
       dependencyMode: 'previous',
@@ -253,6 +272,7 @@ const PROFILES_RAW = [
     },
   },
   {
+    enabled:false,
     meta:{id:'assignment-basic',name:'Assignment: Replace with =',
       description:'Initialize a variable, replace its value with =, then use the updated value.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:2,max:15},allowNegativeOperands:false},
@@ -261,14 +281,16 @@ const PROFILES_RAW = [
     program:{declarations:'interactive',assignmentLesson:'basic-set',scoreAssignments:true},
   },
   {
+    enabled:false,
     meta:{id:'assignment-add-sub',name:'Assignment: += and -=',
       description:'Trace consecutive addition and subtraction assignments on one variable.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:2,max:15},allowNegativeOperands:false},
     operators:{allowed:OPS.ADD_SUB}, template:'operand op operand',
-    scoring:{itemCount:5,pointsPerItem:3},
+    scoring:{itemCount:5,pointsPerItem:2},
     program:{declarations:'interactive',assignmentLesson:'add-sub',scoreAssignments:true},
   },
   {
+    enabled:false,
     meta:{id:'assignment-multiply',name:'Assignment: *=',
       description:'Apply multiplication assignment and observe the variable change in memory.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:2,max:12},allowNegativeOperands:false},
@@ -277,65 +299,75 @@ const PROFILES_RAW = [
     program:{declarations:'interactive',assignmentLesson:'multiply',scoreAssignments:true},
   },
   {
+    enabled:false,
     meta:{id:'assignment-div-mod',name:'Assignment: /= and %=',
       description:'Compare integer quotient assignment with remainder assignment.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:6,max:30},allowNegativeOperands:false},
     operators:{allowed:OPS.ADD_SUB}, template:'operand op operand',
-    scoring:{itemCount:5,pointsPerItem:3},
+    scoring:{itemCount:5,pointsPerItem:2},
     program:{declarations:'interactive',assignmentLesson:'divide-remainder',scoreAssignments:true},
   },
   {
+    enabled:false,
     meta:{id:'assignment-rhs-expression',name:'Assignment: Expression on the Right',
       description:'Resolve a multi-step right-hand expression before applying a compound assignment.'},
     shape:{operandSources:{variable:2,literal:1},operandRange:{min:2,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ARITH_BASIC}, template:'operand op operand op operand',
-    scoring:{itemCount:5,pointsPerItem:4},
+    scoring:{itemCount:3,pointsPerItem:5},
     program:{declarations:'interactive',assignmentLesson:'rhs-expression',scoreAssignments:true},
   },
   {
+    enabled:true,
     meta:{id:'assignment-sequential',name:'Assignment: Sequential Updates',
       description:'Follow several compound assignments that repeatedly update the same variable.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:2,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ADD_SUB}, template:'operand op operand',
-    scoring:{itemCount:5,pointsPerItem:4},
+    scoring:{itemCount:5,pointsPerItem:1},
     program:{declarations:'interactive',assignmentLesson:'sequential',scoreAssignments:true},
   },
   {
+    enabled:true,
     meta:{id:'assignment-dependent',name:'Assignment: Variables and Constants',
       description:'Use an updated variable and an immutable constant in a later assignment.'},
     shape:{operandSources:{variable:2,constant:1},operandRange:{min:2,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ARITH_BASIC}, template:'operand op operand op operand',
-    scoring:{itemCount:5,pointsPerItem:5},
+    scoring:{itemCount:2,pointsPerItem:5},
     program:{declarations:'interactive',assignmentLesson:'dependent',scoreAssignments:true},
   },
   {
+    enabled:true,
     meta:{id:'assignment-advanced-chain',name:'Assignment: Advanced Chain',
       description:'Combine precedence, multiple variables, and dependent compound assignments.'},
     shape:{operandSources:{variable:3},operandRange:{min:2,max:10},allowNegativeOperands:false},
     operators:{allowed:OPS.ARITH_BASIC}, template:'operand op operand op operand',
-    scoring:{itemCount:5,pointsPerItem:6},
+    scoring:{itemCount:2,pointsPerItem:5},
     program:{declarations:'interactive',assignmentLesson:'advanced',scoreAssignments:true},
   },
   {
+    enabled:true,
     meta:{id:'unary-update-sequence',name:'Unary Updates: ++ and -- Statements',
       description:'Apply prefix and postfix increment/decrement as standalone statements, then reuse the changed variables.'},
     shape:{operandSources:{variable:2,literal:1},operandRange:{min:3,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ARITH_BASIC,constraints:{requireMultipleTiers:true}},
     template:'operand op operand op operand',
-    scoring:{itemCount:5,pointsPerItem:5},
+    scoring:{itemCount:2,pointsPerItem:5},
     program:{declarations:'interactive',unaryUpdateLesson:'standalone-sequence',scoreAssignments:true},
+    manualResponses:{enabled:true,namedValueRate:50,operatorRate:50},
   },
   {
+    enabled:true,
     meta:{id:'assignment-unary-advanced-chain',name:'Assignment + Unary: Advanced Chain',
       description:'Trace dependent compound assignments and standalone prefix/postfix updates before evaluating the final expression.'},
     shape:{operandSources:{variable:3,constant:1},operandRange:{min:3,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ARITH_BASIC,constraints:{requireMultipleTiers:true}},
     template:'operand op operand op operand op operand',
-    scoring:{itemCount:5,pointsPerItem:7},
+    scoring:{itemCount:2,pointsPerItem:5},
     manualResponses:{enabled:true,namedValueRate:50,operatorRate:50},
     program:{declarations:'interactive',mixedUpdateLesson:'advanced-assignment-unary',scoreAssignments:true},
+    manualResponses:{enabled:true,namedValueRate:50,operatorRate:50},
   },
   {
+    enabled:true,
     meta:{id:'relational-logical-student-derived',name:'Relational + Logical: Student Derived',
       description:'Evaluate one mixed relational/logical expression while supplying selected retrieved and derived values.'},
     shape:{operandRange:{min:1,max:20},allowNegativeOperands:false},
@@ -346,6 +378,7 @@ const PROFILES_RAW = [
     manualResponses:{enabled:true,namedValueRate:50,operatorRate:50},
   },/*
   {
+    enabled:false,
     meta:{id:'token-identifier-position',name:'Identifier Position',
       description:'Locate the declaration name and decide whether it is a valid identifier.'},
     scoring:{itemCount:5,pointsPerItem:3},
@@ -382,6 +415,7 @@ const PROFILES_RAW = [
     }
   },
   {
+    enabled:true,
     meta:{id:'token-declaration-complete',name:'Declaration Token Classification',
       description:'Classify every token according to its position in a variable or constant declaration.'},
     scoring:{itemCount:5,pointsPerItem:6},
@@ -417,6 +451,7 @@ const PROFILES_RAW = [
     }
   },
   {
+    enabled:true,
     meta:{id:'token-program-chain',name:'Chained Statement Tokens',
       description:'Classify tokens by position across connected declarations and assignments.'},
     scoring:{itemCount:5,pointsPerItem:12},
@@ -452,6 +487,7 @@ const PROFILES_RAW = [
     }
   },*/
   {
+    enabled:true,
     meta:{id:'falling-identifier-sort',name:'Falling Identifier Sort',
       description:'Sort standalone names as valid identifiers, invalid identifiers, or reserved words.'},
     scoring:{itemCount:1,pointsPerItem:30},
@@ -492,10 +528,52 @@ const PROFILES_RAW = [
         practice:{incorrectPlacement:'return-token'},
         exam:{incorrectPlacement:'accept'},
       }},
-      feedback:{practice:'immediate-return',exam:'deferred-until-submit'},
+      feedback:{practice:'immediate-return',exam:'deferred-until-timeout'},
     },
   },
   {
+    enabled:true,
+    meta:{id:'falling-operator-sort',name:'Falling Operator Sort',
+      description:'Classify C and Java operators as arithmetic, relational, boolean, or assignment while filtering out nonoperators.'},
+    scoring:{itemCount:1,pointsPerItem:30},
+    activity:{
+      kind:'falling-token-sort',
+      instructions:'Drag each token into its operator family, or into Not an Operator. Keyboard: select a token, then choose a bucket.',
+      buckets:[
+        {id:'arithmetic',category:'arithmetic-operator',region:'left',order:1},
+        {id:'relational',category:'relational-operator',region:'left',order:2},
+        {id:'boolean',category:'boolean-operator',region:'right',order:1},
+        {id:'assignment',category:'assignment-operator',region:'right',order:2},
+        {id:'distractor',category:'operator-distractor',region:'bottom',order:1},
+      ],
+      dropArea:{visibleTokens:10,landingBehavior:'pass-through'},
+      generator:{capability:'canonical-token-pools',tokenPools:{
+        'arithmetic-operator':['+','-','*','/','%'],
+        'relational-operator':['<','>','<=','>=','==','!='],
+        'boolean-operator':['&&','||','!'],
+        'assignment-operator':['=','+=','-=','*=','/=','%='],
+        'operator-distractor':['value','count','42','3.14','true','false',';',',','(',')'],
+      },policies:{
+        practice:{totalTokens:{exact:30},counts:{
+          'arithmetic-operator':{exact:5},'relational-operator':{exact:6},
+          'boolean-operator':{exact:3},'assignment-operator':{exact:6},
+          'operator-distractor':{exact:10},
+        },shuffle:true},
+        exam:{totalTokens:{exact:30},counts:{
+          'arithmetic-operator':{exact:5},'relational-operator':{exact:6},
+          'boolean-operator':{exact:3},'assignment-operator':{exact:6},
+          'operator-distractor':{exact:10},
+        },shuffle:true},
+      }},
+      assessment:{action:'SORT_TOKEN',cardinality:'per-token',scoreAttempt:'first',completion:'all-tokens-placed'},
+      response:{policies:{
+        practice:{incorrectPlacement:'return-token'},exam:{incorrectPlacement:'accept'},
+      }},
+      feedback:{practice:'immediate-return',exam:'deferred-until-timeout'},
+    },
+  },
+  {
+    enabled:true,
     meta:{id:'c-simulate-output',name:'C Program Output',
       description:'Read C programs, predict their printed output, and give final variable values.'},
     scoring:{itemCount:19,pointsPerItem:10},
@@ -510,14 +588,14 @@ const PROFILES_RAW = [
 // Categories are authored here alongside the profiles. A profile belongs to
 // exactly one category; removing a category or profile ID is validated at load.
 const PROFILE_CATEGORIES = [
-  {id:'expressions',name:'Expressions',profileIds:[
+  {id:'expressions',name:'Expressions',enabled:true,profileIds:[
     'direct-ltr','mult-precedence','same-precedence-assoc','full-basic-precedence','modulus',
     'parens-override','parens-override-multi','parens-override-dual','variables-arithmetic',
     'mixed-variables-literals','variables-constants','literals-variables-constants',
     'mixed-mastery','unary-only','unary-mix','relational-simple','relational-variables',
     'relational-boolean-mix'
   ]},
-  {id:'program-statements',name:'Program Statements',profileIds:[
+  {id:'program-statements',name:'Program Statements',enabled:true,profileIds:[
     'declaration-chain','assignment-basic','assignment-add-sub','assignment-multiply',
     'assignment-div-mod','assignment-rhs-expression','assignment-sequential',
     'assignment-dependent','assignment-advanced-chain','unary-update-sequence',
@@ -525,17 +603,20 @@ const PROFILE_CATEGORIES = [
   ]},
   // The three Token Classification profiles are currently dormant in
   // PROFILES_RAW; keep their membership for deployments that enable them.
-  {id:'identifier-activities',name:'Identifier Activities',profileIds:[
+  {id:'identifier-activities',name:'Identifier Activities',enabled:true,profileIds:[
     'token-identifier-position','token-declaration-complete','token-program-chain',
-    'falling-identifier-sort'
+    'falling-identifier-sort','falling-operator-sort'
   ]},
-  {id:'c-program-output',name:'C Program Output',profileIds:['c-simulate-output']}
+  {id:'c-program-output',name:'C Program Output',enabled:true,profileIds:['c-simulate-output']}
 ];
 
 const FINALIZED_PROFILES = PROFILES_RAW.map(finalizeProfile);
 const categoryByProfileId = new Map();
 PROFILE_CATEGORIES.forEach(category=>{
   if(!category.id||!category.name||!Array.isArray(category.profileIds)) throw new Error('Invalid profile category');
+  if(category.enabled!==undefined&&typeof category.enabled!=='boolean')
+    throw new Error(`Category '${category.id}': enabled must be a boolean`);
+  category.enabled=category.enabled!==false;
   category.profileIds.forEach(id=>{
     if(categoryByProfileId.has(id)) throw new Error(`Profile '${id}' belongs to multiple categories`);
     categoryByProfileId.set(id,category.id);
@@ -552,8 +633,21 @@ categoryByProfileId.forEach((categoryId,id)=>{
     throw new Error(`Category '${categoryId}' references unknown profile '${id}'`);
 });
 function profilesForCategory(categoryId){
-  return PROFILES.filter(profile=>profile.categoryId===categoryId);
+  const category=PROFILE_CATEGORIES.find(candidate=>candidate.id===categoryId);
+  if(!category||category.enabled===false)return [];
+  return PROFILES.filter(profile=>profile.categoryId===categoryId&&profile.enabled!==false);
 }
 const PROFILES = FINALIZED_PROFILES.filter(profile=>!profile.activity);
 const ACTIVITY_PROFILES = FINALIZED_PROFILES.filter(profile=>profile.activity);
+function profileIsEnabled(profileOrId){
+  const profile=typeof profileOrId==='string'
+    ?PROFILES.find(candidate=>candidate.id===profileOrId):profileOrId;
+  if(!profile||profile.enabled===false)return false;
+  const category=PROFILE_CATEGORIES.find(candidate=>candidate.id===profile.categoryId);
+  return !!category&&category.enabled!==false;
+}
+function enabledProfiles(){return PROFILES.filter(profileIsEnabled);}
+function enabledCategories(){
+  return PROFILE_CATEGORIES.filter(category=>category.enabled!==false&&profilesForCategory(category.id).length>0);
+}
 validateProfiles(FINALIZED_PROFILES);

@@ -1,4 +1,12 @@
 function ftsTokenReason(token,language){
+  const operatorReasons={
+    'arithmetic-operator':'performs an arithmetic calculation',
+    'relational-operator':'compares two values',
+    'boolean-operator':'combines or negates boolean conditions',
+    'assignment-operator':'assigns or updates a stored value',
+    'operator-distractor':'is not an operator token'
+  };
+  if(operatorReasons[token.category])return `“${token.text}” ${operatorReasons[token.category]}.`;
   return tcReason(token,token.lexicalCategory||token.category,language);
 }
 
@@ -8,7 +16,13 @@ function ftsCategoryGuide(category,language){
     'valid-identifier':`follows ${rules.label} naming rules`,
     'invalid-identifier':`breaks one or more ${rules.label} naming rules`,
     'reserved-word':`is reserved by ${rules.label} for language syntax`,
-    operator:'performs or represents an operation',literal:'writes a value directly',separator:'separates or terminates syntax'
+    operator:'performs or represents an operation',
+    'arithmetic-operator':'performs arithmetic with numeric operands',
+    'relational-operator':'compares values and produces a boolean result',
+    'boolean-operator':'combines or negates boolean expressions',
+    'assignment-operator':'stores or updates a value',
+    'operator-distractor':'is not an operator in this activity',
+    literal:'writes a value directly',separator:'separates or terminates syntax'
   };
   return `${label}: ${descriptions[category]}.`;
 }
@@ -119,11 +133,11 @@ function ftsBuildFeedback(item,profile){
 function ftsFeedbackReleased(item,profile){
   if(state.mode==='practice')return item.checked;
   if(profile.activity.feedback.exam==='never')return false;
-  return item.checked&&state.examSubmitted&&activeExamPolicy().feedbackRelease==='after-submit';
+  return item.checked&&state.examExpired&&activeExamPolicy().feedbackRelease==='after-timeout';
 }
 
 function ftsSyncDrawers(item,profile){
-  const consoleAllowed=state.mode!=='exam'||state.examSubmitted||activeExamPolicy().showNeutralGuidance;
+  const consoleAllowed=state.mode!=='exam'||state.examExpired||activeExamPolicy().showNeutralGuidance;
   if(consoleAllowed){
     if(typeof setConsoleDrawerTitle==='function')setConsoleDrawerTitle(`${tcLanguage(item.language).label} Token Guide`);
     if(typeof setConsoleDrawerContent==='function')setConsoleDrawerContent(ftsBuildConsoleContent(item,profile),{cursor:false});

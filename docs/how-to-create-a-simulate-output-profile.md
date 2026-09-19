@@ -72,6 +72,6 @@ as text. The check ratio is scaled to the profile's `pointsPerItem` budget.
 Students may edit responses until Check. Practice can reset an unchecked item
 or use Try again after checking; the Feedback drawer offers the correct
 solution. Exam responses are saved as they are typed and lock on Check.
-Correctness remains withheld until Exam submission if the exam policy permits
+Correctness remains withheld until the Exam timer expires if the exam policy permits
 release. The static client includes its answer bank, so browser source inspection
 can expose answers; server-side answer secrecy would require a backend.

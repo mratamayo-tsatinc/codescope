@@ -47,7 +47,7 @@ function renderDeclarationStatement(ctx){
     statementId:statement.id,
     statementNumber:statementIndex+1,
     continuationStyle:true,
-    interactive:isActive && !runtime.checked && !item.checked && !item.practiceInvalidExecution,
+    interactive:isActive && !runtime.checked && !item.checked && !item.practiceInvalidExecution&&!examInteractionLocked(),
     revealCorrectness:runtime.checked&&state.mode!=='exam',
     isFullyResolved:()=>declarationInitializerResolved(statement),
     renderEquals:(ready,context)=>renderDeclarationEquals(statement,ready,context,item,isActive),

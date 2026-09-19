@@ -105,7 +105,7 @@ function renderAssignmentStatement(ctx){
   const compound=isCompoundAssignment(statement);
   card.appendChild(renderExpressionEvaluationPanel({runtime,labelText,labelCh:labelText.length+1,
     title:null,panelClass:'assignment-eval-panel program-expression-panel',
-    statementId:statement.id,interactive:isActive&&!runtime.checked&&!item.checked&&!item.practiceInvalidExecution,revealCorrectness:runtime.checked&&state.mode!=='exam',
+    statementId:statement.id,interactive:isActive&&!runtime.checked&&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked(),revealCorrectness:runtime.checked&&state.mode!=='exam',
     statementNumber:statementIndex+1,continuationStyle:true,
     isFullyResolved:()=>compound?assignmentReadyToApply(statement):assignmentRhsResolved(statement),
     renderEquals:(ready,context)=>renderAssignmentOperator(statement,ready,context,item,isActive),

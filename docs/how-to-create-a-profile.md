@@ -10,8 +10,39 @@ After adding a profile, put its `meta.id` in exactly one category's
 `profileIds` array in `PROFILE_CATEGORIES`, also in `js/profiles.js`.
 Categories determine the expandable sidebar groups and the scope of each
 category's score summary and QR code. To create a new category, add an object
-with a stable `id`, visible `name`, and `profileIds` array. A profile without
-a category, or listed in two categories, fails validation at load time.
+with a stable `id`, visible `name`, `enabled` switch, and `profileIds` array. A
+profile without a category, or listed in two categories, fails validation at
+load time.
+
+## Show or hide profiles and categories
+
+Every profile and category has an `enabled` boolean in `js/profiles.js`:
+
+```js
+{
+  enabled: false, // hides only this profile
+  meta: { id: 'division-practice', name: 'Division Practice', description: '...' },
+  // ...
+}
+
+{
+  id: 'expressions',
+  name: 'Expressions',
+  enabled: false, // hides this category and every profile assigned to it
+  profileIds: ['division-practice'],
+}
+```
+
+Set the value to `false` to remove that content from the student session. A
+hidden profile is omitted from the sidebar, item generation, saved session
+scope, category score, overall score, score breakdown, and QR total. Hiding a
+category does the same for all of its profiles. Re-enabling a profile does not
+make it visible while its category remains disabled.
+
+Omitting `enabled` is supported and defaults to `true`, but keeping it explicit
+makes deployment configuration easier to audit. Configuration changes apply to
+new sessions. When a saved session is resumed, hidden profiles are discarded
+from the restored session and no longer contribute points.
 
 This guide covers expression and statement-sequence profiles. Activity profiles
 use the same global catalog and the same `meta` and `scoring` conventions, but
@@ -19,6 +50,7 @@ replace expression fields with an `activity` block:
 
 ```js
 {
+  enabled: true,
   meta: { id, name, description },
   scoring: { itemCount, pointsPerItem },
   activity: { kind: 'plugin-id', ...pluginConfiguration },
@@ -38,6 +70,7 @@ Every profile has six core parts and two optional capability blocks:
 
 ```js
 {
+  enabled:   true,                                // deployment visibility
   meta:      { id, name, description },        // display text
   shape:     { operandSources, operandRange, allowNegativeOperands },
   operators: { allowed, exclude, constraints }, // which operators, and rules on picking them
@@ -61,6 +94,7 @@ these are the minimum fields a profile needs to generate anything.
 
 ```js
 {
+  enabled: true,
   meta: {
     id: 'division-practice',
     name: 'Division Practice',

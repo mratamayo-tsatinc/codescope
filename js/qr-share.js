@@ -103,7 +103,7 @@ function renderQrInto(boxId, shareUrl, size){
 // the modal opens.
 async function renderScoreSummaryQr(){
   if(!state.userEmail) return;
-  const category=PROFILE_CATEGORIES.find(entry=>entry.id===scoreSummaryCategoryId);
+  const category=enabledCategories().find(entry=>entry.id===scoreSummaryCategoryId);
   const {earned, max} = category?computeCategoryScore(category.id):computeGrandTotalScore();
   const shareUrl = await buildResultsShareUrl(earned, max,
     category?`${getActivityName()} — ${category.name}`:undefined);

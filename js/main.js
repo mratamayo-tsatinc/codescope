@@ -60,6 +60,11 @@ function render(){
   const activeItem=currentItem();
   if(activeItem&&activeItem.activityKind) renderActivityItem(container,activeItem);
   else renderProgramItem(container, activeItem);
+  if(state.mode==='exam'&&state.examExpired){
+    container.prepend(h('div',{class:'exam-time-expired-notice',role:'status'},
+      h('i',{class:'fa-solid fa-lock','aria-hidden':'true'}),
+      h('span',{},h('b',{},'Time expired.'),' Answers and scoring are locked. Use the Score/QR button beside each category to view your result.')));
+  }
   // A click rebuilds #app, but the student's horizontal reading position is
   // part of the current work context. Restore it before connector geometry is
   // measured so rows and their shared SVG begin in the same content space.
@@ -154,14 +159,15 @@ function syncGlobalHeaderUI(){
 
   const timerContainer = document.getElementById('timerContainer');
   if(timerContainer){
-    timerContainer.style.display = (timerIntervalId !== null && appSettings.mode === 'exam') ? 'flex' : 'none';
+    const timerVisible=state.mode==='exam'&&(timerIntervalId!==null||state.examExpired);
+    timerContainer.style.display=timerVisible?'flex':'none';
+    timerContainer.classList.toggle('expired',state.mode==='exam'&&state.examExpired);
+    timerContainer.setAttribute('aria-label',state.examExpired?'Exam time expired':'Exam time remaining');
   }
   const scoreButton=document.getElementById('scoreSummaryBtn');
   if(scoreButton){
     scoreButton.hidden=!DEFAULT_APP_SETTINGS.shell.scoreSummary.overallVisible||!examResultsVisible();
   }
-  const submitButton=document.getElementById('submitExamBtn');
-  if(submitButton) submitButton.style.display=(state.mode==='exam'&&state.screen==='session'&&!state.examSubmitted)?'inline-flex':'none';
 }
 
 // appSettings (mode/timerMinutes) is persisted globally, not per-user (see

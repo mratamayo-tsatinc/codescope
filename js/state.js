@@ -69,8 +69,8 @@ const state = {
   practicePolicy: null, // immutable snapshot of practice settings captured when a session starts
   examPolicy: null, // immutable snapshot of exam settings captured when an attempt starts
   examTimerMinutes: null,
-  examSubmitted: false,
-  examSubmittedAt: null
+  examExpired: false,
+  examExpiredAt: null
 };
 
 // ============================================================================
@@ -82,29 +82,29 @@ const state = {
 //  - timerMinutes: duration for exam mode (set once at login)
 // ============================================================================
 const DEFAULT_APP_SETTINGS = Object.freeze({
-  schemaVersion: 5,
+  schemaVersion: 6,
   // local-configurable | state-only. This deployment switch is intentionally
   // read only: persisted browser data can never override it.
-  settingsPolicy: 'local-configurable',
+  settingsPolicy: 'state-only',
   // Deployment-owned switches. Browser-saved settings cannot override these.
   // Each mode keeps its own per-student snapshot when enabled.
   persistence: Object.freeze({practice:false, exam:true}),
-  mode: 'practice',
-  timerMinutes: 15,
+  mode: 'exam',
+  timerMinutes: 120,
   shell: DEFAULT_SHELL_SETTINGS,
   practice: Object.freeze({
     interactionMode: 'guided', // guided | strict-sequence
     manualResponses:Object.freeze({mode:'profile',namedValueRate:50,operatorRate:50})
   }),
   exam: Object.freeze({
-    interactionMode: 'guided', // guided | strict-sequence
+    interactionMode: 'strict-sequence', // guided | strict-sequence
     allowUndo: true,
     allowReviewFlags: true,
     showNeutralGuidance: false,
-    showScoresDuringExam: false,
-    feedbackRelease: 'after-submit', // after-submit | never
+    showScoresDuringExam: true,
+    feedbackRelease: 'after-timeout', // after-timeout | never
     lockItemAfterCheck: true,
-    autoSubmitOnTimeout: true,
+    autoLockOnTimeout: true,
     showCorrectSolution: false
     ,manualResponses:Object.freeze({mode:'profile',namedValueRate:50,operatorRate:50})
   })
@@ -157,7 +157,7 @@ function snapshotExamPolicy(settings){
     // Correct-solution disclosure is never a configurable exam behavior.
     showCorrectSolution:false,
     lockItemAfterCheck:true,
-    autoSubmitOnTimeout:true,
+    autoLockOnTimeout:true,
     manualResponses:Object.assign({},DEFAULT_APP_SETTINGS.exam.manualResponses,source.manualResponses||{})
   });
 }
@@ -171,12 +171,12 @@ function activePracticePolicy(){
 }
 
 function examAllowsUndo(){
-  return state.mode!=='exam' || (!state.examSubmitted && activeExamPolicy().allowUndo);
+  return state.mode!=='exam' || (!state.examExpired && activeExamPolicy().allowUndo);
 }
 
 function strictSequenceEnabled(){
   if(state.mode==='practice') return activePracticePolicy().interactionMode==='strict-sequence';
-  return state.mode==='exam' && !state.examSubmitted
+  return state.mode==='exam' && !state.examExpired
     && activeExamPolicy().interactionMode==='strict-sequence';
 }
 
@@ -188,9 +188,16 @@ function strictExamSequenceEnabled(){
 
 function examResultsVisible(){
   if(state.mode!=='exam') return true;
-  return state.examSubmitted
-    ? activeExamPolicy().feedbackRelease==='after-submit'
-    : activeExamPolicy().showScoresDuringExam;
+  return state.examExpired || activeExamPolicy().showScoresDuringExam;
+}
+
+function examFeedbackVisible(){
+  return state.mode!=='exam'
+    || (state.examExpired&&activeExamPolicy().feedbackRelease==='after-timeout');
+}
+
+function examInteractionLocked(){
+  return state.mode==='exam'&&state.examExpired;
 }
 
 function canUndoForCurrentMode(item){
@@ -214,12 +221,15 @@ let timerIntervalId = null;
 let timeRemaining = 0; // in seconds
 let examEndTimestamp = null;
 
-function currentProfile(){ return PROFILES.find(p=>p.id===state.profileId); }
+function currentProfile(){
+  const profile=PROFILES.find(p=>p.id===state.profileId);
+  return profileIsEnabled(profile)?profile:null;
+}
 function currentItem(){ return state.items[state.itemIndex]; }
 
 function generateItemsForProfile(profileId) {
   const profile = PROFILES.find(p => p.id === profileId);
-  if (!profile) return [];
+  if (!profileIsEnabled(profile)) return [];
   if(profile.activity&&typeof generateActivityItems==='function') return generateActivityItems(profile);
   
   const items = [];
@@ -248,7 +258,6 @@ function generateItemsForProfile(profileId) {
       playback: null,
       flagged: false,
       lockedAt: null,
-      examOmitted: false,
       examActionLog: [],
       examSequenceFailure: null,
       practiceInvalidExecution: null,
@@ -262,6 +271,13 @@ function generateItemsForProfile(profileId) {
 }
 
 function startSession(){
+  const sessionProfiles=enabledProfiles();
+  if(!sessionProfiles.length){
+    throw new Error('CodeScope requires at least one enabled profile in an enabled category.');
+  }
+  if(!sessionProfiles.some(profile=>profile.id===state.profileId)){
+    state.profileId=sessionProfiles[0].id;
+  }
   // A fresh login is a fresh attempt. Resumed exams bypass this function and
   // restore their saved seed, so reload/logout-login still reproduces exactly
   // the same items while a different student never inherits an in-memory seed.
@@ -275,13 +291,14 @@ function startSession(){
   state.practicePolicy = state.mode==='practice' ? snapshotPracticePolicy(appSettings) : null;
   state.examPolicy = state.mode==='exam' ? snapshotExamPolicy(appSettings) : null;
   state.examTimerMinutes = state.mode==='exam' ? appSettings.timerMinutes : null;
-  state.examSubmitted = false;
-  state.examSubmittedAt = null;
+  state.examExpired = false;
+  state.examExpiredAt = null;
   state.itemIndexByProfile = {};
   
-  // Generate items for ALL profiles once using the seed
+  // Generate items only for enabled profiles once using the seed. Hidden
+  // profiles never enter navigation, persistence, or score denominators.
   state.itemsByProfile = {};
-  PROFILES.forEach(profile => {
+  sessionProfiles.forEach(profile => {
     state.itemsByProfile[profile.id] = generateItemsForProfile(profile.id);
   });
   
@@ -314,7 +331,7 @@ function itemFullyResolved(item){
 // "correct next" one) can be clicked — see the FLAT model comment above.
 function handleTokenClick(action){
   const item = currentItem();
-  if(!item || item.checked || state.examSubmitted || item.practiceInvalidExecution) return;
+  if(!item || item.checked || state.examExpired || item.practiceInvalidExecution) return;
   const statement=currentProgramStatement(item);
   // A handler retained by an expanded/completing row or a queued DOM event
   // must never be reinterpreted as an action on the new current statement.
@@ -502,7 +519,7 @@ function terminateStrictExamItem(item,action,reason,statement){
 }
 
 function recordExamAction(item,action,detail){
-  if(state.mode!=='exam'||state.examSubmitted||!item) return;
+  if(state.mode!=='exam'||state.examExpired||!item) return;
   if(!Array.isArray(item.examActionLog)) item.examActionLog=[];
   item.examActionLog.push(Object.assign({
     type:action&&action.type?action.type:String(action),timestamp:Date.now()
@@ -772,7 +789,7 @@ function scoreItem(facts, pointsPerItem){
 
 function handleCheck(){
   const item=currentItem();
-  if(state.examSubmitted || !item) return;
+  if(state.examExpired || !item) return;
   if(item.activityKind){
     const result=checkActivityItem(item);
     if(result.applied){
@@ -796,30 +813,11 @@ function handleCheck(){
 
 function toggleCurrentItemFlag(){
   const item=currentItem();
-  if(state.mode!=='exam'||state.examSubmitted||!activeExamPolicy().allowReviewFlags
+  if(state.mode!=='exam'||state.examExpired||!activeExamPolicy().allowReviewFlags
     ||!item||item.checked) return;
   item.flagged=!item.flagged;
   recordExamAction(item,{type:item.flagged?'flag':'unflag'});
   render();
-}
-
-function allExamItems(){
-  const rows=[];
-  PROFILES.forEach(profile=>{
-    (state.itemsByProfile[profile.id]||[]).forEach((item,index)=>rows.push({profile,item,index}));
-  });
-  return rows;
-}
-
-function examAttemptSummary(){
-  const rows=allExamItems();
-  return {
-    total:rows.length,
-    answered:rows.filter(row=>row.item.checked).length,
-    inProgress:rows.filter(row=>!row.item.checked&&itemHasAttempt(row.item)).length,
-    unattempted:rows.filter(row=>!row.item.checked&&!itemHasAttempt(row.item)).length,
-    flagged:rows.filter(row=>row.item.flagged).length
-  };
 }
 
 function itemHasAttempt(item){
@@ -830,25 +828,18 @@ function itemHasAttempt(item){
     statement.runtime&&statement.runtime.trace&&statement.runtime.trace.length)));
 }
 
-function submitExam(force){
-  if(state.mode!=='exam'||state.examSubmitted) return false;
-  const summary=examAttemptSummary();
-  if(!force&&typeof confirm==='function'){
-    const accepted=confirm(`Submit this exam?\n\n${summary.answered} answered\n${summary.inProgress} in progress\n${summary.unattempted} unattempted\n${summary.flagged} flagged\n\nAfter submission, answers cannot be changed.`);
-    if(!accepted) return false;
-  }
-  allExamItems().forEach(({profile,item})=>{
-    if(item.checked) return;
-    item.examOmitted=true;
-    item.flagged=false;
-    item.points=0;
-    item.maxPoints=profile.pointsPerItem;
-    item.itemScore=0;
-  });
-  state.examSubmitted=true;
-  state.examSubmittedAt=Date.now();
-  state.screen='done';
-  if(typeof stopTimer==='function') stopTimer();
+function expireExam(){
+  if(state.mode!=='exam'||state.examExpired) return false;
+  state.examExpired=true;
+  state.examExpiredAt=Date.now();
+  timeRemaining=0;
+  if(timerIntervalId!==null){clearInterval(timerIntervalId);timerIntervalId=null;}
+  if(typeof tcCloseModal==='function') tcCloseModal();
+  const manualModal=typeof document!=='undefined'&&document.getElementById('manualResponseModal');
+  if(manualModal){manualModal.classList.remove('open');manualModal.style.display='none';}
+  if(typeof clearManualResponseConnector==='function') clearManualResponseConnector();
+  if(typeof ftsDragSession!=='undefined'&&ftsDragSession&&typeof ftsEndDrag==='function') ftsEndDrag(ftsDragSession);
+  if(typeof updateTimerDisplay==='function') updateTimerDisplay();
   if(typeof saveExamProgress==='function') saveExamProgress();
   render();
   return true;

@@ -60,9 +60,8 @@ body{
   /* JetBrains Mono ships contextual-alternate ligatures that visually merge
      "<=" "&gt;=" "==" "!=" "&&" "||" into single glyphs (e.g. "≤"). Every
      operator in this app must read back exactly as the keyboard characters
-     the student would type, so ligatures are disabled globally; this
-     property inherits into every mono-font element (.code-line, .code-out,
-     .tok-card-body, etc.) without needing a per-selector override. */
+     the student would type. Components that use the `font` shorthand repeat
+     this override because that shorthand resets inherited font features. */
   font-variant-ligatures:none;
   -webkit-font-feature-settings:"liga" 0,"calt" 0;
   font-feature-settings:"liga" 0,"calt" 0;
@@ -1592,12 +1591,27 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   border-color:var(--op);color:var(--op-glow);
   background:rgba(255,163,92,0.08);
 }
-.submit-exam-btn{
-  align-items:center;gap:7px;padding:8px 12px;border-radius:7px;
-  border:1px solid rgba(255,163,92,.65);background:rgba(255,163,92,.12);
-  color:var(--op);font-weight:700;cursor:pointer;
+#scoreSummaryModal.score-summary-exam .modal-content{
+  background:linear-gradient(155deg,#164f88 0%,#103d6b 48%,#0b3158 100%);
+  border-color:rgba(129,194,255,.68);
+  box-shadow:0 24px 70px rgba(2,25,52,.62),0 0 0 1px rgba(117,185,255,.12) inset;
 }
-.submit-exam-btn:hover{background:rgba(255,163,92,.22);}
+#scoreSummaryModal.score-summary-exam .modal-header,
+#scoreSummaryModal.score-summary-exam .modal-footer{
+  border-color:rgba(169,211,255,.24);
+}
+#scoreSummaryModal.score-summary-exam .score-summary-user{
+  border-color:rgba(169,211,255,.2);
+}
+#scoreSummaryModal.score-summary-exam .ssu-label,
+#scoreSummaryModal.score-summary-exam .ssu-clock,
+#scoreSummaryModal.score-summary-exam .sst-label,
+#scoreSummaryModal.score-summary-exam .qr-caption,
+#scoreSummaryModal.score-summary-exam .score-summary-download-status{
+  color:#c1ddf8;
+}
+#scoreSummaryModal.score-summary-exam .modal-close{color:#cfe7ff;}
+#scoreSummaryModal.score-summary-exam .modal-close:hover{color:#fff;}
 .exam-item-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-7px 0 14px;padding:8px 10px;border:1px solid var(--line-soft);border-radius:8px;background:rgba(111,183,255,.035);}
 .exam-item-status{font-size:12px;color:var(--text-mute);}
 .exam-item-status.locked{color:#6fb7ff;}.exam-item-status.flagged{color:var(--op);}
@@ -1605,11 +1619,14 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
 .exam-flag-btn.active{color:var(--op);border-color:rgba(255,163,92,.55);background:rgba(255,163,92,.08);}
 .exam-answer-recorded{display:flex;align-items:flex-start;gap:9px;margin-top:14px;padding:12px;border:1px solid rgba(111,183,255,.28);border-radius:8px;background:rgba(111,183,255,.055);color:var(--text-dim);font-size:12.5px;line-height:1.45;}
 .exam-answer-recorded i{color:#6fb7ff;margin-top:2px;}
-.exam-submitted-icon{font-size:26px;color:var(--good);margin-bottom:8px;}
-.exam-result-total{display:flex;align-items:center;justify-content:space-between;margin:20px 0 12px;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--panel-alt);}
-.exam-result-total strong{font-family:var(--mono);font-size:20px;color:var(--good);}
-.exam-profile-results{max-height:42vh;overflow:auto;}
-.exam-results-withheld{display:flex;gap:9px;margin-top:20px;padding:14px;border:1px solid var(--line);border-radius:8px;color:var(--text-dim);}
+.exam-time-expired-notice{
+  display:flex;align-items:flex-start;gap:10px;margin:0 0 14px;padding:12px 14px;
+  border:1px solid rgba(111,183,255,.5);border-radius:9px;
+  background:rgba(29,104,176,.16);color:#cfe7ff;font-size:12.5px;line-height:1.45;
+}
+.exam-time-expired-notice i{margin-top:2px;color:#79bdff;}
+.timer-container.expired{border-color:rgba(111,183,255,.68);background:rgba(29,104,176,.18);}
+.timer-container.expired .timer-display{color:#9fd0ff;animation:none;}
 .score-summary-user{
   text-align:center;padding-bottom:18px;margin-bottom:18px;
   border-bottom:1px solid var(--line-soft);
@@ -2077,7 +2094,6 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
 .score-summary-btn{color:var(--text-dim);}
 .mode-tag{display:inline-flex;align-items:center;min-height:30px;white-space:nowrap;}
 .timer-container{height:36px;white-space:nowrap;}
-.submit-exam-btn{min-height:40px;white-space:nowrap;}
 
 /* Session context now belongs to the persistent shell header. */
 #app>.session-bar{display:none;}
@@ -2127,7 +2143,6 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   .timer-label{display:none;}
   .timer-display{min-width:44px;font-size:14px;}
   .mode-tag{min-height:28px;padding:3px 7px;font-size:10px;}
-  .submit-exam-btn{min-height:40px;padding:7px 9px;}
   #app{padding-top:1rem;}
   .item-pagination-container{padding:7px 10px max(7px,env(safe-area-inset-bottom));}
   .item-pagination{max-width:420px;padding:6px 8px;gap:6px;flex-wrap:nowrap;}
@@ -2142,8 +2157,6 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   .header-session-context{align-items:baseline;flex-direction:row;gap:6px;}
   .header-profile-name{flex:1;max-width:none;}
   .header-item-position{flex:0 0 auto;}
-  .submit-exam-btn span{display:none;}
-  .submit-exam-btn{width:40px;padding:0;justify-content:center;}
   .item-page-mobile-total{font-size:11px;}
 }
 

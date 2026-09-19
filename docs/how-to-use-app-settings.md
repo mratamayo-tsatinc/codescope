@@ -19,12 +19,21 @@ hardcoded configuration.
 
 ```js
 const DEFAULT_APP_SETTINGS = Object.freeze({
-  schemaVersion: 5,
+  schemaVersion: 6,
   settingsPolicy: 'local-configurable', // or 'state-only'
   persistence: Object.freeze({practice:false, exam:true}),
   // ...
 });
 ```
+
+## Content visibility
+
+Profile and category availability is configured in `js/profiles.js`, alongside
+the content it controls. Set a profile's root-level `enabled` value to `false`
+to hide that profile. Set a `PROFILE_CATEGORIES` entry's `enabled` value to
+`false` to hide the category and every profile assigned to it. Hidden content
+is excluded from item generation, persistence, sidebar navigation, and score
+totals. See `docs/how-to-create-a-profile.md` for examples and scoring details.
 
 The policy itself is never loaded from local storage. A browser user therefore
 cannot persistently switch a `state-only` deployment back to editable mode
@@ -62,7 +71,7 @@ settings and the login Settings panel cannot override them. The defaults keep
 the previous behavior: Practice starts fresh; Exam resumes. When enabled, a
 mode stores each student's generated items, responses, scores, active profile,
 item position, seed, and policy in a mode-specific localStorage record. Exam
-also stores its deadline and submission state. Turning a switch off stops reads
+also stores its deadline and timeout lock state. Turning a switch off stops reads
 and writes for that mode; it does not delete its existing records. The other
 mode's records are unaffected. **Clear all local application data** deletes
 both modes' records.
@@ -71,7 +80,7 @@ both modes' records.
 
 ```js
 const DEFAULT_APP_SETTINGS = Object.freeze({
-  schemaVersion: 5,
+  schemaVersion: 6,
   settingsPolicy: 'local-configurable',
   persistence: Object.freeze({practice:false, exam:true}),
   mode: 'practice',
@@ -93,10 +102,10 @@ const DEFAULT_APP_SETTINGS = Object.freeze({
     allowUndo: true,
     allowReviewFlags: true,
     showNeutralGuidance: false,
-    showScoresDuringExam: false,
-    feedbackRelease: 'after-submit',
+    showScoresDuringExam: true,
+    feedbackRelease: 'after-timeout',
     lockItemAfterCheck: true,
-    autoSubmitOnTimeout: true,
+    autoLockOnTimeout: true,
     showCorrectSolution: false,
     manualResponses: Object.freeze({
       mode: 'profile',
@@ -246,16 +255,20 @@ invalid execution blocks or terminates according to the interaction policy.
 | `allowUndo` | Allows one-step Undo within the current unfinished statement. It cannot undo a checked item or a terminal strict-exam error. |
 | `allowReviewFlags` | Lets students flag unfinished items for later review. |
 | `showNeutralGuidance` | Shows interaction instructions without correctness feedback. |
-| `showScoresDuringExam` | Shows running scores before submission. |
-| `feedbackRelease: 'after-submit'` | Releases scores and item results after final submission. |
-| `feedbackRelease: 'never'` | Records submission without releasing item results. |
+| `showScoresDuringExam` | Shows the running score in each category's Score/QR summary. The default is `true`. |
+| `feedbackRelease: 'after-timeout'` | Releases item results after the timer expires. Category Score/QR summaries remain available. |
+| `feedbackRelease: 'never'` | Keeps item correctness hidden after timeout. Category Score/QR summaries remain available. |
 
 The following Exam rules are enforced invariants even if stale or manually
 edited browser data says otherwise:
 
 - `showCorrectSolution` is always `false`.
 - `lockItemAfterCheck` is always `true`.
-- `autoSubmitOnTimeout` is always `true`.
+- `autoLockOnTimeout` is always `true`.
+
+Exam mode has no manual submission action. When the timer expires, the current
+attempt stays on the session screen, all answer and scoring actions are locked,
+and students use the Score/QR action beside each category to view its summary.
 
 When Exam persistence is enabled, generated items are saved locally. Reloading,
 logging out, or logging back in on the same browser resumes the same attempt
@@ -313,10 +326,10 @@ exam: Object.freeze({
   allowUndo: false,
   allowReviewFlags: true,
   showNeutralGuidance: false,
-  showScoresDuringExam: false,
-  feedbackRelease: 'after-submit',
+  showScoresDuringExam: true,
+  feedbackRelease: 'after-timeout',
   lockItemAfterCheck: true,
-  autoSubmitOnTimeout: true,
+  autoLockOnTimeout: true,
   showCorrectSolution: false,
   manualResponses: Object.freeze({mode:'custom',namedValueRate:50,operatorRate:50}),
 }),

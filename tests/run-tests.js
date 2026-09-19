@@ -104,6 +104,7 @@ function testScriptManifestParses(){
   const tokenFeedback=fs.readFileSync(path.join(ROOT,'plugins','token-classification','feedback.js'),'utf8');
   const tokenStyles=fs.readFileSync(path.join(ROOT,'plugins','token-classification','styles.css'),'utf8');
   const fallingRenderer=fs.readFileSync(path.join(ROOT,'plugins','falling-token-sort','renderer.js'),'utf8');
+  const fallingStyles=fs.readFileSync(path.join(ROOT,'plugins','falling-token-sort','styles.css'),'utf8');
   const simulateRenderer=fs.readFileSync(path.join(ROOT,'plugins','simulate-output','renderer.js'),'utf8');
   assert(tokenRenderer.includes('renderProgramWorkspaceShell(container,item,'));
   assert(tokenRenderer.includes('renderInlineEvaluationActions({'));
@@ -113,6 +114,8 @@ function testScriptManifestParses(){
   assert(!tokenStyles.includes('.token-classification-workspace .program-progress-visual{display:none}'));
   assert(!tokenRenderer.includes("class:'tc-activity'"));
   assert(!tokenRenderer.includes("h('h2',{},profile.name"));
+  assert(fallingStyles.includes('.fts-solution-row code{color:var(--text);font:700 12px/1.45 var(--mono);font-variant-ligatures:none;'));
+  assert(fallingStyles.includes('font-feature-settings:"liga" 0,"calt" 0'));
   assert(tokenFeedback.includes("class:'solution-toggle'"));
   assert(tokenFeedback.includes("typeof openFeedbackDrawer==='function'"));
   assert(tokenFeedback.includes("typeof renderItemCelebration==='function'"));
@@ -200,7 +203,11 @@ function testScriptManifestParses(){
   assert(declarationRenderer.includes('strict-sequence-candidate'));
   assert(assignmentRenderer.includes('strict-sequence-candidate'));
   assert(html.includes('id="examFeedbackRelease"'));
-  assert(html.includes('id="submitExamBtn"'));
+  assert(!html.includes('id="submitExamBtn"'));
+  assert(!bundle.includes('function submitExam('));
+  assert(bundle.includes('function expireExam()'));
+  assert(bundle.includes("showScoresDuringExam: true"));
+  assert(bundle.includes("feedbackRelease: 'after-timeout'"));
   assert(html.includes('id="headerSessionContext"'));
   assert(html.includes('id="accountMenu"'));
   assert(html.includes('class="account-trigger sidebar-account-trigger"'));
@@ -215,11 +222,13 @@ function testScriptManifestParses(){
   assert(styles.includes('.shell-brand-trigger'));
   assert(styles.includes('.brand-toggle-cue'));
   assert(styles.includes('.shell-brand-trigger[aria-expanded="true"] .brand-toggle-cue i'));
+  assert(styles.includes('#scoreSummaryModal.score-summary-exam .modal-content'));
   assert(styles.includes('.header-session-context{align-items:baseline;flex-direction:row;gap:6px;}'));
   assert(styles.includes('env(safe-area-inset-bottom)'));
   assert(styles.includes('.item-page-first,.item-page-last{display:none;}'));
   assert(bundle.includes("sidebar.toggleAttribute('inert',!sidebarVisible)"));
   assert(bundle.includes("document.querySelectorAll('.shell-brand-trigger')"));
+  assert(bundle.includes("modal.classList.toggle('score-summary-exam',state.mode==='exam')"));
   assert(bundle.includes("linksToggle.setAttribute('aria-pressed'"));
   assert(bundle.includes('userControlVisible: false'));
   assert(bundle.includes("displayPolicy: 'content-aware'"));
@@ -592,6 +601,28 @@ function generatedSnapshotHash(){
     return JSON.stringify(result);
   })()`);
   return crypto.createHash('sha256').update(json).digest('hex');
+}
+
+function testParenthesesOverrideProfile(){
+  const ctx=context();
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    __idCounter=1;initializeSeededRandom(1592594996);
+    const profile=PROFILES.find(candidate=>candidate.id==='parens-override');
+    const items=Array.from({length:profile.itemCount},()=>{
+      const generated=generateInstance(profile),flat=flattenInstance(generated.tree);
+      return {source:renderString(generated.tree),flat:flatToString(flat),runs:computeParenRuns(flat).length};
+    });
+    resetRandomGenerator();
+    return JSON.stringify({template:profile.template,items});
+  })()`));
+  assert.strictEqual(result.template,'(operand low operand) high operand low operand');
+  assert.strictEqual(result.items.length,5);
+  result.items.forEach(item=>{
+    assert(item.source.includes('(')&&item.source.includes(')'));
+    assert(item.flat.includes('(')&&item.flat.includes(')'));
+    assert.strictEqual(item.runs,1);
+  });
 }
 
 function testProgramCore(){
@@ -1004,7 +1035,7 @@ function testStandaloneUnaryUpdateProfile(){
   const result=JSON.parse(evaluate(ctx,`(()=>{
     function activate(item,mode){
       state.profileId='unary-update-sequence';state.items=[item];state.itemIndex=0;
-      state.mode=mode||'practice';state.examSubmitted=false;
+      state.mode=mode||'practice';state.examExpired=false;
     }
     function completeDeclarations(item){
       while(currentProgramStatement(item).kind==='declaration'){
@@ -1213,7 +1244,7 @@ function testCanonicalProgramPlayback(){
     expressionStepsShown:true,commitRowsShown:true,finalShown:true,targetReadShown:true,totalMatches:true});
 }
 
-function testExamSettingsAndSubmissionPolicy(){
+function testExamSettingsAndTimeoutPolicy(){
   const ctx=context();
   load(ctx,[
     'engine.js','flat-model.js','template-engine.js','generator.js','profiles.js',
@@ -1244,16 +1275,20 @@ function testExamSettingsAndSubmissionPolicy(){
     const profile=PROFILES[0];
     const item=generateItemsForProfile(profile.id)[0];
     state.itemsByProfile={[profile.id]:[item]};state.items=[item];state.itemIndex=0;
-    state.examSubmitted=false;state.screen='session';
+    state.examExpired=false;state.screen='session';
     const candidate=getMaxPrecCandidatesFlat(item.workingFlat)[0];
     handleTokenClick({type:'evaluate',leftId:candidate.leftId,rightId:candidate.rightId});
     handleUndo();
     const auditPreserved=item.trace.length===0&&item.examActionLog.length===2
       &&item.examActionLog[0].type==='evaluate'&&item.examActionLog[1].type==='undo';
     item.flagged=true;
-    const submitted=submitExam(true);
-    const submissionLocks=submitted&&state.examSubmitted&&state.screen==='done'
-      &&item.examOmitted&&item.points===0&&item.maxPoints===profile.pointsPerItem&&!item.flagged;
+    const expired=expireExam();
+    const pointsAtExpiry=item.points;
+    const traceLengthAtExpiry=item.trace.length;
+    handleTokenClick({type:'evaluate',leftId:candidate.leftId,rightId:candidate.rightId});
+    const timeoutLocks=expired&&state.examExpired&&state.screen==='session'
+      &&item.points===pointsAtExpiry&&item.flagged&&item.trace.length===traceLengthAtExpiry
+      &&examResultsVisible()&&examInteractionLocked();
     item.showSolution=false;toggleSolution();
     const solutionBlocked=!item.showSolution;
 
@@ -1263,10 +1298,10 @@ function testExamSettingsAndSubmissionPolicy(){
       &&localStorage.getItem('precedifyLogin')===null&&localStorage.getItem('precedifyExamProgress:c')===null
       &&appSettings.mode==='practice';
     resetRandomGenerator();
-    return JSON.stringify({migratedDefaults,snapshotStable,scopedPurge,auditPreserved,submissionLocks,solutionBlocked,fullPurge});
+    return JSON.stringify({migratedDefaults,snapshotStable,scopedPurge,auditPreserved,timeoutLocks,solutionBlocked,fullPurge});
   })()`));
   assert.deepStrictEqual(result,{migratedDefaults:true,snapshotStable:true,scopedPurge:true,auditPreserved:true,
-    submissionLocks:true,solutionBlocked:true,fullPurge:true});
+    timeoutLocks:true,solutionBlocked:true,fullPurge:true});
 }
 
 function run(){
@@ -1279,7 +1314,8 @@ function run(){
   testLegacyUnaryMutationCards();
   testInvalidExecutionAlertIsStatementScoped();
   const hash = generatedSnapshotHash();
-  assert.strictEqual(hash, 'f2dde8ab83c0028f616b42a8c973089f40db5e5fc025635578643b2d33f1e1ba');
+  assert.strictEqual(hash, '8a2a85b83925b9a726fbce6351d76c7cb59b96bb87779f66064422e74378f53b');
+  testParenthesesOverrideProfile();
   testProgramCore();
   testLegacyExpressionIntegration();
   testDeclarationChain();
@@ -1289,7 +1325,7 @@ function run(){
   testStandaloneUnaryPanelUsesProgramConnectorFrame();
   testOldExamSaveGainsNewProfile();
   testCanonicalProgramPlayback();
-  testExamSettingsAndSubmissionPolicy();
+  testExamSettingsAndTimeoutPolicy();
   testStrictExamSequencePolicy();
   testStateOnlySettingsPolicy();
   testManualResponseProfilesAndPropagation();
@@ -1304,8 +1340,8 @@ function testTokenClassificationPlugin(){
   const profileSource=fs.readFileSync(profilesFile,'utf8')
     // Keep the hidden lessons out of the live catalog while exercising their
     // original integration coverage in this isolated VM.
-    .replace(/,\s*\/\*\s*(?=\{\s*meta:\{id:'token-identifier-position')/,',\n')
-    .replace(/,\s*\*\/\s*(?=\{\s*meta:\{id:'falling-identifier-sort')/,',\n');
+    .replace(/,\s*\/\*\s*(?=\{\s*(?:enabled:true,\s*)?meta:\{id:'token-identifier-position')/,',\n')
+    .replace(/,\s*\*\/\s*(?=\{\s*(?:enabled:true,\s*)?meta:\{id:'falling-identifier-sort')/,',\n');
   vm.runInContext(profileSource,ctx,{filename:profilesFile});
   load(ctx,['language.js',
     'program-ir.js','program-core.js','activity-core.js','legacy-expression-plugin.js',
@@ -1444,12 +1480,12 @@ function testSimulateOutputPlugin(){
       &&item._feedbackAnimated===false;
     soApplyAction({item,action:{type:'SET_OUTPUT',value:item.expectedLines.join('\\n')+'\\nEXTRA'}});
     const extra=soScoreResponse(item);
-    state.mode='exam';state.examPolicy={feedbackRelease:'after-submit'};
+    state.mode='exam';state.examPolicy={feedbackRelease:'after-timeout'};
     const restored=JSON.parse(JSON.stringify(item));
     const snapshotStable=restored.response.output===item.response.output
       &&restored.source===item.source&&restored.expectedLines.length===item.expectedLines.length;
     soCheck({item:restored,profile,state});
-    const withheld=!soFeedbackReleased(restored);state.examSubmitted=true;
+    const withheld=!soFeedbackReleased(restored);state.examExpired=true;
     const released=soFeedbackReleased(restored);
     resetRandomGenerator();
     return JSON.stringify({profileActive:!!profile,count:items.length,
@@ -1475,13 +1511,18 @@ function testFallingTokenSortMultiple(){
     'plugins/falling-token-sort/actions.js','plugins/falling-token-sort/feedback.js',
     'plugins/falling-token-sort/renderer.js']);
   ctx.roundPoints=value=>Math.round(value*100)/100;
-  ctx.state={mode:'practice',examSubmitted:false};
+  ctx.state={mode:'practice',examExpired:false};
   ctx.tcValidateIdentifierGeneration=()=>{};
   ctx.registerActivityPlugin=plugin=>plugin;
   ctx.TC_CATEGORY_DEFS={
     'valid-identifier':{label:'Valid Identifier',tone:'valid',icon:'fa-check'},
     'invalid-identifier':{label:'Invalid Identifier',tone:'invalid',icon:'fa-xmark'},
-    'reserved-word':{label:'Reserved Word',tone:'reserved',icon:'fa-lock'}
+    'reserved-word':{label:'Reserved Word',tone:'reserved',icon:'fa-lock'},
+    'arithmetic-operator':{label:'Arithmetic',tone:'arithmetic',icon:'fa-calculator'},
+    'relational-operator':{label:'Relational',tone:'relational',icon:'fa-scale-balanced'},
+    'boolean-operator':{label:'Boolean',tone:'boolean',icon:'fa-code-branch'},
+    'assignment-operator':{label:'Assignment',tone:'assignment',icon:'fa-arrow-right-to-bracket'},
+    'operator-distractor':{label:'Not an operator',tone:'distractor',icon:'fa-ban'}
   };
   loadRelative(ctx,['plugins/falling-token-sort/plugin.js']);
   const result=JSON.parse(evaluate(ctx,`(()=>{
@@ -1494,8 +1535,42 @@ function testFallingTokenSortMultiple(){
       exam:{totalTokens:{exact:3},counts:{'valid-identifier':1,'invalid-identifier':1,'reserved-word':1}}
     }},assessment:{action:'SORT_TOKEN',cardinality:'per-token',scoreAttempt:'first',completion:'all-tokens-placed'},response:{policies:{
       practice:{incorrectPlacement:'return-token'},exam:{incorrectPlacement:'accept'}
-    }},feedback:{practice:'immediate-return',exam:'deferred-until-submit'}}};
+    }},feedback:{practice:'immediate-return',exam:'deferred-until-timeout'}}};
     ftsValidateProfile(profile);
+    const operatorProfile={id:'operator-test',pointsPerItem:30,activity:{dropArea:{visibleTokens:10,landingBehavior:'pass-through'},buckets:[
+      {id:'arithmetic',category:'arithmetic-operator',region:'left',order:1},
+      {id:'relational',category:'relational-operator',region:'left',order:2},
+      {id:'boolean',category:'boolean-operator',region:'right',order:1},
+      {id:'assignment',category:'assignment-operator',region:'right',order:2},
+      {id:'distractor',category:'operator-distractor',region:'bottom',order:1}
+    ],generator:{capability:'canonical-token-pools',tokenPools:{
+      'arithmetic-operator':['+','-','*','/','%'],'relational-operator':['<','>','<=','>=','==','!='],
+      'boolean-operator':['&&','||','!'],'assignment-operator':['=','+=','-=','*=','/=','%='],
+      'operator-distractor':['value','count','42','3.14','true','false',';',',','(',')']
+    },policies:{practice:{totalTokens:{exact:30},counts:{
+      'arithmetic-operator':{exact:5},'relational-operator':{exact:6},'boolean-operator':{exact:3},
+      'assignment-operator':{exact:6},'operator-distractor':{exact:10}
+    },shuffle:true},exam:{totalTokens:{exact:30},counts:{
+      'arithmetic-operator':{exact:5},'relational-operator':{exact:6},'boolean-operator':{exact:3},
+      'assignment-operator':{exact:6},'operator-distractor':{exact:10}
+    },shuffle:true}}},assessment:{action:'SORT_TOKEN',cardinality:'per-token',scoreAttempt:'first',completion:'all-tokens-placed'},
+    response:{policies:{practice:{incorrectPlacement:'return-token'},exam:{incorrectPlacement:'accept'}}},
+    feedback:{practice:'immediate-return',exam:'deferred-until-timeout'}}};
+    ftsValidateProfile(operatorProfile);
+    seededRandom=()=>.37;state.mode='practice';
+    const operatorC=ftsGenerateItem({profile:operatorProfile,index:0,language:'c',generationContext:{}});
+    seededRandom=()=>.37;state.mode='exam';
+    const operatorJava=ftsGenerateItem({profile:operatorProfile,index:0,language:'java',generationContext:{}});
+    const expectedOperatorCounts={'arithmetic-operator':5,'relational-operator':6,'boolean-operator':3,
+      'assignment-operator':6,'operator-distractor':10};
+    const expectedOperatorTokens=['+','-','*','/','%','<','>','<=','>=','==','!=','&&','||','!',
+      '=','+=','-=','*=','/=','%=','value','count','42','3.14','true','false',';',',','(',')'];
+    const operatorProfilesValid=[operatorC,operatorJava].every(item=>item.tokens.length===30
+      &&item.generatedTokenTarget===30&&new Set(item.tokens.map(token=>token.text)).size===30
+      &&expectedOperatorTokens.every(token=>item.tokens.some(candidate=>candidate.text===token))
+      &&Object.entries(expectedOperatorCounts).every(([category,count])=>item.generatedCounts[category]===count))
+      &&operatorC.language==='c'&&operatorJava.language==='java';
+    state.mode='practice';
     const invalidProfile=JSON.parse(JSON.stringify(profile));invalidProfile.activity.dropArea.visibleTokens=0;
     let invalidRejected=false;try{ftsValidateProfile(invalidProfile)}catch(error){invalidRejected=true}
     const invalidLanding=JSON.parse(JSON.stringify(profile));invalidLanding.activity.dropArea.landingBehavior='float';
@@ -1633,7 +1708,7 @@ function testFallingTokenSortMultiple(){
       score:rejectedDrag.scoreResults[0]?.wasCorrect,renders:dragRenders};
     return JSON.stringify({initial,invalidRejected,invalidLandingRejected,invalidTotalRejected,invalidRangeRejected,
       invalidSpecifiedTargetRejected,invalidZeroTargetRejected,invalidCategoryTargetRejected,
-      targetAllocation,generatedTargets,fittedHeight,fittedAfterScroll,compactMinimum,
+      targetAllocation,generatedTargets,operatorProfilesValid,fittedHeight,fittedAfterScroll,compactMinimum,
       sequential,freeReleaseClamped,variedPositions,slowEnough,passPositionChanges,passAnimating,
       choiceCount:countNodesWithClass(before,'fts-token-choice'),
       firstDrops,selectionRerenderDrops,motionOffCount,passMotionOffCount,staticPassStable,
@@ -1652,7 +1727,7 @@ function testFallingTokenSortMultiple(){
     invalidTotalRejected:true,invalidRangeRejected:true,invalidSpecifiedTargetRejected:true,
     invalidZeroTargetRejected:true,
     invalidCategoryTargetRejected:true,
-    targetAllocation:true,generatedTargets:true,
+    targetAllocation:true,generatedTargets:true,operatorProfilesValid:true,
     fittedHeight:518,fittedAfterScroll:518,compactMinimum:340,
     sequential:true,freeReleaseClamped:true,variedPositions:true,slowEnough:true,
     passPositionChanges:true,passAnimating:true,choiceCount:1,
@@ -1718,7 +1793,7 @@ function testManualResponseProfilesAndPropagation(){
       manualCorrect:facts.correct,manualTotal:facts.total
     });
   })()`));
-  assert.deepStrictEqual(result,{advancedItems:5,logicalItems:5,advancedHalf:true,logicalHalf:true,
+  assert.deepStrictEqual(result,{advancedItems:2,logicalItems:5,advancedHalf:true,logicalHalf:true,
     legacyOff:true,plainWritesEligible:true,declarationsEligible:true,
     hasAssignment:true,hasUnary:true,propagated:true,originalPreserved:true,
     manualCorrect:1,manualTotal:2});
@@ -1762,17 +1837,31 @@ function testProfileCategoriesAndScopedScores(){
   const result=JSON.parse(evaluate(ctx,`(()=>{
     const assigned=PROFILES.every(profile=>PROFILE_CATEGORIES.some(category=>category.id===profile.categoryId));
     const unique=PROFILES.every(profile=>PROFILE_CATEGORIES.filter(category=>category.profileIds.includes(profile.id)).length===1);
+    const explicitVisibility=PROFILES.every(profile=>profile.enabled===true)
+      &&PROFILE_CATEGORIES.every(category=>category.enabled===true);
     const expression=PROFILES.find(profile=>profile.id==='direct-ltr');
+    const hiddenExpression=PROFILES.find(profile=>profile.id==='mult-precedence');
     const falling=ACTIVITY_PROFILES.find(profile=>profile.id==='falling-identifier-sort');
     PROFILES.push(falling);
     PROFILES.push(ACTIVITY_PROFILES.find(profile=>profile.id==='c-simulate-output'));
+    hiddenExpression.enabled=false;
     state.itemsByProfile={
       [expression.id]:[{checked:true,points:0.6,wasCorrectFinal:false}],
+      [hiddenExpression.id]:[{checked:true,points:1,wasCorrectFinal:true}],
       [falling.id]:[{checked:true,points:12,wasCorrectFinal:false}]
     };
+    const hiddenProfileExcluded=!profilesForCategory('expressions').includes(hiddenExpression)
+      &&generateItemsForProfile(hiddenExpression.id).length===0;
     const expressionScore=computeCategoryScore('expressions');
     const identifierScore=computeCategoryScore('identifier-activities');
     const overall=computeGrandTotalScore();
+    const identifierCategory=PROFILE_CATEGORIES.find(category=>category.id==='identifier-activities');
+    identifierCategory.enabled=false;
+    const hiddenCategoryExcluded=computeCategoryScore('identifier-activities')===null
+      &&profilesForCategory('identifier-activities').length===0
+      &&!enabledCategories().includes(identifierCategory)
+      &&JSON.stringify(computeGrandTotalScore())===JSON.stringify({earned:0.6,max:1});
+    identifierCategory.enabled=true;
     scoreSummaryCategoryId='identifier-activities';
     renderScoreSummaryContent();
     const scopedModal=document.getElementById('scoreSummaryTitle').textContent==='Identifier Activities Score Summary'
@@ -1791,11 +1880,13 @@ function testProfileCategoriesAndScopedScores(){
         &&results.className==='category-score-link'
         &&results.children.length===1&&results.children[0].className.includes('fa-qrcode');
     });
-    return JSON.stringify({assigned,unique,expressionScore,identifierScore,overall,
+    return JSON.stringify({assigned,unique,explicitVisibility,hiddenProfileExcluded,hiddenCategoryExcluded,
+      expressionScore,identifierScore,overall,
       scopedModal,scopedFilename,overallModal,grouped,professionalHierarchy});
   })()`));
   assert.deepStrictEqual(result,{
-    assigned:true,unique:true,expressionScore:{earned:0.6,max:1},
+    assigned:true,unique:true,explicitVisibility:true,hiddenProfileExcluded:true,hiddenCategoryExcluded:true,
+    expressionScore:{earned:0.6,max:1},
     identifierScore:{earned:12,max:30},overall:{earned:12.6,max:31},
     scopedModal:true,scopedFilename:true,overallModal:true,grouped:true,professionalHierarchy:true
   });
@@ -1872,7 +1963,7 @@ function testModeScopedPersistence(){
       &&state.items[2].points===0.6&&state.items[2].checked===true;
     const samePolicy=activePracticePolicy().interactionMode==='strict-sequence';
     const sameSeed=state.sessionSeed===24680;
-    const noTimer=state.examTimerMinutes===null&&state.examSubmitted===false;
+    const noTimer=state.examTimerMinutes===null&&state.examExpired===false;
     clearAllPrecedifyLocalData();
     const cleared=localStorage.getItem(practiceProgressKey('student@example.edu'))===null
       &&localStorage.getItem(examProgressKey('student@example.edu'))===null;

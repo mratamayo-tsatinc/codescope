@@ -18,6 +18,7 @@ configuration used to compose activities.
 
 ```js
 {
+  enabled: true,
   meta: {
     id: 'falling-identifier-sort',
     name: 'Falling Identifier Sort',
@@ -122,7 +123,7 @@ configuration used to compose activities.
     },
     feedback: {
       practice: 'immediate-return',
-      exam: 'deferred-until-submit',
+      exam: 'deferred-until-timeout',
     },
   },
 },
@@ -155,11 +156,28 @@ The current canonical categories support:
 | `invalid-identifier` | `2ndScore`, `student-name` |
 | `reserved-word` | `class`, `while` |
 | `operator` | `=`, `+=`, `&&` |
+| `arithmetic-operator` | `+`, `-`, `*`, `/`, `%` |
+| `relational-operator` | `<`, `>`, `<=`, `>=`, `==`, `!=` |
+| `boolean-operator` | `&&`, `||`, `!` |
+| `assignment-operator` | `=`, `+=`, `-=`, `*=`, `/=`, `%=` |
+| `operator-distractor` | Profile supplied nonoperator tokens |
 | `literal` | `7`, `3.14`, `'A'`, `true` |
 | `separator` | `;`, `,`, `(`, `)` |
 
 Only configured categories appear in an activity. The app does not add an
 identifier, operator, literal, or separator bucket automatically.
+
+Profiles can provide category vocabularies through `generator.tokenPools`:
+
+```js
+tokenPools: {
+  'arithmetic-operator': ['+', '-', '*', '/', '%'],
+  'operator-distractor': ['value', '42', ';'],
+}
+```
+
+A pool can also use `{default: [...], c: [...], java: [...]}` when its tokens
+differ by language. Generated items retain their C or Java language snapshot.
 
 Valid and invalid identifiers are procedurally proposed from the selected
 templates and styles, then independently accepted or rejected by the active
@@ -313,14 +331,14 @@ assigns either supported policy to either mode.
 ```js
 feedback: {
   practice: 'immediate-return',
-  exam: 'deferred-until-submit',
+  exam: 'deferred-until-timeout',
 }
 ```
 
 Supported values are:
 
 - Practice: `immediate-return` or `deferred`.
-- Exam: `deferred-until-submit` or `never`.
+- Exam: `deferred-until-timeout` or `never`.
 
 Practice feedback includes the existing Show/Hide correct solution control.
 Exam feedback also respects the shell's exam feedback-release setting and never

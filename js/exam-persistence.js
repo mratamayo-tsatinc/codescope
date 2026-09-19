@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // state.js controls persistence independently for Practice and Exam. Both
 // modes save generated items and progress; Exam additionally saves its
-// deadline and submission state. Separate keys prevent cross-mode restores.
+// deadline and timeout lock state. Separate keys prevent cross-mode restores.
 //
 // Both storage keys are per-student. Logging out removes only the separate
 // 'precedifyLogin' record, so an enabled mode can resume on the next login.
@@ -41,10 +41,10 @@ function clearPracticeProgress(email){
 function saveSessionProgress(){
   const mode=state.mode;
   if(!modePersistenceEnabled(mode)||appSettings.mode!==mode||!state.userEmail) return;
-  if(state.screen!=='session'&&!(mode==='exam'&&state.screen==='done'&&state.examSubmitted)) return;
+  if(state.screen!=='session') return;
   try{
     const record = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       mode,
       email: state.userEmail,
       studentId: state.userStudentId,
@@ -59,8 +59,8 @@ function saveSessionProgress(){
       practicePolicy: mode==='practice'?activePracticePolicy():null,
       timerMinutes: mode==='exam'?(state.examTimerMinutes || appSettings.timerMinutes):null,
       examPolicy: mode==='exam'?activeExamPolicy():null,
-      submitted: mode==='exam'&&!!state.examSubmitted,
-      submittedAt: mode==='exam'?state.examSubmittedAt:null,
+      expired: mode==='exam'&&!!state.examExpired,
+      expiredAt: mode==='exam'?state.examExpiredAt:null,
       examEndTimestamp: mode==='exam'?examEndTimestamp:null,
       savedAt: Date.now()
     };
@@ -105,8 +105,10 @@ function tryResumeSession(mode,email){
   state.userEmail = record.email;
   state.userStudentId = record.studentId;
   state.mode = mode;
-  state.profileId = PROFILES.some(profile=>profile.id===record.profileId)
-    ?record.profileId:PROFILES[0].id;
+  const sessionProfiles=enabledProfiles();
+  if(!sessionProfiles.length) return false;
+  state.profileId = sessionProfiles.some(profile=>profile.id===record.profileId)
+    ?record.profileId:sessionProfiles[0].id;
   state.itemIndex = record.itemIndex || 0;
   state.itemIndexByProfile = record.itemIndexByProfile || {};
   state.sessionSeed = record.sessionSeed;
@@ -115,18 +117,23 @@ function tryResumeSession(mode,email){
   state.examPolicy = mode==='exam'
     ?snapshotExamPolicy({exam:record.examPolicy||appSettings.exam}):null;
   state.examTimerMinutes = mode==='exam'?(record.timerMinutes || appSettings.timerMinutes):null;
-  state.examSubmitted = mode==='exam'&&!!record.submitted;
-  state.examSubmittedAt = mode==='exam'?(record.submittedAt || null):null;
+  // `submitted` is read only as a one-release migration path. Earlier builds
+  // used submission as their terminal lock; those attempts now reopen in the
+  // same review-only state as a timer-expired attempt.
+  state.examExpired = mode==='exam'&&!!(record.expired||record.submitted);
+  state.examExpiredAt = mode==='exam'?(record.expiredAt||record.submittedAt||null):null;
   examEndTimestamp = mode==='exam'?(record.examEndTimestamp || null):null;
-  state.itemsByProfile = record.itemsByProfile;
+  state.itemsByProfile = Object.fromEntries(sessionProfiles
+    .filter(profile=>Array.isArray(record.itemsByProfile[profile.id]))
+    .map(profile=>[profile.id,record.itemsByProfile[profile.id]]));
 
   // A saved session from an earlier release may not contain profiles added by
   // this one. Replay the seeded generation sequence and retain only missing
   // profiles; existing student work is never regenerated or overwritten.
-  const missingProfileIds = PROFILES.filter(p=>!state.itemsByProfile[p.id]).map(p=>p.id);
+  const missingProfileIds = sessionProfiles.filter(p=>!state.itemsByProfile[p.id]).map(p=>p.id);
   if(missingProfileIds.length){
     initializeSeededRandom(state.sessionSeed);
-    PROFILES.forEach(profile=>{
+    sessionProfiles.forEach(profile=>{
       const generated = generateItemsForProfile(profile.id);
       if(!state.itemsByProfile[profile.id]) state.itemsByProfile[profile.id] = generated;
     });
@@ -152,7 +159,6 @@ function tryResumeSession(mode,email){
       // student's existing expression state or score.
       if(!item.activityKind)ensureProgramEnvelope(item);
       if(typeof item.flagged!=='boolean') item.flagged=false;
-      if(typeof item.examOmitted!=='boolean') item.examOmitted=false;
       if(!Array.isArray(item.examActionLog)) item.examActionLog=[];
       if(item.examSequenceFailure===undefined) item.examSequenceFailure=null;
       if(item.practiceInvalidExecution===undefined) item.practiceInvalidExecution=null;
@@ -170,8 +176,8 @@ function tryResumeSession(mode,email){
     return true;
   }
 
-  if(state.examSubmitted){
-    state.screen='done';
+  if(state.examExpired){
+    timeRemaining=0;
     render();
     return true;
   }
@@ -184,9 +190,9 @@ function tryResumeSession(mode,email){
     ? Math.max(0, Math.round((record.examEndTimestamp - Date.now())/1000))
     : 0;
   if(remaining <= 0){
-    // Time ran out while the student was away. Preserve and submit the exact
-    // restored attempt instead of deleting its audit/progress record.
-    submitExam(true);
+    // Time ran out while the student was away. Preserve the exact restored
+    // attempt and lock it without moving away from category Score/QR access.
+    expireExam();
   } else {
     startTimer(remaining);
   }

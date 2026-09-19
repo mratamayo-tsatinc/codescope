@@ -35,14 +35,14 @@ function normalizeAppSettings(value){
   ['allowUndo','allowReviewFlags','showNeutralGuidance','showScoresDuringExam'].forEach(key=>{
     if(typeof exam[key]==='boolean') normalized.exam[key]=exam[key];
   });
-  if(exam.feedbackRelease==='after-submit'||exam.feedbackRelease==='never'){
-    normalized.exam.feedbackRelease=exam.feedbackRelease;
+  if(exam.feedbackRelease==='after-timeout'||exam.feedbackRelease==='after-submit'||exam.feedbackRelease==='never'){
+    normalized.exam.feedbackRelease=exam.feedbackRelease==='after-submit'?'after-timeout':exam.feedbackRelease;
   }
   normalized.exam.manualResponses=normalizeManualResponseSettings(exam.manualResponses,normalized.exam.manualResponses);
   // Assessment integrity invariants cannot be relaxed by stale/tampered data.
   normalized.exam.showCorrectSolution=false;
   normalized.exam.lockItemAfterCheck=true;
-  normalized.exam.autoSubmitOnTimeout=true;
+  normalized.exam.autoLockOnTimeout=true;
   normalized.schemaVersion=DEFAULT_APP_SETTINGS.schemaVersion;
   return normalized;
 }

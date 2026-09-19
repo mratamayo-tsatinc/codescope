@@ -47,7 +47,20 @@ function ftsResolveTokenCounts(policy,buckets){
 
 // Non-identifier categories remain finite canonical vocabularies. Identifier
 // text is proposed procedurally and accepted only after canonical analysis.
-function ftsStaticPool(category){
+function ftsConfiguredPool(profile,category,language){
+  const configured=profile&&profile.activity&&profile.activity.generator
+    &&profile.activity.generator.tokenPools&&profile.activity.generator.tokenPools[category];
+  if(Array.isArray(configured))return configured.slice();
+  if(configured&&typeof configured==='object'){
+    const selected=configured[language]||configured.default;
+    if(Array.isArray(selected))return selected.slice();
+  }
+  return [];
+}
+
+function ftsStaticPool(category,profile,language){
+  const configured=ftsConfiguredPool(profile,category,language);
+  if(configured.length)return configured;
   const pools={
     operator:['=','+=','-=','*=','/=','%=','==','&&','||'],
     literal:['0','7','42','3.14',"'A'",'true','false'],
@@ -89,9 +102,9 @@ function ftsGenerateIdentifierTokens(category,count,language,configuration,gener
   return tokens;
 }
 
-function ftsGenerateCategoryTokens(category,count,language,configuration,generationContext,itemUsed){
+function ftsGenerateCategoryTokens(category,count,language,configuration,generationContext,itemUsed,profile){
   if(ftsIdentifierCategory(category))return ftsGenerateIdentifierTokens(category,count,language,configuration,generationContext,itemUsed);
-  const pool=ftsShuffle(ftsStaticPool(category));
+  const pool=ftsShuffle(ftsStaticPool(category,profile,language));
   if(!pool.length)throw new Error(`No canonical token source for '${category}'`);
   const tokens=[];
   for(let index=0;index<count;index++){
@@ -113,7 +126,7 @@ function ftsGenerateItem({profile,index,language,generationContext}){
   const {target,counts}=ftsResolveTokenCounts(policy,profile.activity.buckets);
   profile.activity.buckets.forEach(bucket=>{
     const count=counts[bucket.category];
-    tokens.push(...ftsGenerateCategoryTokens(bucket.category,count,languageSnapshot,identifierGeneration,generationContext||{},itemUsed));
+    tokens.push(...ftsGenerateCategoryTokens(bucket.category,count,languageSnapshot,identifierGeneration,generationContext||{},itemUsed,profile));
   });
   const orderedTokens=policy.shuffle===false?tokens:ftsShuffle(tokens);
   return {

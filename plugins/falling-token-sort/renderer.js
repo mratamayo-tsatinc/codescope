@@ -1,4 +1,4 @@
-function ftsCorrectnessVisible(){return state.mode!=='exam'||state.examSubmitted;}
+function ftsCorrectnessVisible(){return examFeedbackVisible();}
 
 function ftsProgressSteps(item){
   const placed=new Set(item.placements.map(placement=>placement.tokenId));
@@ -23,7 +23,9 @@ function ftsOrderedRegions(profile){
 
 const FTS_TRANSFER_COLORS=Object.freeze({
   'valid-identifier':'#67c7d4','invalid-identifier':'#f2a45f','reserved-word':'#e5c66e',
-  operator:'#76aee8',literal:'#b5c48b',separator:'#9aa7bb'
+  operator:'#76aee8','arithmetic-operator':'#69b7ff','relational-operator':'#b799ff',
+  'boolean-operator':'#53d6b5','assignment-operator':'#ffad66','operator-distractor':'#f07878',
+  literal:'#b5c48b',separator:'#9aa7bb'
 });
 
 const ftsDropStateByItem=new WeakMap();
@@ -300,7 +302,7 @@ function ftsEndDrag(session){
 
 function ftsCommitDraggedToken(session,bucket){
   const item=currentItem(),profile=currentProfile();
-  if(item!==session.item||item.checked||item._transferInProgress)return null;
+  if(item!==session.item||item.checked||state.examExpired||item._transferInProgress)return null;
   const token=ftsVisibleTokens(item,profile).find(candidate=>candidate.id===session.tokenId);
   const bucketId=bucket?.getAttribute('data-bucket-id');
   if(!token||!ftsBucketById(profile,bucketId))return null;
@@ -349,7 +351,7 @@ function ftsContinueFromRelease(session,rerender){
 function ftsPointerDown(event){
   const source=event.currentTarget,item=currentItem();
   if((event.button!==undefined&&event.button!==0)||event.isPrimary===false
-    ||!item||item.checked||item._transferInProgress||ftsDragSession)return;
+    ||!item||item.checked||state.examExpired||item._transferInProgress||ftsDragSession)return;
   const tokenId=source.getAttribute('data-token-id');
   if(!ftsVisibleTokens(item,currentProfile()).some(token=>token.id===tokenId))return;
   const rect=source.getBoundingClientRect();
@@ -415,7 +417,7 @@ function ftsPointerLostCapture(event){
 
 function ftsChooseBucket(bucketId,bucketElement){
   const item=currentItem();
-  if(!item||item.checked||item._transferInProgress)return;
+  if(!item||item.checked||state.examExpired||item._transferInProgress)return;
   const token=ftsCurrentToken(item,currentProfile()),bucket=ftsBucketById(currentProfile(),bucketId);
   const sourceElement=[...document.querySelectorAll('.fts-current-token')]
     .find(element=>element.getAttribute('data-token-id')===token?.id);
@@ -444,7 +446,7 @@ function ftsChooseBucket(bucketId,bucketElement){
 
 function ftsSelectToken(tokenId){
   const item=currentItem();
-  if(!item||item.checked||item._transferInProgress)return;
+  if(!item||item.checked||state.examExpired||item._transferInProgress)return;
   const result=applyActivityAction(item,{type:'SELECT_TOKEN',tokenId});
   if(result.applied){item._focusBucketsAfterRender=true;render();}
 }
@@ -454,7 +456,7 @@ function ftsRenderBucket(item,profile,bucket){
   return h('button',{
     class:`fts-bucket fts-tone-${definition.tone}${item._arrivedBucketId===bucket.id?' fts-bucket-arrived':''}${item._rejectedBucketId===bucket.id?' fts-bucket-rejected':''}`,
     type:'button','data-bucket-id':bucket.id,
-    disabled:item.checked||item._transferInProgress||!ftsVisibleTokens(item,profile).length,
+    disabled:item.checked||state.examExpired||item._transferInProgress||!ftsVisibleTokens(item,profile).length,
     onclick:event=>ftsChooseBucket(bucket.id,event.currentTarget),
     'aria-label':`${definition.label} bucket, ${count} ${count===1?'token':'tokens'} placed`
   },
@@ -521,7 +523,7 @@ function ftsCreateTokenElement(item,profile,token,entry,now,motion){
     class:`fts-current-token fts-token-choice${item.selectedTokenId===token.id?' fts-token-selected':''}${motionClass}`,
     type:'button',...attributes,'aria-pressed':item.selectedTokenId===token.id?'true':'false',
     'aria-label':`Drag token ${token.text} to a bucket, or select it and choose a bucket`,
-    disabled:item._transferInProgress||item.checked,
+    disabled:item._transferInProgress||item.checked||state.examExpired,
     onclick:event=>{
       if(event.currentTarget._ftsWasDragged){event.currentTarget._ftsWasDragged=false;return;}
       ftsSelectToken(token.id);
@@ -557,7 +559,7 @@ function ftsRenderTokenLane(item,profile){
 }
 
 function ftsRenderControls(item){
-  if(item.checked)return null;
+  if(item.checked||state.examExpired)return null;
   const canUndo=item.history.length>0&&examAllowsUndo();
   const canCheck=item.cursor>=item.tokens.length;
   const canReset=state.mode==='practice'&&(item.cursor>0||item.attempts.length);
@@ -595,9 +597,9 @@ function ftsRender({container,item,profile}){
   const result=ftsRenderPracticeResult(item,profile);if(result)stage.appendChild(result);
   const controls=ftsRenderControls(item);if(controls)stage.appendChild(controls);
   flow.appendChild(stage);
-  if(item.checked&&state.mode==='exam'&&!state.examSubmitted){
+  if(item.checked&&state.mode==='exam'&&!state.examExpired){
     container.appendChild(h('div',{class:'exam-answer-recorded'},h('i',{class:'fa-solid fa-lock'}),
-      h('span',{},h('b',{},'Answer recorded and locked.'),' Correctness and score are withheld until the exam is submitted.')));
+      h('span',{},h('b',{},'Answer recorded and locked.'),' Correctness and score are withheld until time expires.')));
   }
   if(item.checked&&state.mode==='practice'){
     appendPracticeRetryBar(container);

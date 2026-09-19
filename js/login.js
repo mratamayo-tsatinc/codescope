@@ -291,8 +291,8 @@ function saveSettings() {
     allowReviewFlags:checked('examAllowReviewFlags'),
     showNeutralGuidance:checked('examShowNeutralGuidance'),
     showScoresDuringExam:checked('examShowScoresDuringExam'),
-    feedbackRelease:(document.getElementById('examFeedbackRelease')||{}).value==='never'?'never':'after-submit',
-    lockItemAfterCheck:true,autoSubmitOnTimeout:true,showCorrectSolution:false,
+    feedbackRelease:(document.getElementById('examFeedbackRelease')||{}).value==='never'?'never':'after-timeout',
+    lockItemAfterCheck:true,autoLockOnTimeout:true,showCorrectSolution:false,
     manualResponses:readManualSettingsControls('exam')
   };
   // Persist immediately — this global setting is the single source of
@@ -343,9 +343,9 @@ function handleClearAllLocalData(){
 // ============================================================================
 // The timer counts down from a fixed duration (set in appSettings.timerMinutes)
 // and applies to the entire exam session across ALL items, not individual items.
-// Timer starts when startSession() is called and continues until:
-//  1. User ends the session (End session button)
-//  2. Time runs out (handleTimerExpired)
+// Timer starts when startSession() is called and continues until time runs
+// out. Expiration leaves the session visible for category Score/QR review,
+// while every answer mutation is locked.
 // ============================================================================
 
 function startTimer(resumeSeconds) {
@@ -422,9 +422,8 @@ function stopTimer() {
 }
 
 function handleTimerExpired() {
-  stopTimer();
-  alert('Time is up. Your exam has been submitted automatically.');
-  submitExam(true);
+  if(!expireExam()) return;
+  alert('Time is up. Your answers are now locked. Use each category’s Score/QR button to view your result.');
 }
 
 // ============================================================================
@@ -487,7 +486,7 @@ function expandDesktopSidebar() {
 }
 
 function selectProfile(profileId) {
-  if(!PROFILES.some(profile=>profile.id===profileId)) return;
+  if(!profileIsEnabled(profileId)) return;
   // Update active state in sidebar
   document.querySelectorAll('.profile-nav-btn').forEach(btn => {
     btn.classList.remove('active');
@@ -528,6 +527,7 @@ function selectProfile(profileId) {
 // pill shown) until at least one item in that profile has been checked.
 function computeProfileScore(profileId){
   if(!examResultsVisible()) return null;
+  if(!profileIsEnabled(profileId)) return null;
   const items = state.itemsByProfile && state.itemsByProfile[profileId];
   if(!items || items.length===0) return null;
   const anyChecked = items.some(it => it.checked);
@@ -546,7 +546,7 @@ function populateProfileSidebar() {
   profileList.innerHTML = '';
   if(openCategoryIds.size===0 && currentProfile()) openCategoryIds.add(currentProfile().categoryId);
 
-  PROFILE_CATEGORIES.forEach(category=>{
+  enabledCategories().forEach(category=>{
     const profiles=profilesForCategory(category.id);
     if(!profiles.length) return;
     const categoryOpen=openCategoryIds.has(category.id);
@@ -651,7 +651,7 @@ function buildItemPageWindow(total, current) {
 //   ''          — untouched
 function itemPageStatus(item){
   if (!item) return '';
-  if(state.mode==='exam'&&!state.examSubmitted){
+  if(state.mode==='exam'&&!state.examExpired){
     if(item.checked) return 'locked';
     if(item.flagged) return 'flagged';
     if(itemHasAttempt(item)) return 'attempted';

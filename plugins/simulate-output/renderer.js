@@ -63,7 +63,7 @@ function soSourcePanel(item){
 function soOutputPanel(item){
   const input=h('textarea',{class:'so-output-input',rows:Math.max(4,Math.min(10,item.expectedLines.length+1)),
     wrap:'off',spellcheck:'false','aria-label':'Predicted console output',
-    placeholder:'Type the program output, one line at a time',disabled:item.checked,
+    placeholder:'Type the program output, one line at a time',disabled:item.checked||state.examExpired,
     oninput:event=>soEdit(item,{type:'SET_OUTPUT',value:event.currentTarget.value})},item.response.output);
   return h('section',{class:'so-answer-panel'},
     h('div',{class:'so-panel-heading'},h('i',{class:'fa-solid fa-terminal','aria-hidden':'true'}),
@@ -78,7 +78,7 @@ function soVariableInput(item,variable,index,part){
   return h('label',{class:'so-variable-row'},h('span',{class:'so-variable-name'},label),
     h('span',{class:'so-variable-equals','aria-hidden':'true'},'='),
     h('input',{class:'so-variable-input',type:'text',value,spellcheck:'false',
-      autocomplete:'off','aria-label':`Final value of ${label}`,disabled:item.checked,
+      autocomplete:'off','aria-label':`Final value of ${label}`,disabled:item.checked||state.examExpired,
       oninput:event=>soEdit(item,{type:'SET_VARIABLE',index,element:array?part:undefined,
         value:event.currentTarget.value})}));
 }
@@ -104,12 +104,12 @@ function soRender({container,item,profile}){
     h('span',{},profile.activity.instructions)));
   flow.appendChild(soSourcePanel(item));
   flow.appendChild(h('div',{class:'so-answer-grid'},soOutputPanel(item),soVariablesPanel(item)));
-  if(item.checked&&state.mode==='exam'&&!state.examSubmitted){
+  if(item.checked&&state.mode==='exam'&&!state.examExpired){
     flow.appendChild(h('div',{class:'so-recorded',role:'status'},
       h('i',{class:'fa-solid fa-lock','aria-hidden':'true'}),
-      ' Answer recorded. Results are available after exam submission if the exam policy permits.'));
+      ' Answer recorded. Results are available after time expires if the exam policy permits.'));
   }
-  if(!item.checked){
+  if(!item.checked&&!state.examExpired){
     const controls=h('div',{class:'so-controls'});
     if(state.mode==='practice')controls.appendChild(h('button',{
       class:'item-reset-button so-reset-button',type:'button',disabled:!soHasResponse(item),

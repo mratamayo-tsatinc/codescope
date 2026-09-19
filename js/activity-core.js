@@ -47,26 +47,31 @@ function renderActivityItem(container,item){
 }
 
 function applyActivityAction(item,action){
+  if(typeof examInteractionLocked==='function'&&examInteractionLocked()) return {applied:false,reason:'exam-expired'};
   const plugin=activityPluginForItem(item);
   return plugin ? plugin.applyAction({item,profile:currentProfile(),action,state}) : {applied:false};
 }
 
 function checkActivityItem(item){
+  if(typeof examInteractionLocked==='function'&&examInteractionLocked()) return {applied:false,reason:'exam-expired'};
   const plugin=activityPluginForItem(item);
   return plugin ? plugin.check({item,profile:currentProfile(),state}) : {applied:false};
 }
 
 function undoActivityItem(item){
+  if(typeof examInteractionLocked==='function'&&examInteractionLocked()) return {applied:false,reason:'exam-expired'};
   const plugin=activityPluginForItem(item);
   return plugin&&typeof plugin.undo==='function' ? plugin.undo({item,profile:currentProfile(),state}) : {applied:false};
 }
 
 function resetActivityItem(item){
+  if(typeof examInteractionLocked==='function'&&examInteractionLocked()) return {applied:false,reason:'exam-expired'};
   const plugin=activityPluginForItem(item);
   return plugin&&typeof plugin.reset==='function' ? plugin.reset({item,profile:currentProfile(),state}) : {applied:false};
 }
 
 function retryActivityItem(item){
+  if(typeof examInteractionLocked==='function'&&examInteractionLocked()) return {applied:false,reason:'exam-expired'};
   const plugin=activityPluginForItem(item);
   return plugin&&typeof plugin.retry==='function' ? plugin.retry({item,profile:currentProfile(),state}) : {applied:false};
 }
