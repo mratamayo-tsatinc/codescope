@@ -86,6 +86,31 @@ unless the user explicitly approves a change.
 - Logical `!` derives a Boolean without mutating its source variable. A resolved
   `!` operand therefore renders as the derived literal in later prompts.
 - Resolved `++`/`--` results retain the variable identity and updated value.
+- Output statements read initialized values from program memory. C resolves
+  format placeholders; Java resolves concatenation operators before printing.
+- `printf`, `System.out.print`, and `System.out.println` append atomic `PRINT`
+  events to the program output buffer. Character playback is presentation and
+  does not create additional scoring checks.
+- A displayed `\\n` escape cue becomes one real newline in Program Output.
+- A Program Output source-file profile uses the active language folder and its
+  configured exercise-set manifest. Only manifest-listed files become items,
+  in manifest order unless seeded shuffle is enabled.
+- Source files are parsed at runtime into the same Program IR used by generated
+  items. A statement with multiple values requires a separate memory read and
+  placeholder or concatenation resolution for every referenced identifier.
+- Output identifiers may be read in any order. Guided unlocks only the matching
+  placeholder or concatenation control after its identifier is read. Strict
+  exposes every unresolved output control and applies the normal strict policy
+  to premature actions.
+- Resolving one output value does not remove its source identifier from later
+  timeline rows. The identifier remains visible and muted while the derived
+  value stays associated with its output position.
+- Source-backed items display the complete metadata-free source. Structures
+  and statements without registered behavior remain present, muted, and
+  read-only rather than disappearing or gaining inferred semantics.
+- Generated Program Output remains selectable through profile configuration;
+  changing content sources does not change statement actions, scoring, Undo,
+  output playback, or persistence semantics.
 
 ## Token Classification
 

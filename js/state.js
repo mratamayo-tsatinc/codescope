@@ -25,6 +25,12 @@ const DEFAULT_SHELL_SETTINGS = Object.freeze({
     valueRollDurationMs: 420,
     valueRollFallbackMs: 560
   }),
+  outputPanel:Object.freeze({
+    visible:true,
+    characterAnimation:true,
+    characterDelayMs:55,
+    escapeDelayMs:320
+  }),
   compoundAssignment: Object.freeze({
     mergeDurationMs: 2200,
     writebackDelayMs: 2400
@@ -58,7 +64,7 @@ const state = {
   userEmail: null,
   userStudentId: null,
   language: 'c',
-  mode: 'exam',
+  mode: 'practice',
   profileId: PROFILES[0].id,
   itemIndex: 0,
   itemIndexByProfile: {}, // Remembers which item each profile was last viewing, so switching profiles via the sidebar returns to that exact item instead of resetting to Item 1
@@ -82,14 +88,14 @@ const state = {
 //  - timerMinutes: duration for exam mode (set once at login)
 // ============================================================================
 const DEFAULT_APP_SETTINGS = Object.freeze({
-  schemaVersion: 6,
+  schemaVersion: 7,
   // local-configurable | state-only. This deployment switch is intentionally
   // read only: persisted browser data can never override it.
-  settingsPolicy: 'state-only',
+  settingsPolicy: 'local-configurable',
   // Deployment-owned switches. Browser-saved settings cannot override these.
   // Each mode keeps its own per-student snapshot when enabled.
   persistence: Object.freeze({practice:false, exam:true}),
-  mode: 'exam',
+  mode: 'practice',
   timerMinutes: 120,
   shell: DEFAULT_SHELL_SETTINGS,
   practice: Object.freeze({
@@ -124,6 +130,7 @@ function cloneDefaultAppSettings(){
           speedLevelsMs:DEFAULT_APP_SETTINGS.shell.memoryPanel.transferAnimation.speedLevelsMs.slice()
         })
       }),
+      outputPanel:Object.assign({},DEFAULT_APP_SETTINGS.shell.outputPanel),
       compoundAssignment:Object.assign({},DEFAULT_APP_SETTINGS.shell.compoundAssignment),
       solutionPlayback:Object.assign({},DEFAULT_APP_SETTINGS.shell.solutionPlayback),
       liveStepScroll:Object.assign({},DEFAULT_APP_SETTINGS.shell.liveStepScroll),
@@ -227,47 +234,76 @@ function currentProfile(){
 }
 function currentItem(){ return state.items[state.itemIndex]; }
 
-function generateItemsForProfile(profileId) {
-  const profile = PROFILES.find(p => p.id === profileId);
-  if (!profileIsEnabled(profile)) return [];
-  if(profile.activity&&typeof generateActivityItems==='function') return generateActivityItems(profile);
-  
+function itemMaximumPoints(item,profile){
+  if(!item)return 0;
+  if(item.activityKind&&typeof activityItemMaxPoints==='function'){
+    const activityMaximum=activityItemMaxPoints(item,profile);
+    if(Number.isFinite(activityMaximum))return activityMaximum;
+  }
+  if(Number.isFinite(item.maxPoints))return item.maxPoints;
+  return profile&&Number.isFinite(profile.pointsPerItem)?profile.pointsPerItem:0;
+}
+
+function generateGeneratedProfileItems(profile){
   const items = [];
   for(let i = 0; i < profile.itemCount; i++) {
-    const inst = generateInstance(profile);
-    const flat0 = flattenInstance(inst.tree);
-    const item = {
-      profileId: profile.id, // which profile generated this item — scoreItem()/handleCheck() use this to look up that profile's own pointsPerItem, rather than a single global point budget shared by every profile
-      originalTree: inst.tree,
-      originalFlat: flat0,
-      decls: inst.decls,
-      resultName: inst.resultName, // per-item randomly (seeded) chosen name for the "int ___ = ...;" assignment target — see generator.js's RESULT_NAMES/pickResultName. Replaces the old hardcoded literal "result".
-      correctFinalValue: inst.correctFinalValue,
-      canonicalTrace: inst.canonicalTrace,
-      workingFlat: deepCloneFlat(flat0),
-      history: [deepCloneFlat(flat0)],
-      trace: [],
-      checked: false,
-      itemScore: null,
-      points: null,
-      maxPoints: null,
-      correctSteps: 0,
-      totalOpSteps: 0,
-      wasCorrectFinal: null,
-      showSolution: false,
-      playback: null,
-      flagged: false,
-      lockedAt: null,
-      examActionLog: [],
-      examSequenceFailure: null,
-      practiceInvalidExecution: null,
-      _bindings: null // lazily built by var-final-state.js (ensureBindings)
-    };
-    buildGeneratedProgram(item, profile);
+    let item=null;
+    // Program builders may update seeded values after the base expression has
+    // passed validation. Keep that completed-program validation inside the
+    // deterministic retry stream so a derived zero divisor cannot abort app
+    // startup or session restoration.
+    for(let programAttempt=0;programAttempt<300&&!item;programAttempt++){
+      const inst = generateInstance(profile);
+      const flat0 = flattenInstance(inst.tree);
+      const candidate = {
+        profileId: profile.id, // which profile generated this item — scoreItem()/handleCheck() use this to look up that profile's own pointsPerItem, rather than a single global point budget shared by every profile
+        originalTree: inst.tree,
+        originalFlat: flat0,
+        decls: inst.decls,
+        resultName: inst.resultName, // per-item randomly (seeded) chosen name for the "int ___ = ...;" assignment target — see generator.js's RESULT_NAMES/pickResultName. Replaces the old hardcoded literal "result".
+        correctFinalValue: inst.correctFinalValue,
+        canonicalTrace: inst.canonicalTrace,
+        workingFlat: deepCloneFlat(flat0),
+        history: [deepCloneFlat(flat0)],
+        trace: [],
+        checked: false,
+        itemScore: null,
+        points: null,
+        maxPoints: null,
+        correctSteps: 0,
+        totalOpSteps: 0,
+        wasCorrectFinal: null,
+        showSolution: false,
+        playback: null,
+        flagged: false,
+        lockedAt: null,
+        examActionLog: [],
+        examSequenceFailure: null,
+        practiceInvalidExecution: null,
+        _bindings: null // lazily built by var-final-state.js (ensureBindings)
+      };
+      try{
+        buildGeneratedProgram(candidate, profile);
+        item=candidate;
+      }catch(error){
+        if(!(error instanceof EngineError)||error.code!=='DIV_BY_ZERO') throw error;
+      }
+    }
+    if(!item) throw new EngineError('GENERATION_FAILED');
     items.push(item);
   }
   if(typeof assignManualResponsePlans==='function') assignManualResponsePlans(profile,items);
   return items;
+}
+
+function generateItemsForProfile(profileId) {
+  const profile = PROFILES.find(p => p.id === profileId);
+  if (!profileIsEnabled(profile)) return [];
+  if(profile.activity&&typeof generateActivityItems==='function') return generateActivityItems(profile);
+  if(profile.content&&typeof generateProfileContentItems==='function'){
+    return generateProfileContentItems(profile,()=>generateGeneratedProfileItems(profile));
+  }
+  return generateGeneratedProfileItems(profile);
 }
 
 function startSession(){
@@ -331,7 +367,8 @@ function itemFullyResolved(item){
 // "correct next" one) can be clicked — see the FLAT model comment above.
 function handleTokenClick(action){
   const item = currentItem();
-  if(!item || item.checked || state.examExpired || item.practiceInvalidExecution) return;
+  if(!item || item.checked || state.examExpired || item.practiceInvalidExecution
+    ||(typeof programOutputInteractionLocked==='function'&&programOutputInteractionLocked())) return;
   const statement=currentProgramStatement(item);
   // A handler retained by an expanded/completing row or a queued DOM event
   // must never be reinterpreted as an action on the new current statement.
@@ -352,9 +389,9 @@ function handleTokenClick(action){
         ? runtime.trace[runtime.trace.length-1] : null;
       const event=result.event||null;
       const scoredAction=!!((producedStep&&producedStep.action==='EVALUATE')
-        ||(event&&event.action==='ASSIGN'));
+        ||(event&&(event.action==='ASSIGN'||event.action==='PRINT')));
       const actionWasCorrect=producedStep&&producedStep.action==='EVALUATE'
-        ? producedStep.wasCorrect : (event&&event.action==='ASSIGN'?event.wasCorrect:undefined);
+        ? producedStep.wasCorrect : (event&&(event.action==='ASSIGN'||event.action==='PRINT')?event.wasCorrect:undefined);
       recordExamAction(item,action,{
         statementId:statement&&statement.id,
         wasCorrect:actionWasCorrect,
@@ -366,6 +403,9 @@ function handleTokenClick(action){
         manualWasCorrect:action.manualResponse&&action.manualResponse.wasCorrect,
         manualResponseKey:action.manualResponse&&action.manualResponse.key
       });
+      if(event&&event.type==='OUTPUT'&&typeof queueProgramOutputAnimation==='function'){
+        queueProgramOutputAnimation(item,event);
+      }
       render();
     } else if(!result.ignored&&strictSequenceEnabled()){
       const reason=strictSequenceInvalidAttemptReason(item,statement,runtime,action);
@@ -380,7 +420,7 @@ function handleTokenClick(action){
   const commitAction = ()=>{
     // When the optional memory animation is enabled, substitution remains a
     // two-phase action. It now starts only after the empty stage is on-screen.
-    if(action && (action.type==='substitute'||action.type==='reveal-assignment-target')
+    if(action && (action.type==='substitute'||action.type==='reveal-assignment-target'||action.type==='read-output-value')
       && !action.manualResponse && typeof animateVarFinalMemoryToExpression==='function'
       && animateVarFinalMemoryToExpression(item,action,applyAction)) return;
     applyAction();

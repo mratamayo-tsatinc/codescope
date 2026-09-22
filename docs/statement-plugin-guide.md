@@ -67,7 +67,7 @@ registerStatementPlugin({
 ```
 
 Plugins should emit normalized events such as `SUBSTITUTE`, `EVALUATE`,
-`ASSIGN`, `READ_INPUT`, `WRITE_OUTPUT`, `BRANCH` or `LOOP_TEST`. A plugin may
+`ASSIGN`, `READ_INPUT`, `PRINT`, `BRANCH` or `LOOP_TEST`. A plugin may
 add event-specific details, but shared features should depend on stable event
 names and fields.
 
@@ -149,16 +149,56 @@ moving to the center of the panel.
 Assignments reject writes to immutable bindings and reads from
 uninitialized bindings.
 
+## Output statements
+
+`plugins/program-output/` registers the `output` statement kind. Its IR stores
+text and expression parts independently of source language. The renderer shows
+those parts as `printf` with format placeholders in C or as
+`System.out.print`/`System.out.println` concatenation in Java.
+
+Items may come from the seeded `formatted-values` builder or from C/Java source
+files selected by an exercise-set manifest. The runtime parser converts the
+supported beginner source subset into the same declaration, assignment, unary,
+output, and final-expression IR. Source loading and parsing belong to
+`plugins/program-output/content.js`; statement execution remains independent of
+where the item came from.
+
+The built-in `formatted-values` lesson follows this dependency model:
+
+1. Read any referenced identifier from program memory.
+2. Activate that identifier's `%d` in C or `+` in Java to combine the staged
+   value with text.
+3. Activate the output command to append one `PRINT` event.
+4. Animate that event into Program Output one character at a time. A source
+   `\\n` is shown as an escape cue before it becomes a real output newline.
+
+The character animation is presentation only. Scoring and persistence use the
+atomic semantic event and never depend on animation completion. Output events
+form the reproducible runtime output buffer, so Undo and Reset can reconstruct
+the exact screen contents.
+
+Guided mode exposes all unread identifiers and only the combine controls whose
+matching value has been read. Strict mode exposes every unresolved control so
+the normal invalid-execution policy can assess premature actions. Timeline
+derivations never remove consumed source identifiers; they remain visible in a
+muted state while the derived value stays associated with its placeholder or
+concatenation step.
+
+Source-backed items also carry the complete metadata-free source. The shared
+program workspace shows it as a read-only overview. Lines without registered
+statement semantics remain muted instead of being omitted or treated as if the
+application executed them.
+
 ## Future statements
 
-Input/output, selection and looping should be separate registrations. Program
+Input, selection and looping should be separate registrations. Program
 IR may later allow statement-owned blocks (`then`, `else`, `body`) while
 Program Core grows a program-counter stack. Do not embed those semantics in the
 declaration or expression plugins.
 
 Input plugins should read from a deterministic runtime input queue. Output
-plugins should append to a runtime output buffer. This keeps student execution
-and canonical execution reproducible.
+statements append to the deterministic event buffer described above. This keeps
+student execution and canonical execution reproducible.
 
 ## Compatibility promise
 

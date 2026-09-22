@@ -175,6 +175,42 @@ function buildAdvancedAssignmentUnaryStatements(item,memory){
   return statements;
 }
 
+function buildOutputStatementRuntime(spec,index,memory){
+  const statement=outputStatement({
+    id:`output-${index+1}`,
+    newline:spec.newline!==false,
+    parts:spec.parts
+  });
+  statement.runtime={
+    parts:statement.parts.map(part=>({
+      stagedValue:null,
+      resolvedValue:null,
+      expectedValue:part.kind==='expression'?memory[part.expression.name]:null
+    })),
+    trace:[],checked:false,assignedValue:null,wasCorrectAssignment:null,
+    correctSteps:0,totalOpSteps:0
+  };
+  statement.dependencies=statement.parts.filter(part=>part.kind==='expression')
+    .map(part=>part.expression&&part.expression.kind==='identifier'?part.expression.name:null)
+    .filter(Boolean);
+  return statement;
+}
+
+function buildOutputLessonStatements(item,lesson,memory){
+  const variables=item.decls.filter(declaration=>declaration.kind==='variable');
+  if(lesson!=='formatted-values'||variables.length<3) return [];
+  const first=variables[0],second=variables[1],sum=variables[2];
+  const text=value=>({kind:'text',value});
+  const value=declaration=>({kind:'expression',expression:identifierExpression(declaration.name),format:'d'});
+  const specs=[
+    {parts:[text('OUTPUT LESSON')]},
+    {parts:[text(`Value of ${first.name} is `),value(first)]},
+    {parts:[text(`Value of ${second.name} is `),value(second)]},
+    {parts:[text(`Sum of ${first.name} and ${second.name} is `),value(sum)]}
+  ];
+  return specs.map((spec,index)=>buildOutputStatementRuntime(spec,index,memory));
+}
+
 function applyProgramMemoryToTree(node,memory){
   if(!node) return;
   if(node.kind==='variable'||node.kind==='constant'){
@@ -208,9 +244,22 @@ function buildGeneratedProgram(item, profile){
   const isAssignmentLesson=!!cfg.assignmentLesson;
   const isUnaryUpdateLesson=!!cfg.unaryUpdateLesson;
   const isMixedUpdateLesson=!!cfg.mixedUpdateLesson;
-  const isProgramLesson=isAssignmentLesson||isUnaryUpdateLesson||isMixedUpdateLesson;
+  const isOutputLesson=!!cfg.outputLesson;
+  const isProgramLesson=isAssignmentLesson||isUnaryUpdateLesson||isMixedUpdateLesson||isOutputLesson;
+  const outputVariables=isOutputLesson?item.decls.filter(declaration=>declaration.kind==='variable'):[];
+  if(isOutputLesson&&outputVariables.length<3){
+    throw new Error(`${profile.id}: outputLesson requires at least three variable declarations`);
+  }
+  if(isOutputLesson){
+    outputVariables[2].value=outputVariables[0].value+outputVariables[1].value;
+  }
   const statements = item.decls.map((decl, index)=>{
-    const initializerTree = isProgramLesson ? makeLiteral(decl.value) : declarationInitializerTree(item.decls, index);
+    let initializerTree=isProgramLesson?makeLiteral(decl.value):declarationInitializerTree(item.decls,index);
+    if(isOutputLesson&&decl===outputVariables[2]){
+      initializerTree=makeBinOp('+',
+        makeNamed(outputVariables[0].kind,outputVariables[0].name,outputVariables[0].value),
+        makeNamed(outputVariables[1].kind,outputVariables[1].name,outputVariables[1].value));
+    }
     const statement = declarationStatement({
       id:`declaration-${index+1}`,
       name:decl.name,
@@ -242,6 +291,17 @@ function buildGeneratedProgram(item, profile){
     const expectedMemory={};
     item.decls.forEach(decl=>{expectedMemory[decl.name]=decl.value;});
     statements.push(...buildAdvancedAssignmentUnaryStatements(item,expectedMemory));
+    rebuildFinalExpressionForMemory(item,expectedMemory);
+  }
+
+  if(isOutputLesson){
+    const expectedMemory={};
+    item.decls.forEach(decl=>{expectedMemory[decl.name]=decl.value;});
+    statements.push(...buildOutputLessonStatements(item,cfg.outputLesson,expectedMemory));
+    // End with the established expression check using the derived sum from
+    // memory. This keeps scoring, feedback, solution playback and persistence
+    // on the same path as every other expression based program profile.
+    item.originalTree=makeNamed(outputVariables[2].kind,outputVariables[2].name,expectedMemory[outputVariables[2].name]);
     rebuildFinalExpressionForMemory(item,expectedMemory);
   }
 

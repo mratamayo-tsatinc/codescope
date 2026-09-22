@@ -515,6 +515,48 @@ and a final expression that reads the resulting memory. Choose exactly one of
 These options describe alternative statement-sequence builders, not features
 that should be stacked in one object.
 
+### C and Java output statements
+
+Program Output supports source-file and generated content. Source-file mode is
+recommended when a teacher should be able to change the exact program without
+recreating JavaScript data:
+
+```js
+{
+  meta:{id:'program-output-basics',name:'Output Statements',description:'...'},
+  shape:{operandSources:{variable:3},operandRange:{min:2,max:12},allowNegativeOperands:false},
+  operators:{allowed:OPS.ADD_SUB},
+  template:'operand op operand op operand',
+  scoring:{itemCount:5,pointsPerItem:2},
+  content:{
+    provider:'program-output',
+    mode:'source-files',
+    recipe:'formatted-values',
+    exerciseSet:'formatted-output',
+    selection:{count:5,shuffle:false},
+  },
+  program:{
+    declarations:'interactive',
+    outputLesson:'formatted-values',
+    scoreAssignments:true,
+  },
+}
+```
+
+The plugin loads the matching
+`plugins/program-output/exercises/<language>/<exerciseSet>/manifest.json` and
+parses only the source files listed there. Set `content.mode:'generated'` to use
+the seeded `shape`/`template` path instead. Both modes produce the same Program
+IR and use the established Check, feedback, scoring, persistence, and
+correct-solution flow.
+
+`outputLesson` names a builder in `program-item-builder.js`; adding another
+lesson key requires a builder and tests. Output source syntax and interaction
+semantics remain in `plugins/program-output/`, not in the profile.
+
+See `docs/how-to-create-a-program-output-profile.md` for the source directory,
+manifest, metadata, supported syntax, selection, and language rules.
+
 `scoreAssignments: true` includes declaration/assignment commit checks in the
 item's existing point budget. Setting it to `false` leaves those writes
 instructional but does not award assignment-check credit.

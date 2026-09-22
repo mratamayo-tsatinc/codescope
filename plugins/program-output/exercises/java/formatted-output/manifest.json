@@ -1,0 +1,10 @@
+{
+  "title": "Java Formatted Output",
+  "exercises": [
+    "BasicValues.java",
+    "MultipleValues.java",
+    "EmbeddedLines.java",
+    "NoTrailingNewline.java",
+    "AssignmentThenOutput.java"
+  ]
+}

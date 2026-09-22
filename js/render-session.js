@@ -73,6 +73,10 @@ function strictPracticeInvalidMessage(item){
     'initializer-unresolved':'The declaration cannot assign a value until its initializer has been fully derived.',
     'assignment-value-unresolved':'The assignment cannot execute until its right-side expression has been fully derived.',
     'assignment-target-unread':'The compound assignment cannot execute until the variable’s current value is available.',
+    'output-memory-unavailable':'The output value cannot be read before its variable is initialized.',
+    'output-value-unread':'The placeholder cannot be resolved until its variable value is read from memory.',
+    'output-unresolved':'The output command cannot execute until every dynamic value is resolved.',
+    'output-order':'Output values must be resolved from left to right.',
     'division-by-zero':'This operation cannot execute because division or remainder by zero is undefined.'
   };
   return `${labels[item.practiceInvalidExecution.reason]||'This action cannot execute in the current program state.'} Use Undo to return to the executable state.`;
@@ -173,10 +177,33 @@ function programStatementSource(statement,item){
     return `${statement.target} ${statement.operator} ${renderString(statement.runtime.originalTree)};`;
   }
   if(statement.kind==='unary-update') return unaryUpdateSource(statement);
+  if(statement.kind==='output'&&typeof outputStatementSource==='function'){
+    return outputStatementSource(statement,item);
+  }
   const expression=renderString(item.originalTree);
   return typeof assignLineString==='function'
     ? assignLineString(expression,item.resultName)
     : `int ${item.resultName||'result'} = ${expression};`;
+}
+
+function renderProgramSourceOverview(item){
+  const fallback=item&&typeof item.source==='string'?{
+    filename:item.filename||'Source program',
+    lines:item.source.split(/\r?\n/).map((text,index)=>({number:index+1,text,supported:false}))
+  }:null;
+  const source=item&&(item.sourceDisplay||fallback);
+  if(!source||!Array.isArray(source.lines)||!source.lines.length) return null;
+  const code=h('code',{class:'program-source-overview-code'});
+  source.lines.forEach(line=>code.appendChild(h('span',{
+    class:`program-source-overview-line ${line.supported?'supported':'unsupported'}`
+  },h('span',{class:'program-source-overview-number','aria-hidden':'true'},String(line.number)),
+  h('span',{class:'program-source-overview-text'},line.text||' '))));
+  return h('section',{class:'program-source-overview','aria-label':`Source program ${source.filename||''}`},
+    h('div',{class:'program-source-overview-title'},
+      h('i',{class:'fa-solid fa-file-code','aria-hidden':'true'}),
+      h('span',{},source.filename||'Source program'),
+      h('span',{class:'program-source-overview-note'},'Unsupported structure remains read-only')),
+    h('pre',{class:'program-source-overview-scroll'},code));
 }
 
 function renderProgramWorkspaceShell(container,item,program){
@@ -185,6 +212,8 @@ function renderProgramWorkspaceShell(container,item,program){
   const examBar=renderExamItemBar(item);
   if(examBar) container.appendChild(examBar);
   const workspace=h('section',{class:'program-workspace','aria-label':'Program execution'});
+  const sourceOverview=renderProgramSourceOverview(item);
+  if(sourceOverview) workspace.appendChild(sourceOverview);
   const completionMode=program.progressMode==='completion';
   const completedStatements=program.statements.filter(statement=>statement.status==='complete'||statement.status==='invalid').length;
   const progress=h('div',{class:'program-progress-visual',role:'progressbar',
@@ -200,7 +229,11 @@ function renderProgramWorkspaceShell(container,item,program){
   });
   workspace.appendChild(progress);
   const flow=h('div',{class:'program-statement-flow'});
-  workspace.appendChild(flow);
+  const hasOutput=program.statements.some(statement=>statement.kind==='output')
+    &&DEFAULT_APP_SETTINGS.shell.outputPanel.visible;
+  if(hasOutput&&typeof renderProgramOutputPanel==='function'){
+    workspace.appendChild(h('div',{class:'program-workspace-layout'},flow,renderProgramOutputPanel(item,program)));
+  }else workspace.appendChild(flow);
   container.appendChild(workspace);
   return flow;
 }

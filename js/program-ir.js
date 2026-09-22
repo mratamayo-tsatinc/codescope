@@ -81,6 +81,29 @@ function expressionStatement(expression, opts){
   return {id:opts.id||null, kind:'expression', expression, sourceSpan:opts.sourceSpan||null};
 }
 
+// Output is represented by language-neutral parts. Renderers translate the
+// same statement to printf for C or System.out.print/println for Java while
+// the runtime evaluates one shared sequence of semantic actions.
+function outputStatement(spec){
+  spec=spec||{};
+  const parts=Array.isArray(spec.parts)?spec.parts.map((part,index)=>{
+    if(!part||typeof part!=='object') throw new Error(`Output part ${index+1} must be an object`);
+    if(part.kind==='text') return {kind:'text',value:String(part.value==null?'':part.value)};
+    if(part.kind==='expression'&&part.expression){
+      return {kind:'expression',expression:part.expression,format:part.format||'d'};
+    }
+    throw new Error(`Unsupported output part '${part.kind}'`);
+  }):[];
+  if(!parts.length) throw new Error('Output statement requires at least one part');
+  return {
+    id:spec.id||null,
+    kind:'output',
+    newline:spec.newline!==false,
+    parts,
+    sourceSpan:spec.sourceSpan||null
+  };
+}
+
 function collectExpressionDependencies(expression, out){
   out = out || new Set();
   if(!expression || typeof expression !== 'object') return out;

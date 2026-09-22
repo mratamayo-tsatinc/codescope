@@ -33,16 +33,16 @@ function soEdit(item,action){
   if(typeof saveSessionProgress==='function') saveSessionProgress();
 }
 
-function soSourceFragments(line){
-  if(/^\s*#/.test(line))return [h('span',{class:'so-syntax-prep'},line)];
-  const fragments=[],pattern=/\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:int|char|float|double|void|long|short|const|unsigned|signed|static|return|if|else|for|while|do|break|continue|switch|case|default)\b|\b\d+(?:\.\d+)?\b|\b[A-Za-z_]\w*(?=\s*\()/g;
+function soSourceFragments(line,language){
+  if(language==='c'&&/^\s*#/.test(line))return [h('span',{class:'so-syntax-prep'},line)];
+  const fragments=[],pattern=/\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:int|char|float|double|void|long|short|const|unsigned|signed|static|boolean|String|public|private|protected|class|final|new|return|if|else|for|while|do|break|continue|switch|case|default|package|import|throws|try|catch|finally)\b|\b\d+(?:\.\d+)?\b|\b[A-Za-z_]\w*(?=\s*\()/g;
   let cursor=0,match;
   while((match=pattern.exec(line))){
     if(match.index>cursor)fragments.push(line.slice(cursor,match.index));
     const token=match[0];
     const kind=token.startsWith('//')?'comment':/^['"]/.test(token)?'string':/^\d/.test(token)?'number'
-      :/^(int|char|float|double|void|long|short|const|unsigned|signed|static)$/.test(token)?'type'
-      :/^(return|if|else|for|while|do|break|continue|switch|case|default)$/.test(token)?'keyword':'function';
+      :/^(int|char|float|double|void|long|short|const|unsigned|signed|boolean|String)$/.test(token)?'type'
+      :/^(static|public|private|protected|class|final|new|return|if|else|for|while|do|break|continue|switch|case|default|package|import|throws|try|catch|finally)$/.test(token)?'keyword':'function';
     fragments.push(h('span',{class:`so-syntax-${kind}`},token));
     cursor=match.index+token.length;
   }
@@ -52,12 +52,14 @@ function soSourceFragments(line){
 
 function soSourcePanel(item){
   const lines=item.source.split('\n');
-  return h('section',{class:'so-source-panel','aria-label':'C source code'},
+  const language=item.language==='java'?'Java':item.language==='c'?'C'
+    :String(item.language||'source').replace(/(^|-)([a-z])/g,(_,separator,letter)=>`${separator}${letter.toUpperCase()}`);
+  return h('section',{class:'so-source-panel','aria-label':`${language} source code`},
     h('div',{class:'so-panel-heading'},h('i',{class:'fa-solid fa-code','aria-hidden':'true'}),
-      h('span',{},item.filename),h('span',{class:'so-language'},'C')),
+      h('span',{},item.filename),h('span',{class:'so-language'},language)),
     h('div',{class:'so-source-code'},...lines.map((line,index)=>h('div',{class:'so-source-line'},
       h('span',{class:'so-line-number','aria-hidden':'true'},String(index+1)),
-      h('span',{class:'so-source-text'},...soSourceFragments(line))))));
+      h('span',{class:'so-source-text'},...soSourceFragments(line,item.language))))));
 }
 
 function soOutputPanel(item){

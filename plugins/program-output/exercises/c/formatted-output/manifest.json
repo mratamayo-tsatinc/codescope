@@ -1,0 +1,10 @@
+{
+  "title": "C Formatted Output",
+  "exercises": [
+    "BasicValues.c",
+    "MultipleValues.c",
+    "EmbeddedLines.c",
+    "NoTrailingNewline.c",
+    "AssignmentThenOutput.c"
+  ]
+}

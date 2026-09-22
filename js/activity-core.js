@@ -1,6 +1,8 @@
 // Activity-plugin orchestration owned by the app shell. Activity plugins live
 // under /plugins and communicate with the shell only through this registry.
 const activityPluginRegistry = new Map();
+const profileContentProviderRegistry = new Map();
+let activityContentReadyPromise = null;
 
 function registerActivityPlugin(plugin){
   if(!plugin||typeof plugin!=='object'||!plugin.id) throw new Error('Activity plugin requires an id');
@@ -22,6 +24,48 @@ function registerActivityPlugin(plugin){
   return plugin;
 }
 
+// Profiles may obtain item content from generated data or from runtime-loaded
+// source files without teaching the shell either domain. The provider owns
+// validation, loading, parsing and item construction; the shell supplies the
+// existing seeded generator as an explicit fallback for generated mode.
+function registerProfileContentProvider(provider){
+  if(!provider||typeof provider!=='object'||!provider.id)
+    throw new Error('Profile content provider requires an id');
+  if(profileContentProviderRegistry.has(provider.id))
+    throw new Error(`Profile content provider '${provider.id}' is already registered`);
+  if(typeof provider.generateItems!=='function')
+    throw new Error(`Profile content provider '${provider.id}' requires generateItems()`);
+  const matchingProfiles=PROFILES.filter(profile=>profile.content&&profile.content.provider===provider.id);
+  matchingProfiles.forEach(profile=>{
+    if(typeof provider.validateProfile==='function') provider.validateProfile(profile);
+  });
+  profileContentProviderRegistry.set(provider.id,Object.freeze(Object.assign({},provider)));
+  return provider;
+}
+
+function profileContentProviderFor(profile){
+  return profile&&profile.content
+    ?profileContentProviderRegistry.get(profile.content.provider)||null:null;
+}
+
+function generateProfileContentItems(profile,generateDefault){
+  const provider=profileContentProviderFor(profile);
+  if(!provider) throw new Error(`${profile.id}: unknown content provider '${profile.content&&profile.content.provider}'`);
+  const items=provider.generateItems({profile,language:state.language,generateDefault});
+  if(!Array.isArray(items)||!items.length)
+    throw new Error(`${profile.id}: content provider '${provider.id}' returned no items`);
+  return items;
+}
+
+function ensureActivityContentReady(){
+  if(activityContentReadyPromise) return activityContentReadyPromise;
+  const loaders=[...activityPluginRegistry.values(),...profileContentProviderRegistry.values()];
+  activityContentReadyPromise=Promise.all(loaders.map(owner=>
+    typeof owner.loadContent==='function'?owner.loadContent():Promise.resolve()
+  ));
+  return activityContentReadyPromise;
+}
+
 function activityPluginForProfile(profile){
   return profile&&profile.activity ? activityPluginRegistry.get(profile.activity.kind)||null : null;
 }
@@ -33,11 +77,21 @@ function activityPluginForItem(item){
 function generateActivityItems(profile){
   const plugin=activityPluginForProfile(profile);
   if(!plugin) throw new Error(`No activity plugin registered for '${profile.activity.kind}'`);
+  const itemCount=typeof plugin.itemCount==='function'
+    ?plugin.itemCount({profile,language:state.language}):profile.itemCount;
+  if(!Number.isInteger(itemCount)||itemCount<1)
+    throw new Error(`${profile.id}: activity item count must be a positive integer`);
   // One opaque context is shared only across items generated for this profile.
   // Plugins may use it for deterministic uniqueness without exposing domain
   // knowledge to the shell or leaking values between profiles.
   const generationContext={};
-  return Array.from({length:profile.itemCount},(_,index)=>plugin.generateItem({profile,index,language:state.language,generationContext}));
+  return Array.from({length:itemCount},(_,index)=>plugin.generateItem({profile,index,language:state.language,generationContext}));
+}
+
+
+function activityItemMaxPoints(item,profile){
+  const plugin=activityPluginForItem(item);
+  return plugin&&typeof plugin.maxPoints==='function'?plugin.maxPoints({item,profile}):null;
 }
 
 function renderActivityItem(container,item){

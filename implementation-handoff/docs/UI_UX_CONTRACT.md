@@ -28,6 +28,10 @@ New activities must look like members of the existing application.
   line number, but should not overpower the active token.
 - Completed statements remain readable. Do not aggressively collapse or mute
   them as though they are void.
+- Source-backed program activities keep one immutable, metadata-free source
+  overview. Unsupported scaffolding or statements are muted but remain visible.
+  Evaluation rows may show derived values, but retain consumed source
+  identifiers so the authored command never appears to have changed.
 - Classified tokens retain syntax-category colors before and after Check.
 - After Check, use thin muted green or red underlines as an additional
   correctness cue. Incorrect tokens use a restrained wavy red underline.
@@ -83,6 +87,12 @@ New activities must look like members of the existing application.
 - The header animation control cycles Off → 1s → 2s → 3s → Off.
 - Off disables transfer travel but not the value-roll update.
 - Transfers in both directions use the selected duration.
+- Programs containing output statements show one cumulative Program Output
+  panel. Desktop places it beside the statement flow when space permits;
+  mobile places it above the flow without horizontal page overflow.
+- Output command execution reuses the curved transfer cue, then reveals text
+  character by character. Escape notation is exposed before its control effect;
+  reduced motion reveals the completed event immediately.
 - Curved comet/trailing-line transfers should be reused by compatible plugin
   interactions rather than inventing a separate flight animation.
 - Falling Token Sort uses the available vertical space for its token area.

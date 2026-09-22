@@ -117,8 +117,12 @@ function stepColor(index){ return STEP_PALETTE[((index%STEP_PALETTE.length)+STEP
 // named value preserves that binding's identity; operations that derive or
 // mutate a value receive the generated color for their step position.
 function stepVisualColor(step,index){
-  if(step && step.action==='READ_TARGET'){
+  if(step && (step.action==='READ_TARGET'||step.action==='READ_OUTPUT_VALUE')){
     return bindingIdentityColor(step.target,'variable');
+  }
+  if(step && step.action==='EVALUATE'&&step.outputAction&&step.sourceBinding){
+    return bindingIdentityColor(step.sourceBinding,
+      step.sourceBindingKind==='constant'?'constant':'variable');
   }
   if(step && step.action==='SUBSTITUTE' && step.targetKind!=='literal'){
     return bindingIdentityColor(step.target,step.targetKind==='constant'?'constant':'variable');

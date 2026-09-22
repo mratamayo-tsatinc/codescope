@@ -35,7 +35,7 @@ async function loadStudentDatabase() {
   }
 }
 
-function handleLogin(event) {
+async function handleLogin(event) {
   event.preventDefault();
   
   const emailInput = document.getElementById('emailInput');
@@ -75,6 +75,14 @@ function handleLogin(event) {
   
   if (!user) {
     showLoginError('Invalid email or student number. Please check and try again.');
+    return;
+  }
+
+  try{
+    await ensureActivityContentReady();
+  }catch(error){
+    console.error('Failed to load activity content:',error);
+    showLoginError(`Exercise content could not be loaded: ${error.message}`);
     return;
   }
   
@@ -536,7 +544,7 @@ function computeProfileScore(profileId){
   // pointsPerItem is per-profile now (generator.js's PROFILES), not one
   // shared constant — look up THIS profile's own budget.
   const profile = PROFILES.find(p=>p.id===profileId);
-  const max = items.length * (profile ? profile.pointsPerItem : 0);
+  const max = items.reduce((sum,item)=>sum+itemMaximumPoints(item,profile),0);
   return {earned, max};
 }
 

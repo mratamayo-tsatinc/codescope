@@ -272,6 +272,18 @@ const PROFILES_RAW = [
     },
   },
   {
+    enabled:true,
+    meta:{id:'program-output-basics',name:'Output Statements',
+      description:'Build values in memory, format or concatenate them, then trace C or Java output one character at a time.'},
+    shape:{operandSources:{variable:3},operandRange:{min:2,max:12},allowNegativeOperands:false},
+    operators:{allowed:OPS.ADD_SUB},
+    template:'operand op operand op operand',
+    scoring:{itemCount:5,pointsPerItem:2},
+    content:{provider:'program-output',mode:'source-files',recipe:'formatted-values',
+      exerciseSet:'formatted-output',selection:{count:5,shuffle:false}},
+    program:{declarations:'interactive',outputLesson:'formatted-values',scoreAssignments:true},
+  },
+  {
     enabled:false,
     meta:{id:'assignment-basic',name:'Assignment: Replace with =',
       description:'Initialize a variable, replace its value with =, then use the updated value.'},
@@ -376,7 +388,7 @@ const PROFILES_RAW = [
     template:'(operand:lit cmp operand:lit) and operand:var:bool:unary or operand:var:bool:unary',
     scoring:{itemCount:5,pointsPerItem:4},
     manualResponses:{enabled:true,namedValueRate:50,operatorRate:50},
-  },/*
+  },
   {
     enabled:false,
     meta:{id:'token-identifier-position',name:'Identifier Position',
@@ -415,7 +427,7 @@ const PROFILES_RAW = [
     }
   },
   {
-    enabled:true,
+    enabled:false,
     meta:{id:'token-declaration-complete',name:'Declaration Token Classification',
       description:'Classify every token according to its position in a variable or constant declaration.'},
     scoring:{itemCount:5,pointsPerItem:6},
@@ -451,7 +463,7 @@ const PROFILES_RAW = [
     }
   },
   {
-    enabled:true,
+    enabled:false,
     meta:{id:'token-program-chain',name:'Chained Statement Tokens',
       description:'Classify tokens by position across connected declarations and assignments.'},
     scoring:{itemCount:5,pointsPerItem:12},
@@ -485,7 +497,7 @@ const PROFILES_RAW = [
       ]},
       response:{mode:'classify',categories:['valid-identifier','invalid-identifier','reserved-word','operator','literal','separator']}
     }
-  },*/
+  },
   {
     enabled:true,
     meta:{id:'falling-identifier-sort',name:'Falling Identifier Sort',
@@ -574,13 +586,13 @@ const PROFILES_RAW = [
   },
   {
     enabled:true,
-    meta:{id:'c-simulate-output',name:'C Program Output',
-      description:'Read C programs, predict their printed output, and give final variable values.'},
-    scoring:{itemCount:19,pointsPerItem:10},
+    meta:{id:'c-simulate-output',name:'Simulate Output',
+      description:'Read source programs, predict their printed output, and give final variable values.'},
+    scoring:{itemCount:'manifest',pointsPerItem:'exercise-metadata'},
     activity:{
-      kind:'simulate-output',language:'c',
-      instructions:'Read the C source, then predict its console output and final variable values. Check when ready.',
-      generator:{bank:'it3-midterm-a',shuffle:true}
+      kind:'simulate-output',
+      instructions:'Read the source program, then predict its console output and final variable values. Check when ready.',
+      generator:{exerciseSet:'it3-midterm-a',shuffle:false}
     }
   },
 ];
@@ -596,7 +608,7 @@ const PROFILE_CATEGORIES = [
     'relational-boolean-mix'
   ]},
   {id:'program-statements',name:'Program Statements',enabled:true,profileIds:[
-    'declaration-chain','assignment-basic','assignment-add-sub','assignment-multiply',
+    'declaration-chain','program-output-basics','assignment-basic','assignment-add-sub','assignment-multiply',
     'assignment-div-mod','assignment-rhs-expression','assignment-sequential',
     'assignment-dependent','assignment-advanced-chain','unary-update-sequence',
     'assignment-unary-advanced-chain','relational-logical-student-derived'
@@ -607,7 +619,7 @@ const PROFILE_CATEGORIES = [
     'token-identifier-position','token-declaration-complete','token-program-chain',
     'falling-identifier-sort','falling-operator-sort'
   ]},
-  {id:'c-program-output',name:'C Program Output',enabled:true,profileIds:['c-simulate-output']}
+  {id:'c-program-output',name:'Program Output',enabled:true,profileIds:['c-simulate-output']}
 ];
 
 const FINALIZED_PROFILES = PROFILES_RAW.map(finalizeProfile);

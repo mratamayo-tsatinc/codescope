@@ -74,6 +74,9 @@ function toggleConnectors(){
 
 function findConnectorSourceEl(row, step){
   if(step.action==='EVALUATE'){
+    if(step.outputAction){
+      return row.querySelector(`[data-token-id="${step.sourceNodeId}"]`);
+    }
     return row.querySelector(`[data-op-left="${step.leftId}"][data-op-right="${step.rightId}"]`);
   }
   // Compound assignment completion is intentionally a presentation-only
@@ -362,9 +365,9 @@ function drawCanonicalProgramConnectorLines(item){
   });
 }
 
-// Each interactive declaration owns an independent expression trace. Draw
-// connectors inside each statement panel using the same geometry engine as
-// the legacy expression timeline; no statement semantics live here.
+// Each interactive program statement owns an independent evaluation trace.
+// Draw declaration, assignment, unary and output connectors with the same
+// geometry engine as the legacy expression timeline.
 function drawDeclarationConnectorLines(item){
   // The final expression reuses .program-expression-panel for workspace
   // styling, but its trace and connector lifecycle are owned by
@@ -392,11 +395,14 @@ function drawDeclarationConnectorLines(item){
     // The compound merge row is appended after the expression timeline and
     // is not part of runtime.trace by design. Add a synthetic visual step so
     // buildConnectorVisuals maps the last expression row to that merge row.
-    const visualSteps = compoundApplied ? trace.concat({
+    const statementSteps=statement&&statement.kind==='output'
+      ? trace.filter(step=>step.action==='READ_OUTPUT_VALUE'||step.action==='EVALUATE')
+      : trace;
+    const visualSteps = compoundApplied ? statementSteps.concat({
       action:'APPLY_ASSIGNMENT',
       statementId:statement.id,
       resultNodeId:assignmentResultId
-    }) : trace;
+    }) : statementSteps;
     if(!visualSteps.length) return;
     const rows = panel.querySelectorAll('.tl-row');
     panel.classList.add('connector-measuring');

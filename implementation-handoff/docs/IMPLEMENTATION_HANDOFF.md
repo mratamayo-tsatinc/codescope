@@ -1,6 +1,6 @@
 # Implementation Handoff
 
-Last consolidated: 2026-09-17
+Last consolidated: 2026-09-21
 
 ## Current baseline
 
@@ -8,9 +8,10 @@ Last consolidated: 2026-09-17
 - Temporary icon/logo: original **Precedify** artwork pending an approved
   CodeScope replacement.
 - Runtime: static vanilla HTML/CSS/classic JavaScript.
-- Profile count: 34, all in `js/profiles.js`.
+- Profile count: 35, all in `js/profiles.js`.
 - Activity plugins: `token-classification` 1.1.0 and `falling-token-sort` 1.7.0.
-- Statement plugins: legacy expression, declaration, assignment, unary update.
+- Statement plugins: legacy expression, declaration, assignment, unary update,
+  and Program Output.
 - Persistence: browser localStorage; no backend database.
 - Full test command: `node tests/run-tests.js`.
 
@@ -26,6 +27,24 @@ Last consolidated: 2026-09-17
   registration path.
 - Left the four existing statement plugins in `js/` for a future separately
   approved refactor.
+
+### Program Output content sources
+
+- Added the generic profile content-provider boundary in `js/activity-core.js`.
+- Program Output can use profile-selected `source-files` or `generated` content
+  without changing its statement interaction contract.
+- C and Java source banks live under
+  `plugins/program-output/exercises/<language>/<exerciseSet>/`; each
+  `manifest.json` alone controls membership and order.
+- Runtime parsing supports the current beginner declaration, expression,
+  assignment, unary update, `printf`, and `System.out.print/println` subset,
+  including multiple identifiers in one output statement.
+- Source-backed items store serializable Program IR and retain the established
+  final expression check.
+- The complete metadata-free source is displayed read-only; source structures
+  without registered behavior remain muted. Output variables can be read in
+  any order, Guided unlocks their matching combine controls, and Strict exposes
+  all unresolved controls. Consumed identifiers remain visible in later rows.
 
 ### Identifier activities
 

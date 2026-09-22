@@ -59,16 +59,34 @@ contract; it does not maintain a second answer list.
 
 ## Reference implementation
 
-`plugins/falling-token-sort/`, `plugins/token-classification/`, and
-`plugins/simulate-output/` are reference
+`plugins/falling-token-sort/`, `plugins/token-classification/`,
+`plugins/simulate-output/`, and `plugins/program-output/` are reference
 directory boundaries for activity plugins. Their profiles are declared
 globally in `js/profiles.js`; their plugin directories contain only the
 behavior and presentation needed to execute those configurations.
 
-Simulate Output owns a static C exercise bank with answer metadata, a synchronous
-catalog for seeded item selection, answer comparison, and its response UI. It
-uses the shell's login, navigation, Practice/Exam policy, persistence, scoring
-summary, and drawers. See `docs/how-to-create-a-simulate-output-profile.md`.
+Program Output is a statement capability rather than a standalone activity.
+It registers language-neutral output semantics and a renderer inside its plugin
+directory, then composes with declarations, assignments, and the expression
+engine through Program Core. Its profile content provider can parse a
+manifest-selected C or Java source bank at runtime or delegate to the seeded
+generator. Both inputs converge on the same serializable Program IR.
+
+`js/activity-core.js` owns the generic profile content-provider registry. The
+shell asks registered providers to validate profiles, load external content,
+and construct items. It does not know source formats or exercise-set layouts.
+See `docs/how-to-create-a-program-output-profile.md` for the Program Output
+provider contract.
+
+Simulate Output owns runtime-loaded exercise manifests, source files with
+embedded answer metadata, answer comparison, and its response UI. Exercise
+banks use `exercises/<global-language>/<profile-exercise-set>/`; the profile
+selects the set while CodeScope's global language selects the language folder.
+The shell waits for plugin content loading before it generates a session. Each
+set manifest is the only exercise membership and ordering source; files absent
+from the manifest remain inactive. It uses the shell's login, navigation,
+Practice/Exam policy, persistence, scoring summary, and drawers. See
+`docs/how-to-create-a-simulate-output-profile.md`.
 
 The four existing statement plugins in `js/` are intentionally unchanged.
 Their migration will be handled by a separate refactoring plan.

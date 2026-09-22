@@ -26,7 +26,7 @@ function computeScoreForProfiles(profiles){
     // profile contributes against its OWN point budget, not one shared
     // constant, so the grand total honestly reflects that harder profiles
     // are worth more.
-    max += items.length * p.pointsPerItem;
+    max += items.reduce((sum,item)=>sum+itemMaximumPoints(item,p),0);
     earned += items.reduce((sum, it)=> sum + (it.points || 0), 0);
   });
   // roundPoints() (state.js) strips floating-point noise from summing many
@@ -178,7 +178,7 @@ function renderScoreSummaryContent(){
     if(!items || items.length===0){
       value.textContent = '—';
     } else {
-      const max = items.length * p.pointsPerItem;
+      const max = items.reduce((sum,item)=>sum+itemMaximumPoints(item,p),0);
       const anyChecked = items.some(it=>it.checked);
       // roundPoints() (state.js) — see computeGrandTotalScore's comment.
       const earned = roundPoints(items.reduce((sum, it)=> sum + (it.points || 0), 0));

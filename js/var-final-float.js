@@ -136,13 +136,17 @@ function cycleVarFinalFlyAnimation(){
 // only the value rolls into the destination card.
 function animateVarFinalMemoryToExpression(item, action, applyAction){
   if(!floatVisible || !item || !action
-    || (action.type!=='substitute'&&action.type!=='reveal-assignment-target')) return false;
+    || (action.type!=='substitute'&&action.type!=='reveal-assignment-target'&&action.type!=='read-output-value')) return false;
   if(memoryTransferInProgress) return true;
 
   const statement = typeof currentProgramStatement==='function' ? currentProgramStatement(item) : null;
   const runtime = statement && statement.kind!=='legacy-expression' ? statement.runtime : item;
   let named,tokenId;
-  if(action.type==='reveal-assignment-target'){
+  if(action.type==='read-output-value'){
+    if(!statement||statement.kind!=='output') return false;
+    named={name:action.name,kind:'variable'};
+    tokenId=programOutputReadTokenId(statement,action.partIndex);
+  } else if(action.type==='reveal-assignment-target'){
     if(!statement || statement.kind!=='assignment' || !isCompoundAssignment(statement)
       || runtime.targetRevealed) return false;
     named={name:statement.target,kind:'variable'};
@@ -156,8 +160,10 @@ function animateVarFinalMemoryToExpression(item, action, applyAction){
   }
 
   const source = document.querySelector('.var-final-float [data-token-id="vff-'+named.name+'"]');
-  const scope = statement && statement.kind!=='legacy-expression'
-    ? '[data-statement-id="'+statement.id+'"].program-expression-panel'
+  const scope = statement&&statement.kind==='output'
+    ? '[data-statement-id="'+statement.id+'"].program-output-statement'
+    : statement && statement.kind!=='legacy-expression'
+      ? '[data-statement-id="'+statement.id+'"].program-expression-panel'
     : '.eval-panel';
   const destinations = document.querySelectorAll(scope+' [data-token-id="'+tokenId+'"]');
   const destination = destinations.length ? destinations[destinations.length-1] : null;
@@ -187,7 +193,12 @@ function animateVarFinalMemoryToExpression(item, action, applyAction){
   const renderedDestination = renderedDestinations.length
     ? renderedDestinations[renderedDestinations.length-1] : null;
   const waitingBody = renderedDestination && renderedDestination.querySelector('.tok-card-body');
-  if(!renderedDestination || !waitingBody){
+  if(!renderedDestination){
+    shield.remove();
+    memoryTransferInProgress = false;
+    return true;
+  }
+  if(!waitingBody){
     shield.remove();
     memoryTransferInProgress = false;
     return true;

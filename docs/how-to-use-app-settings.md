@@ -19,7 +19,7 @@ hardcoded configuration.
 
 ```js
 const DEFAULT_APP_SETTINGS = Object.freeze({
-  schemaVersion: 6,
+  schemaVersion: 7,
   settingsPolicy: 'local-configurable', // or 'state-only'
   persistence: Object.freeze({practice:false, exam:true}),
   // ...
@@ -80,7 +80,7 @@ both modes' records.
 
 ```js
 const DEFAULT_APP_SETTINGS = Object.freeze({
-  schemaVersion: 6,
+  schemaVersion: 7,
   settingsPolicy: 'local-configurable',
   persistence: Object.freeze({practice:false, exam:true}),
   mode: 'practice',
@@ -143,6 +143,10 @@ browser settings do not override them.
 | `memoryPanel.transferAnimation.speedLevelsMs` | `[1000, 2000, 3000]` | Durations cycled by the memory header control. |
 | `memoryPanel.entranceDurationMs` | `220` | Memory-panel entrance duration. |
 | `memoryPanel.valueRollDurationMs` | `420` | Duration of the old/new memory value roll. |
+| `outputPanel.visible` | `true` | Shows the content-aware Program Output screen for programs containing output statements. |
+| `outputPanel.characterAnimation` | `true` | Types each emitted output event into the screen instead of revealing it at once. Reduced-motion preference still disables the animation. |
+| `outputPanel.characterDelayMs` | `55` | Delay between visible output characters. |
+| `outputPanel.escapeDelayMs` | `320` | Total pause used to expose an escape such as `\\n` before applying its control effect. |
 | `compoundAssignment.mergeDurationMs` | `2200` | Compound-assignment convergence duration. |
 | `compoundAssignment.writebackDelayMs` | `2400` | Delay before the merged result is written to memory. Keep this greater than the merge duration. |
 | `solutionPlayback.stepDurationMs` | `1000` | Correct-solution playback interval. |

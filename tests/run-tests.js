@@ -27,7 +27,11 @@ function context(){
 function load(ctx, names){
   names.forEach(name=>{
     const filename = path.join(ROOT, 'js', name);
-    vm.runInContext(fs.readFileSync(filename, 'utf8'), ctx, {filename});
+    let source=fs.readFileSync(filename,'utf8');
+    // Generator and renderer tests exercise every authored profile regardless
+    // of the deployment visibility selected in the disk configuration.
+    if(name==='profiles.js')source=source.replace(/enabled:false,/g,'enabled:true,');
+    vm.runInContext(source, ctx, {filename});
   });
 }
 
@@ -94,11 +98,17 @@ function testScriptManifestParses(){
   assert(localScripts.includes('js/activity-core.js'));
   assert(localScripts.includes('plugins/token-classification/plugin.js'));
   assert(html.includes('plugins/simulate-output/styles.css'));
-  assert(localScripts.indexOf('plugins/simulate-output/catalog.js')
+  assert(!localScripts.includes('plugins/simulate-output/catalog.js'));
+  assert(localScripts.indexOf('plugins/simulate-output/manifest.js')
     <localScripts.indexOf('plugins/simulate-output/generator.js'));
   assert(localScripts.indexOf('plugins/simulate-output/generator.js')
     <localScripts.indexOf('plugins/simulate-output/plugin.js'));
   assert(localScripts.indexOf('plugins/simulate-output/plugin.js')
+    <localScripts.indexOf('js/state.js'));
+  assert(localScripts.includes('plugins/program-output/content.js'));
+  assert(localScripts.indexOf('js/program-item-builder.js')
+    <localScripts.indexOf('plugins/program-output/content.js'));
+  assert(localScripts.indexOf('plugins/program-output/content.js')
     <localScripts.indexOf('js/state.js'));
   const tokenRenderer=fs.readFileSync(path.join(ROOT,'plugins','token-classification','renderer.js'),'utf8');
   const tokenFeedback=fs.readFileSync(path.join(ROOT,'plugins','token-classification','feedback.js'),'utf8');
@@ -180,6 +190,7 @@ function testScriptManifestParses(){
   assert(memoryFloatRenderer.includes('function rollVarFinalCardValue('));
   assert(memoryFloatRenderer.includes('runVarFinalComet(sourceRect,destinationRect,color,rollIntoExpression)'));
   assert(memoryFloatRenderer.includes("rollVarFinalCardValue(renderedDestination,sourceValue,finishTransfer,'')"));
+  assert(memoryFloatRenderer.includes('tokenId=programOutputReadTokenId(statement,action.partIndex)'));
   assert(memoryFloatRenderer.includes('if(!flyAnimEnabled){'));
   assert(memoryFloatRenderer.includes("bodyEl.classList.add('vf-value-roll')"));
   assert(!memoryFloatRenderer.includes('function spawnVarFinalFlyingToken('));
@@ -197,7 +208,7 @@ function testScriptManifestParses(){
   assert(html.includes('id="settingsPolicyNotice"'));
   assert(html.includes('id="settingsConfigFields"'));
   assert(bundle.includes("interactionMode: 'guided'"));
-  assert(bundle.includes("settingsPolicy: 'local-configurable'"));
+  assert(/settingsPolicy: '(?:local-configurable|state-only)'/.test(bundle));
   assert(bundle.includes('function strictSequenceEnabled()'));
   assert(bundle.includes('function classifyRejectedProgramAction('));
   assert(declarationRenderer.includes('strict-sequence-candidate'));
@@ -417,8 +428,8 @@ function testStrictExamSequencePolicy(){
       &&currentProgramStatement(guidedPractice).runtime.trace.length===0;
     return JSON.stringify({wrongOrderContinues,chainContinued,independentCredit,localPairContinues,
       prematureTerminates,prematureAssignmentTerminates,guidedUnchanged,practicePaused,practiceRecovered,guidedPracticeUnchanged,
-      strictDefault:snapshotExamPolicy({exam:{}}).interactionMode==='guided',
-      practiceDefault:snapshotPracticePolicy({practice:{}}).interactionMode==='guided'});
+      strictDefault:snapshotExamPolicy({exam:{}}).interactionMode===DEFAULT_APP_SETTINGS.exam.interactionMode,
+      practiceDefault:snapshotPracticePolicy({practice:{}}).interactionMode===DEFAULT_APP_SETTINGS.practice.interactionMode});
   })()`));
   assert.deepStrictEqual(result,{wrongOrderContinues:true,chainContinued:true,independentCredit:true,
     localPairContinues:true,prematureTerminates:true,prematureAssignmentTerminates:true,guidedUnchanged:true,practicePaused:true,
@@ -430,7 +441,7 @@ function testStateOnlySettingsPolicy(){
   load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js']);
   const stateFilename=path.join(ROOT,'js','state.js');
   const stateSource=fs.readFileSync(stateFilename,'utf8')
-    .replace("settingsPolicy: 'local-configurable'","settingsPolicy: 'state-only'");
+    .replace(/settingsPolicy: '(?:local-configurable|state-only)'/,"settingsPolicy: 'state-only'");
   vm.runInContext(stateSource,ctx,{filename:stateFilename});
   load(ctx,['settings-persistence.js']);
   const result=JSON.parse(evaluate(ctx,`(()=>{
@@ -443,10 +454,10 @@ function testStateOnlySettingsPolicy(){
     loadPersistedAppSettings();
     const hardcodedOnly=settingsAreStateOnly()
       &&appSettings.settingsPolicy==='state-only'
-      &&appSettings.mode==='practice'
-      &&appSettings.timerMinutes===15
-      &&appSettings.practice.interactionMode==='guided'
-      &&appSettings.exam.interactionMode==='guided';
+      &&appSettings.mode===DEFAULT_APP_SETTINGS.mode
+      &&appSettings.timerMinutes===DEFAULT_APP_SETTINGS.timerMinutes
+      &&appSettings.practice.interactionMode===DEFAULT_APP_SETTINGS.practice.interactionMode
+      &&appSettings.exam.interactionMode===DEFAULT_APP_SETTINGS.exam.interactionMode;
     const writeBlocked=savePersistedAppSettings()===false;
     const examPreserved=localStorage.getItem('precedifyExamProgress:student@example.edu')==='preserved-attempt';
     return JSON.stringify({hardcodedOnly,writeBlocked,examPreserved});
@@ -848,7 +859,7 @@ function testDeclarationChain(){
     });
   })()`));
   assert.deepStrictEqual(result, {
-    profileCount:30,
+    profileCount:31,
     declarationCount:4,
     statementCount:5,
     dependencyCounts:[0,1,1,1],
@@ -1190,7 +1201,7 @@ function testOldExamSaveGainsNewProfile(){
     });
   })()`));
   assert.deepStrictEqual(result, {
-    resumed:true, profileCount:30, preservedScore:0.75,policyMigrated:true,
+    resumed:true, profileCount:31, preservedScore:0.75,policyMigrated:true,
     addedKind:'interactive-declarations',addedAssignmentKind:'interactive-program'
   });
 }
@@ -1249,9 +1260,13 @@ function testExamSettingsAndTimeoutPolicy(){
   load(ctx,[
     'engine.js','flat-model.js','template-engine.js','generator.js','profiles.js',
     'program-ir.js','program-core.js','legacy-expression-plugin.js',
-    'declaration-statement-plugin.js','assignment-statement-plugin.js','program-item-builder.js','state.js',
-    'settings-persistence.js'
+    'declaration-statement-plugin.js','assignment-statement-plugin.js','program-item-builder.js'
   ]);
+  const stateFilename=path.join(ROOT,'js','state.js');
+  const stateSource=fs.readFileSync(stateFilename,'utf8').replace(
+    "settingsPolicy: 'state-only'","settingsPolicy: 'local-configurable'");
+  vm.runInContext(stateSource,ctx,{filename:stateFilename});
+  load(ctx,['settings-persistence.js']);
   const result=JSON.parse(evaluate(ctx,`(()=>{
     localStorage.setItem(APP_SETTINGS_KEY,JSON.stringify({mode:'exam',timerMinutes:45,
       exam:{allowUndo:false,feedbackRelease:'never'}}));
@@ -1296,7 +1311,7 @@ function testExamSettingsAndTimeoutPolicy(){
     const removedAll=clearAllPrecedifyLocalData();
     const fullPurge=removedAll>=3&&localStorage.getItem(APP_SETTINGS_KEY)===null
       &&localStorage.getItem('precedifyLogin')===null&&localStorage.getItem('precedifyExamProgress:c')===null
-      &&appSettings.mode==='practice';
+      &&appSettings.mode===DEFAULT_APP_SETTINGS.mode;
     resetRandomGenerator();
     return JSON.stringify({migratedDefaults,snapshotStable,scopedPurge,auditPreserved,timeoutLocks,solutionBlocked,fullPurge});
   })()`));
@@ -1340,8 +1355,11 @@ function testTokenClassificationPlugin(){
   const profileSource=fs.readFileSync(profilesFile,'utf8')
     // Keep the hidden lessons out of the live catalog while exercising their
     // original integration coverage in this isolated VM.
-    .replace(/,\s*\/\*\s*(?=\{\s*(?:enabled:true,\s*)?meta:\{id:'token-identifier-position')/,',\n')
-    .replace(/,\s*\*\/\s*(?=\{\s*(?:enabled:true,\s*)?meta:\{id:'falling-identifier-sort')/,',\n');
+    .replace(/,\s*\/\*\s*(?=\{\s*(?:enabled:(?:true|false),\s*)?meta:\{id:'token-identifier-position')/,',\n')
+    .replace(/,\s*\*\/\s*(?=\{\s*(?:enabled:(?:true|false),\s*)?meta:\{id:'falling-identifier-sort')/,',\n')
+    .replace(/enabled:false,(\s*meta:\{id:'token-identifier-position')/,'enabled:true,$1')
+    .replace(/enabled:false,(\s*meta:\{id:'token-declaration-complete')/,'enabled:true,$1')
+    .replace(/enabled:false,(\s*meta:\{id:'token-program-chain')/,'enabled:true,$1');
   vm.runInContext(profileSource,ctx,{filename:profilesFile});
   load(ctx,['language.js',
     'program-ir.js','program-core.js','activity-core.js','legacy-expression-plugin.js',
@@ -1436,7 +1454,7 @@ function testSimulateOutputPlugin(){
   const ctx=context();
   load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','activity-core.js']);
   loadRelative(ctx,[
-    'plugins/simulate-output/manifest.js','plugins/simulate-output/catalog.js',
+    'plugins/simulate-output/manifest.js',
     'plugins/simulate-output/generator.js','plugins/simulate-output/actions.js',
     'plugins/simulate-output/feedback.js','plugins/simulate-output/renderer.js',
     'plugins/simulate-output/plugin.js'
@@ -1445,21 +1463,33 @@ function testSimulateOutputPlugin(){
   ctx.document={querySelector:()=>null};
   ctx.savedEdits=0;
   ctx.saveSessionProgress=()=>{ctx.savedEdits++;};
-  const catalog=JSON.parse(evaluate(ctx,'JSON.stringify(SO_EXERCISES)'));
+  const manifest=JSON.parse(fs.readFileSync(path.join(ROOT,'plugins','simulate-output','exercises','c','it3-midterm-a','manifest.json'),'utf8'));
+  const rows=manifest.exercises.map(filename=>({filename,raw:fs.readFileSync(
+    path.join(ROOT,'plugins','simulate-output','exercises','c','it3-midterm-a',filename),'utf8')}));
+  rows.push({filename:'Unlisted.c',raw:rows[0].raw});
+  ctx.testManifest=manifest;ctx.testExerciseRows=rows;
+  evaluate(ctx,"soInstallExerciseBank('plugins/simulate-output/exercises/c/it3-midterm-a/manifest.json','c','it3-midterm-a',testManifest,testExerciseRows)");
+  ctx.javaManifest={title:'Java - Simulate Output',exercises:['Hello.java']};
+  ctx.javaRows=[{filename:'Hello.java',raw:'/*\n@output\nHello\n@variables\ncount = 1\n*/\npublic class Hello { public static void main(String[] args) { System.out.println("Hello"); } }'}];
+  evaluate(ctx,"soInstallExerciseBank('plugins/simulate-output/exercises/java/java-basics/manifest.json','java','java-basics',javaManifest,javaRows)");
+  const catalog=JSON.parse(evaluate(ctx,"JSON.stringify(soCatalog(PROFILES.find(profile=>profile.id==='c-simulate-output'),'c'))"));
   assert.strictEqual(catalog.length,19);
   catalog.forEach(exercise=>{
-    const source=fs.readFileSync(path.join(ROOT,'plugins','simulate-output','exercises',exercise.filename),'utf8')
+    const source=fs.readFileSync(path.join(ROOT,'plugins','simulate-output','exercises','c','it3-midterm-a',exercise.filename),'utf8')
       .replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
     assert.strictEqual(exercise.raw,source);
   });
   const result=JSON.parse(evaluate(ctx,`(()=>{
     const profile=PROFILES.find(candidate=>candidate.id==='c-simulate-output');
+    const javaProfile={id:'java-output',activity:{generator:{exerciseSet:'java-basics',shuffle:false}}};
+    const javaItem=soGenerateItem({profile:javaProfile,index:0,language:'java',generationContext:{}});
     state.mode='practice';initializeSeededRandom(1234);
-    const contextA={},items=Array.from({length:profile.itemCount},(_,index)=>
-      soGenerateItem({profile,index,generationContext:contextA}));
+    const count=simulateOutputPlugin.itemCount({profile,language:'c'});
+    const contextA={},items=Array.from({length:count},(_,index)=>
+      soGenerateItem({profile,index,language:'c',generationContext:contextA}));
     initializeSeededRandom(1234);
-    const contextB={},repeat=Array.from({length:profile.itemCount},(_,index)=>
-      soGenerateItem({profile,index,generationContext:contextB}));
+    const contextB={},repeat=Array.from({length:count},(_,index)=>
+      soGenerateItem({profile,index,language:'c',generationContext:contextB}));
     const item=items.find(candidate=>candidate.variables.length>0);
     const metadataHidden=!item.source.includes('@output')&&!item.source.includes('@variables');
     state.profileId=profile.id;
@@ -1473,6 +1503,7 @@ function testSimulateOutputPlugin(){
     });
     const full=soCheck({item,profile,state});
     const fullScore=item.points;
+    const fullMaximum=item.maxPoints;
     const traceMatches=soCanonicalTrace({item}).length===item.totalOpSteps;
     item._feedbackAnimated=true;
     const retry=soRetry({item});
@@ -1488,17 +1519,21 @@ function testSimulateOutputPlugin(){
     const withheld=!soFeedbackReleased(restored);state.examExpired=true;
     const released=soFeedbackReleased(restored);
     resetRandomGenerator();
-    return JSON.stringify({profileActive:!!profile,count:items.length,
+    return JSON.stringify({profileActive:!!profile,javaLoaded:javaItem.language==='java'
+        &&javaItem.filename==='Hello.java'&&javaItem.maxPoints===2,count:items.length,
       unique:new Set(items.map(candidate=>candidate.exerciseId)).size,
+      manifestOrder:items.map(candidate=>candidate.filename).join(',')===testManifest.exercises.join(','),
       deterministic:items.map(candidate=>candidate.exerciseId).join(',')
         ===repeat.map(candidate=>candidate.exerciseId).join(','),
       allC:items.every(candidate=>candidate.language==='c'),metadataHidden,typingSaved,
-      full:full.applied,fullScore,traceMatches,retry:retry.applied,resetClean,
+      full:full.applied,metadataScoring:fullScore===fullMaximum,traceMatches,retry:retry.applied,resetClean,
+      bankMaximum:items.reduce((sum,candidate)=>sum+activityItemMaxPoints(candidate,profile),0),
       extraPenalty:extra.outputCorrect===item.expectedLines.length-1,
       snapshotStable,withheld,released});
   })()`));
-  assert.deepStrictEqual(result,{profileActive:true,count:19,unique:19,deterministic:true,
-    allC:true,metadataHidden:true,typingSaved:true,full:true,fullScore:10,traceMatches:true,
+  assert.deepStrictEqual(result,{profileActive:true,javaLoaded:true,count:19,unique:19,manifestOrder:true,deterministic:true,
+    allC:true,metadataHidden:true,typingSaved:true,full:true,metadataScoring:true,
+    traceMatches:true,bankMaximum:184,
     retry:true,resetClean:true,
     extraPenalty:true,snapshotStable:true,withheld:true,released:true});
 }
@@ -1837,10 +1872,10 @@ function testProfileCategoriesAndScopedScores(){
   const result=JSON.parse(evaluate(ctx,`(()=>{
     const assigned=PROFILES.every(profile=>PROFILE_CATEGORIES.some(category=>category.id===profile.categoryId));
     const unique=PROFILES.every(profile=>PROFILE_CATEGORIES.filter(category=>category.profileIds.includes(profile.id)).length===1);
-    const explicitVisibility=PROFILES.every(profile=>profile.enabled===true)
-      &&PROFILE_CATEGORIES.every(category=>category.enabled===true);
-    const expression=PROFILES.find(profile=>profile.id==='direct-ltr');
-    const hiddenExpression=PROFILES.find(profile=>profile.id==='mult-precedence');
+    const explicitVisibility=PROFILES.every(profile=>typeof profile.enabled==='boolean')
+      &&PROFILE_CATEGORIES.every(category=>typeof category.enabled==='boolean');
+    const expression=PROFILES.find(profile=>profile.id==='full-basic-precedence');
+    const hiddenExpression=PROFILES.find(profile=>profile.id==='parens-override-dual');
     const falling=ACTIVITY_PROFILES.find(profile=>profile.id==='falling-identifier-sort');
     PROFILES.push(falling);
     PROFILES.push(ACTIVITY_PROFILES.find(profile=>profile.id==='c-simulate-output'));
@@ -1925,7 +1960,7 @@ function testModeScopedPersistence(){
 
   const enabledPractice=sessionContext(true,false);
   const practiceRecord=evaluate(enabledPractice,`(()=>{
-    const profile=PROFILES[0];
+    const profile=enabledProfiles()[0];
     initializeSeededRandom(24680);
     const items=generateItemsForProfile(profile.id);
     resetRandomGenerator();
@@ -1959,7 +1994,7 @@ function testModeScopedPersistence(){
       &&!modePersistenceEnabled('exam')&&appSettings.persistence.practice===true;
     const examBlocked=tryResumeSession('exam','student@example.edu')===false;
     const practiceResumed=tryResumePracticeSession('student@example.edu');
-    const sameItem=state.profileId==='direct-ltr'&&state.itemIndex===2
+    const sameItem=state.profileId===enabledProfiles()[0].id&&state.itemIndex===2
       &&state.items[2].points===0.6&&state.items[2].checked===true;
     const samePolicy=activePracticePolicy().interactionMode==='strict-sequence';
     const sameSeed=state.sessionSeed===24680;
@@ -1973,6 +2008,215 @@ function testModeScopedPersistence(){
     samePolicy:true,sameSeed:true,noTimer:true,cleared:true});
 }
 
+function testProgramOutputStatementPlugin(){
+  const rendererSource=fs.readFileSync(path.join(ROOT,'plugins','program-output','renderer.js'),'utf8');
+  const outputStyles=fs.readFileSync(path.join(ROOT,'plugins','program-output','styles.css'),'utf8');
+  const ctx=context();
+  installFakeDom(ctx);
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
+    'program-ir.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
+    'assignment-statement-plugin.js','activity-core.js']);
+  loadRelative(ctx,['plugins/program-output/manifest.js','plugins/program-output/statement.js']);
+  load(ctx,['program-item-builder.js']);
+  loadRelative(ctx,['plugins/program-output/content.js']);
+  load(ctx,['state.js','dom-helpers.js','render-session.js']);
+  loadRelative(ctx,['plugins/program-output/renderer.js']);
+  const installBank=(language)=>{
+    const directory=path.join(ROOT,'plugins','program-output','exercises',language,'formatted-output');
+    const manifest=JSON.parse(fs.readFileSync(path.join(directory,'manifest.json'),'utf8'));
+    const rows=manifest.exercises.map(filename=>({filename,raw:fs.readFileSync(path.join(directory,filename),'utf8')}));
+    ctx[`test${language.toUpperCase()}Manifest`]=manifest;
+    ctx[`test${language.toUpperCase()}Rows`]=rows;
+    evaluate(ctx,`poInstallExerciseBank('plugins/program-output/exercises/${language}/formatted-output/manifest.json',
+      '${language}','formatted-output',test${language.toUpperCase()}Manifest,test${language.toUpperCase()}Rows)`);
+    return manifest;
+  };
+  const cManifest=installBank('c');
+  const javaManifest=installBank('java');
+  ctx.testTolerantProgram='/* @codescope\n@result x\n*/\n#include <stdio.h>\nint main(){\n int x = 4;\n mystery(x);\n printf("%d", x);\n return 0;\n}';
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    // Seed 40 previously produced a valid base expression whose advanced
+    // assignments later changed a divisor to zero and aborted app startup.
+    initializeSeededRandom(40);
+    const recoveredProgramItems=generateItemsForProfile('assignment-advanced-chain').length;
+    resetRandomGenerator();
+    state.language='c';initializeSeededRandom(73129);
+    const sourceItems=generateItemsForProfile('program-output-basics');
+    const item=sourceItems[0];resetRandomGenerator();
+    const sourceOverview=renderProgramSourceOverview(item);
+    const fallbackOverview=renderProgramSourceOverview(Object.assign({},item,{sourceDisplay:null}));
+    const kinds=item.program.statements.map(statement=>statement.kind);
+    item.program.memory={};
+    item.decls.forEach(declaration=>{item.program.memory[declaration.name]={name:declaration.name,
+      kind:declaration.kind,initialized:true,value:declaration.value};});
+    item.program.statements.slice(0,3).forEach(statement=>{statement.status='complete';});
+    item.program.cursor=3;item.program.statements[3].status='active';
+    const literal=dispatchProgramAction(item,{type:'emit-output',statementId:'output-1'});
+    const dynamic=item.program.statements[item.program.cursor];
+    const read=dispatchProgramAction(item,{type:'read-output-value',partIndex:1,statementId:dynamic.id});
+    const readTimeline=renderProgramOutputTimeline(dynamic,item,item.program,4,false);
+    const readTimelineRows=countNodesWithClass(readTimeline,'tl-row');
+    const readTimelineCards=countNodesWithClass(readTimeline,'tok-card');
+    const combine=dispatchProgramAction(item,{type:'resolve-output-part',partIndex:1,statementId:dynamic.id});
+    const combinedTimeline=renderProgramOutputTimeline(dynamic,item,item.program,4,false);
+    const combinedTimelineRows=countNodesWithClass(combinedTimeline,'tl-row');
+    const combinedTimelineText=combinedTimeline.textContent;
+    const visualStepIds=dynamic.runtime.trace.map(step=>step.resultNodeId);
+    const combineSourceId=dynamic.runtime.trace[1].sourceNodeId;
+    const sourceBinding=dynamic.runtime.trace[1].sourceBinding;
+    const bindingColor=bindingIdentityColor(sourceBinding,'variable');
+    const formatColor=stepVisualColor(dynamic.runtime.trace[1],1);
+    const printed=dispatchProgramAction(item,{type:'emit-output',statementId:dynamic.id});
+    const cSource=outputStatementSource(dynamic,item);
+    const cText=programOutputText(item.program);
+    const panelText=renderProgramOutputPanel(item,item.program).textContent;
+    const canonical=buildCanonicalProgramTrace(item);
+    item.program.language='java';
+    const javaSource=outputStatementSource(dynamic,item);
+    const javaLineSource=outputStatementSource(item.program.statements[5],item);
+    const multi=sourceItems[1];
+    multi.program.memory={};
+    multi.decls.forEach(declaration=>{multi.program.memory[declaration.name]={name:declaration.name,
+      kind:declaration.kind,initialized:true,value:declaration.value};});
+    multi.program.statements.slice(0,3).forEach(statement=>{statement.status='complete';});
+    multi.program.cursor=3;multi.program.statements[3].status='active';
+    const multiOutput=multi.program.statements[3];
+    state.mode='practice';
+    state.practicePolicy=snapshotPracticePolicy({practice:{interactionMode:'guided'}});
+    const guidedInitial=renderProgramOutputState(multiOutput,multi,multi.program,{traceCount:0,interactive:true});
+    state.practicePolicy=snapshotPracticePolicy({practice:{interactionMode:'strict-sequence'}});
+    const strictInitial=renderProgramOutputState(multiOutput,multi,multi.program,{traceCount:0,interactive:true});
+    const strictPrematureReason=classifyRejectedProgramAction(multi,
+      {type:'resolve-output-part',partIndex:1,statementId:multiOutput.id});
+    state.practicePolicy=snapshotPracticePolicy({practice:{interactionMode:'guided'}});
+    const outOfOrderRead=dispatchProgramAction(multi,{type:'read-output-value',partIndex:5,statementId:multiOutput.id});
+    const guidedAfterRead=renderProgramOutputState(multiOutput,multi,multi.program,{traceCount:1,interactive:true});
+    const outOfOrderResolve=dispatchProgramAction(multi,{type:'resolve-output-part',partIndex:5,statementId:multiOutput.id});
+    const resolvedOutOfOrder=renderProgramOutputState(multiOutput,multi,multi.program,{traceCount:2,interactive:true});
+    [1,3].forEach(partIndex=>{
+      dispatchProgramAction(multi,{type:'read-output-value',partIndex,statementId:multiOutput.id});
+      dispatchProgramAction(multi,{type:'resolve-output-part',partIndex,statementId:multiOutput.id});
+    });
+    dispatchProgramAction(multi,{type:'emit-output',statementId:multiOutput.id});
+    const sourceProfile=PROFILES.find(candidate=>candidate.id==='program-output-basics');
+    const generatedProfile=Object.assign({},sourceProfile,{
+      content:Object.assign({},sourceProfile.content,{mode:'generated'})
+    });
+    const generatedFallback=poGenerateContentItems({profile:generatedProfile,language:'c',
+      generateDefault:()=>['generated-fallback']});
+    const javaItems=poGenerateContentItems({profile:sourceProfile,language:'java',generateDefault:()=>[]});
+    const javaMulti=javaItems[1].program.statements.find(statement=>statement.kind==='output');
+    const tolerant=poParseSourceExercise({filename:'MutedUnsupported.c',raw:testTolerantProgram},'c');
+    return JSON.stringify({
+      manifest:PROGRAM_OUTPUT_PLUGIN_MANIFEST.id,
+      recoveredProgramItems,
+      statementCount:kinds.length,
+      kinds,
+      sumInitializer:item.program.statements[2].runtime.originalTree.op,
+      literal:literal.applied,read:read.applied,combine:combine.applied,printed:printed.applied,
+      readTimelineRows,readTimelineCards,combinedTimelineRows,combinedTimelineText,visualStepIds,combineSourceId,
+      sourceBinding,bindingColor,formatColor,
+      cSource,javaSource,javaLineSource,cText,panelText,canonicalPrints:canonical.filter(event=>event.action==='PRINT').length,
+      canonicalBindings:canonical.filter(event=>event.outputAction).every(event=>!!event.sourceBinding),
+      serializable:!!JSON.parse(JSON.stringify(item)).program,
+      outputSettings:DEFAULT_APP_SETTINGS.shell.outputPanel.characterDelayMs,
+      filenames:sourceItems.map(sourceItem=>sourceItem.filename),
+      sourceResultName:item.resultName,sourceResultExpression:item.originalTree.name,
+      multiPartKinds:multiOutput.parts.map(part=>part.kind),
+      multiExpressionNames:multiOutput.parts.filter(part=>part.kind==='expression').map(part=>part.expression.name),
+      multiOutputText:programOutputText(multi.program),multiNewline:multiOutput.newline,
+      multiTraceActions:multiOutput.runtime.trace.map(step=>step.action),
+      multiTracePartIndexes:multiOutput.runtime.trace.map(step=>step.partIndex==null?null:step.partIndex),
+      multiTraceIds:multiOutput.runtime.trace.map(step=>step.resultNodeId),
+      outOfOrderRead:outOfOrderRead.applied,outOfOrderResolve:outOfOrderResolve.applied,
+      guidedInitialActions:countNodesWithClass(guidedInitial,'actionable'),
+      strictInitialActions:countNodesWithClass(strictInitial,'actionable'),
+      guidedAfterReadActions:countNodesWithClass(guidedAfterRead,'actionable'),
+      resolvedSourceIdentifiers:countNodesWithClass(resolvedOutOfOrder,'program-output-source-identifier'),
+      strictPrematureReason,
+      sourceHasWholeProgram:item.sourceDisplay.lines.map(line=>line.text).join(' ').includes('#include <stdio.h>')
+        &&item.sourceDisplay.lines.some(line=>line.text.includes('return 0;')),
+      sourceMetadataHidden:!item.sourceDisplay.lines.some(line=>line.text.includes('@codescope')),
+      supportedSourceLines:item.sourceDisplay.lines.filter(line=>line.supported).length,
+      mutedSourceLines:item.sourceDisplay.lines.filter(line=>!line.supported).length,
+      overviewLines:countNodesWithClass(sourceOverview,'program-source-overview-line'),
+      fallbackOverviewLines:countNodesWithClass(fallbackOverview,'program-source-overview-line'),
+      unsupportedStatementMuted:tolerant.statements.some(statement=>statement.kind==='output')
+        &&tolerant.sourceDisplay.lines.some(line=>line.text.includes('mystery(x)')&&!line.supported),
+      generatedFallback,
+      javaFilenames:javaItems.map(sourceItem=>sourceItem.filename),
+      javaMultiPartKinds:javaMulti.parts.map(part=>part.kind),
+      javaMultiSource:outputStatementSource(javaMulti,javaItems[1]),
+      javaLanguage:javaItems[1].language
+    });
+  })()`));
+  assert.strictEqual(result.manifest,'program-output');
+  assert.strictEqual(result.recoveredProgramItems,2);
+  assert.strictEqual(result.statementCount,8);
+  assert.deepStrictEqual(result.kinds,['declaration','declaration','declaration','output','output','output','output','legacy-expression']);
+  assert.strictEqual(result.sumInitializer,'+');
+  assert(result.literal&&result.read&&result.combine&&result.printed);
+  assert.strictEqual(result.readTimelineRows,2);
+  assert.strictEqual(result.readTimelineCards,1);
+  assert.strictEqual(result.combinedTimelineRows,3);
+  assert(result.combinedTimelineText.includes('printf')&&!result.combinedTimelineText.includes('Evaluated text'));
+  assert(result.combinedTimelineText.includes(' is ')&&result.combinedTimelineText.includes('\\n'));
+  assert(!result.combinedTimelineText.includes('='));
+  assert(result.visualStepIds[0].startsWith('output-read-'));
+  assert(result.visualStepIds[1].startsWith('output-result-'));
+  assert.strictEqual(result.combineSourceId,result.visualStepIds[0]);
+  assert(result.sourceBinding);
+  assert.strictEqual(result.formatColor,result.bindingColor);
+  assert(result.canonicalBindings);
+  assert(result.cSource.startsWith('printf("Value of '));
+  assert(result.cSource.includes(' is %d\\n"'));
+  assert(result.javaSource.startsWith('System.out.println("Value of '));
+  assert(result.javaSource.includes(' + '));
+  assert(result.javaLineSource.startsWith('System.out.println("Value of '));
+  assert(result.cText.startsWith('OUTPUT LESSON\nValue of '));
+  assert(result.panelText.includes('Program Output')&&result.panelText.includes('OUTPUT LESSON'));
+  assert(result.panelText.includes('↵'));
+  assert(rendererSource.includes("pre,escape,"));
+  assert(rendererSource.includes("escape.classList.add('is-visible')"));
+  assert(rendererSource.includes("style:bindingIdentityStyle(name,'variable')"));
+  assert(outputStyles.includes('.program-output-string{color:color-mix(in srgb,var(--text) 74%,var(--text-dim));'));
+  assert(!outputStyles.includes('.program-output-string{color:#9fda72;'));
+  assert(outputStyles.includes('.program-output-resolved-value{color:var(--binding-color,var(--good));}'));
+  assert(!rendererSource.includes("escape.textContent='\\\\n'"));
+  assert(outputStyles.includes('.program-output-escape-cue.is-visible{display:inline-flex'));
+  assert(!outputStyles.includes('.program-output-escape-cue{position:absolute'));
+  assert.strictEqual(result.canonicalPrints,4);
+  assert(result.serializable&&result.outputSettings>0);
+  assert.deepStrictEqual(result.filenames,cManifest.exercises);
+  assert.strictEqual(result.sourceResultName,'result');
+  assert.strictEqual(result.sourceResultExpression,'z');
+  assert.deepStrictEqual(result.javaFilenames,javaManifest.exercises);
+  assert.deepStrictEqual(result.multiPartKinds,['text','expression','text','expression','text','expression']);
+  assert.deepStrictEqual(result.multiExpressionNames,['x','y','z']);
+  assert.strictEqual(result.multiOutputText,'Value of x is 12\nand value of y is 8\nand their sum is 20');
+  assert.strictEqual(result.multiNewline,false);
+  assert.deepStrictEqual(result.multiTraceActions,['READ_OUTPUT_VALUE','EVALUATE','READ_OUTPUT_VALUE','EVALUATE',
+    'READ_OUTPUT_VALUE','EVALUATE','PRINT']);
+  assert.deepStrictEqual(result.multiTracePartIndexes,[5,5,1,1,3,3,null]);
+  assert.strictEqual(new Set(result.multiTraceIds).size,result.multiTraceIds.length);
+  assert(result.outOfOrderRead&&result.outOfOrderResolve);
+  assert.strictEqual(result.guidedInitialActions,3);
+  assert.strictEqual(result.strictInitialActions,7);
+  assert.strictEqual(result.guidedAfterReadActions,3);
+  assert.strictEqual(result.resolvedSourceIdentifiers,1);
+  assert.strictEqual(result.strictPrematureReason,'output-value-unread');
+  assert(result.sourceHasWholeProgram&&result.sourceMetadataHidden);
+  assert(result.supportedSourceLines>0&&result.mutedSourceLines>0);
+  assert.strictEqual(result.overviewLines,result.supportedSourceLines+result.mutedSourceLines);
+  assert.strictEqual(result.fallbackOverviewLines,result.overviewLines);
+  assert(result.unsupportedStatementMuted);
+  assert.deepStrictEqual(result.generatedFallback,['generated-fallback']);
+  assert.deepStrictEqual(result.javaMultiPartKinds,result.multiPartKinds);
+  assert(result.javaMultiSource.startsWith('System.out.print('));
+  assert.strictEqual(result.javaLanguage,'java');
+}
+
 testProfileCategoriesAndScopedScores();
 testModeScopedPersistence();
+testProgramOutputStatementPlugin();
 run();

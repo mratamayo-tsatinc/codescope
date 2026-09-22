@@ -176,36 +176,32 @@ function syncGlobalHeaderUI(){
 // key their resume decision off it.
 loadPersistedAppSettings();
 
-// Check for existing login session and restore if available.
-// Mirrors handleLogin()'s post-login flow (login.js): restore the saved
-// identity, then actually call startSession() to (re)generate every
-// profile's items and land on state.screen='session'. Previously this only
-// set state.screen='setup' and left state.items as [] — but render() calls
-// renderSession(container) unconditionally for any non-login screen (the
-// 'setup' screen itself is legacy/dead now that login always skips straight
-// to session), so on refresh renderSession ran against an empty state.items,
-// currentItem() returned undefined, and accessing item.decls threw —
-// producing the blank #app area and the "Cannot read properties of
-// undefined" console errors.
-const savedLogin = localStorage.getItem('precedifyLogin');
-if(savedLogin){
-  const login = JSON.parse(savedLogin);
-  state.userEmail = login.email;
-  state.userStudentId = login.studentId;
-  // A mode resumes only if its deployment switch is enabled and this
-  // student has a snapshot for that same mode.
-  if (tryResumeSession(appSettings.mode,login.email)) {
-    // resumed
-  } else {
-    state.mode = appSettings.mode;
-    startSession();
+async function initializeCodeScope(){
+  // Runtime-authored activity content must exist before a new or migrated
+  // session generates items. Simulate Output uses this boundary to fetch its
+  // manifest and only the source files explicitly listed there.
+  await Promise.all([ensureActivityContentReady(),loadStudentDatabase()]);
+
+  const savedLogin=localStorage.getItem('precedifyLogin');
+  if(savedLogin){
+    const login=JSON.parse(savedLogin);
+    state.userEmail=login.email;
+    state.userStudentId=login.studentId;
+    if(!tryResumeSession(appSettings.mode,login.email)){
+      state.mode=appSettings.mode;
+      startSession();
+    }
   }
+  render();
 }
 
-// Initialize student database
-loadStudentDatabase().then(() => {
+initializeCodeScope().catch(error=>{
+  console.error('Failed to initialize:',error);
+  state.screen='login';
   render();
-}).catch(err => {
-  console.error('Failed to initialize:', err);
-  render();
+  const message=document.getElementById('loginError');
+  if(message){
+    message.textContent=`Application content could not be loaded: ${error.message}`;
+    message.style.display='block';
+  }
 });

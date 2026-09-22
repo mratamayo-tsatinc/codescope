@@ -55,8 +55,8 @@ function soCheck({item,profile,state}){
   item.result=result;item.checked=true;
   item.correctSteps=result.correct;item.totalOpSteps=result.total;
   item.wasCorrectFinal=result.correct===result.total;
-  item.points=Math.round(profile.pointsPerItem*result.correct/result.total*100)/100;
-  item.maxPoints=profile.pointsPerItem;
+  item.points=result.correct;
+  item.maxPoints=result.total;
   item.itemScore=item.points/item.maxPoints;
   item.lockedAt=state.mode==='exam'?Date.now():null;
   return {applied:true,completed:true};

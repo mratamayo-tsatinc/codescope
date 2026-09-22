@@ -1,19 +1,13 @@
 function soValidateProfile(profile){
   const generator=profile.activity&&profile.activity.generator;
-  if(!generator||generator.bank!=='it3-midterm-a')
-    throw new Error(`${profile.id}: unknown simulate-output exercise bank`);
-  if(profile.activity.language!=='c')throw new Error(`${profile.id}: this exercise bank requires C`);
-  if(!Number.isInteger(profile.itemCount)||profile.itemCount<1||profile.itemCount>soCatalog().length)
-    throw new Error(`${profile.id}: itemCount must be between 1 and ${soCatalog().length}`);
-  if(!Number.isFinite(profile.pointsPerItem)||profile.pointsPerItem<=0)
-    throw new Error(`${profile.id}: pointsPerItem must be positive`);
+  if(!generator||typeof generator.exerciseSet!=='string'||!generator.exerciseSet.trim())
+    throw new Error(`${profile.id}: simulate-output requires generator.exerciseSet`);
+  soPathSlug(generator.exerciseSet,`${profile.id}: exerciseSet`);
+  if(profile.itemCount!=='manifest')throw new Error(`${profile.id}: itemCount must be 'manifest'`);
+  if(profile.pointsPerItem!=='exercise-metadata')
+    throw new Error(`${profile.id}: pointsPerItem must be 'exercise-metadata'`);
   if(generator.shuffle!==undefined&&typeof generator.shuffle!=='boolean')
     throw new Error(`${profile.id}: generator.shuffle must be a boolean`);
-  const ids=new Set();
-  soCatalog().forEach(exercise=>{
-    if(ids.has(exercise.id))throw new Error(`Duplicate exercise '${exercise.id}'`);
-    ids.add(exercise.id);soParseExercise(exercise);
-  });
 }
 
 function soCanonicalTrace({item}){
@@ -26,6 +20,9 @@ function soCanonicalTrace({item}){
 
 const simulateOutputPlugin=registerActivityPlugin({
   id:SIMULATE_OUTPUT_MANIFEST.id,manifest:SIMULATE_OUTPUT_MANIFEST,
+  loadContent:soLoadExerciseContent,
+  itemCount({profile,language}){return soCatalog(profile,language).length;},
+  maxPoints({item}){return soScoreResponse(item).total;},
   validateProfile:soValidateProfile,generateItem:soGenerateItem,render:soRender,
   applyAction:soApplyAction,check:soCheck,reset:soReset,retry:soRetry,
   buildCanonicalTrace:soCanonicalTrace,

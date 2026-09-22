@@ -99,8 +99,25 @@ See `docs/identifier-generation.md` for the precise configuration contract.
 ## Statement plugins
 
 Program Core dispatches each statement by `statement.kind`. Current statement
-plugins are legacy expression, declaration, assignment, and unary update. One
-profile can generate a sequence that uses several statement kinds.
+plugins are legacy expression, declaration, assignment, unary update, and
+output. One profile can generate a sequence that uses several statement kinds.
+
+Program Output lives in `plugins/program-output/` and renders the same
+language-neutral output IR as C `printf` or Java
+`System.out.print`/`System.out.println`. Profiles select a source-file exercise
+set or a generated recipe; they do not embed source text, canonical answers, or
+language-specific interaction logic.
+
+External profile content is registered through the generic content-provider
+API in `js/activity-core.js`. A provider owns configuration validation, content
+loading, parsing, and item construction. It returns the same serializable item
+contract as generated content, uses the seeded random source for selection,
+and leaves restored Exam snapshots authoritative. The shell does not know a
+provider's manifest layout or source grammar.
+
+For source exercise banks, the manifest is the complete membership and order
+authority. Do not restore generated catalogs or copied `raw` source attributes.
+Files absent from a manifest remain inactive.
 
 Do not add I/O, selection, or loop semantics to an existing statement plugin.
 Add a separate semantic registration and renderer. Do not refactor current

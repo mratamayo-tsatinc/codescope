@@ -46,6 +46,32 @@ coverage, then run the full suite.
 - [ ] Boolean selected controls use a filled contextual accent color.
 - [ ] Manual connectors start at the operator and end with a dot at the
       destination border.
+- [ ] The Output Statements profile builds three declarations, four output
+      statements, and the established final expression check in both languages.
+- [ ] C requires memory read then `%d`; Java requires memory read then `+`.
+- [ ] Each output command appends one persisted `PRINT` event, and Undo/Reset
+      reconstruct the cumulative Program Output text.
+- [ ] Character playback applies `\\n` as one newline and respects reduced
+      motion; it never changes scoring.
+- [ ] Program Output is beside the flow on desktop and above it near 390 px.
+- [ ] Source-file mode loads only manifest-listed exercises from the active
+      C/Java language folder and preserves manifest order unless seeded shuffle
+      is configured.
+- [ ] A Program Output statement with three identifiers creates three memory
+      reads, three value-resolution steps, and one `PRINT` event.
+- [ ] Guided permits output identifiers in any order and unlocks only the
+      combine control paired with each retrieved value.
+- [ ] Strict exposes unresolved identifiers, combine controls, and the output
+      command; premature actions use strict invalid-execution handling.
+- [ ] After one value resolves, its source identifier remains visible and muted
+      in every succeeding timeline row.
+- [ ] The metadata-free source overview includes headers/imports, wrappers,
+      braces, returns, and unsupported statements; unsupported lines are muted
+      and read-only.
+- [ ] Generated Program Output mode still delegates to seeded profile
+      generation and produces the same statement interaction contract.
+- [ ] A serialized source-backed item contains complete Program IR and restores
+      without reparsing changed source into the active Exam.
 
 ## Token Classification scenarios
 

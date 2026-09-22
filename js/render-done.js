@@ -7,7 +7,8 @@ function renderDone(container){
   // several already-rounded decimal points produces (PER_CHECK's default
   // scores are 1-decimal fractions, e.g. 0.6, 1.8, 2.4 — see state.js).
   const totalPoints = roundPoints(state.items.reduce((s,i)=>s+(i.points||0),0));
-  const totalMaxPoints = state.items.reduce((s,i)=>s+(i.maxPoints||0),0);
+  const profile=currentProfile();
+  const totalMaxPoints = state.items.reduce((sum,item)=>sum+itemMaximumPoints(item,profile),0);
   const correctCount = state.items.filter(i=>i.wasCorrectFinal).length;
 
   const card = h('div',{class:'card'});

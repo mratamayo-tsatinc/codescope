@@ -44,11 +44,11 @@ snapshots are stored in the browser.
 | Layer | Primary files | Responsibility |
 |---|---|---|
 | Static shell | `index.html`, `css/`, shared `js/` | Application framing and reusable services. |
-| Profile catalog | `js/profiles.js` | All 34 profile configurations. No plugin-local profiles. |
+| Profile catalog | `js/profiles.js` | All 35 profile configurations. No plugin-local profiles. |
 | Expression engine | `js/engine.js`, `flat-model.js`, `template-engine.js`, `generator.js` | Seeded expression construction and evaluation. |
 | Program runtime | `js/program-ir.js`, `program-core.js`, `program-item-builder.js` | Ordered statement programs and dispatch. |
-| Statement semantics | `legacy-expression-plugin.js`, `declaration-statement-plugin.js`, `assignment-statement-plugin.js`, `unary-update-statement-plugin.js` | Existing statement behavior. These remain in `js/` pending a separate refactor. |
-| Activity orchestration | `js/activity-core.js` | Activity-plugin registry and shell lifecycle dispatch. |
+| Statement semantics | Existing statement files in `js/`; Program Output in `plugins/program-output/` | Expression, declaration, assignment, unary update, and language-neutral output behavior. |
+| Activity orchestration | `js/activity-core.js` | Activity-plugin registry, profile content-provider registry, and shell lifecycle dispatch. |
 | Token Classification | `plugins/token-classification/` | Language rules, identifier generation/analysis, syntax-position classification, modal, renderer, and feedback. |
 | Falling Token Sort | `plugins/falling-token-sort/` | Configurable bucket sorting using Token Classification's public identifier capabilities. |
 | Persistence | `js/settings-persistence.js`, `exam-persistence.js` | Device settings and independently configurable per-student Practice/Exam snapshots. |
@@ -67,6 +67,8 @@ The global catalog currently contains:
   - `token-program-chain`
 - 1 Falling Token Sort profile:
   - `falling-identifier-sort`
+- 1 Program Output statement profile:
+  - `program-output-basics`
 
 Do not duplicate these configurations inside plugin directories.
 
@@ -77,6 +79,13 @@ later scripts. `index.html` is therefore an executable dependency manifest.
 When adding or moving a file, preserve dependency order and add a load-order
 test. Do not introduce an ES-module or build-system migration as an incidental
 change.
+
+Program Output registers a profile content provider. In `source-files` mode it
+loads `plugins/program-output/exercises/<language>/<exerciseSet>/manifest.json`
+and parses only the listed C or Java source files into Program IR. In
+`generated` mode it delegates to the existing seeded generator. Source-backed
+items persist the resulting IR, so an active Exam restores its snapshot rather
+than rebuilding its statements from changed source files.
 
 ## Shared services
 
@@ -91,5 +100,6 @@ Activity plugins may use these shell capabilities without reimplementing them:
 - Undo, Check, Try again, and solution disclosure policy;
 - shared design tokens, accessibility primitives, and animation services.
 
-See `docs/plugin-architecture.md`, `docs/statement-plugin-guide.md`, and
+See `docs/plugin-architecture.md`, `docs/statement-plugin-guide.md`,
+`docs/how-to-create-a-program-output-profile.md`, and
 `docs/how-to-use-app-settings.md` for implementation detail.
