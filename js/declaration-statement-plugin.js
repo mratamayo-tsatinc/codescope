@@ -22,6 +22,11 @@ function declarationInitializerResolved(statement){
 function syncDeclarationOperandsFromMemory(statement, program){
   const runtime = statement.runtime;
   if(!runtime || runtime.trace.length>0) return;
+  if(runtime.originalTree&&typeof applyProgramMemoryToTree==='function'){
+    applyProgramMemoryToTree(runtime.originalTree,program.memory);
+    runtime.expectedValue=evalTree(runtime.originalTree);
+    runtime.canonicalTrace=buildCanonicalTrace(runtime.originalTree);
+  }
   function syncOperand(operand){
     if(!operand) return;
     if(operand.kind==='unary'){

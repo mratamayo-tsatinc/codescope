@@ -31,6 +31,15 @@ const DEFAULT_SHELL_SETTINGS = Object.freeze({
     characterDelayMs:55,
     escapeDelayMs:320
   }),
+  activityZoom:Object.freeze({
+    enabled:true,
+    userControlVisible:true,
+    defaultPercent:100,
+    minPercent:80,
+    maxPercent:140,
+    stepPercent:10,
+    persistPreference:true
+  }),
   sourceFlow:Object.freeze({
     resultHoldMs:900,
     modalCloseSettleMs:320,
@@ -75,6 +84,7 @@ const state = {
   itemIndex: 0,
   itemIndexByProfile: {}, // Remembers which item each profile was last viewing, so switching profiles via the sidebar returns to that exact item instead of resetting to Item 1
   showConnectors: DEFAULT_SHELL_SETTINGS.connectors.visible, // runtime value toggled by connector-lines.js
+  activityZoomPercent: DEFAULT_SHELL_SETTINGS.activityZoom.defaultPercent,
   items: [], // {originalTree, originalFlat, decls, correctFinalValue, canonicalTrace, workingFlat, history:[], trace:[], checked, itemScore, revealSolution}
   itemsByProfile: {}, // Stores all generated items per profile for persistence
   sessionSeed: null, // Seed used for reproducible item generation
@@ -137,6 +147,7 @@ function cloneDefaultAppSettings(){
         })
       }),
       outputPanel:Object.assign({},DEFAULT_APP_SETTINGS.shell.outputPanel),
+      activityZoom:Object.assign({},DEFAULT_APP_SETTINGS.shell.activityZoom),
       sourceFlow:Object.assign({},DEFAULT_APP_SETTINGS.shell.sourceFlow),
       compoundAssignment:Object.assign({},DEFAULT_APP_SETTINGS.shell.compoundAssignment),
       solutionPlayback:Object.assign({},DEFAULT_APP_SETTINGS.shell.solutionPlayback),

@@ -96,6 +96,7 @@ registerStatementPlugin({
       const partState=runtime.parts[entry.index];
       if(!binding||!binding.initialized||partState.stagedValue!==null
         ||partState.resolvedValue!==null) return {applied:false};
+      partState.expectedValue=binding.value;
       partState.stagedValue=binding.value;
       runtime.trace.push({type:'READ',action:'READ_OUTPUT_VALUE',statementId:statement.id,
         partIndex:entry.index,target:name,targetKind:'variable',sourceValue:binding.value,

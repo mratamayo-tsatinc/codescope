@@ -6,6 +6,165 @@
 // ============================================================================
 
 let activeAccountTrigger = null;
+const ACTIVITY_ZOOM_STORAGE_PREFIX='precedifyActivityZoom:';
+let activityZoomPreferenceOwner=null;
+let activityZoomResizeObserver=null;
+let activityZoomGeometryFrame=null;
+
+function activityZoomSettings(){
+  return DEFAULT_APP_SETTINGS.shell.activityZoom;
+}
+
+function clampActivityZoomPercent(value){
+  const settings=activityZoomSettings(),number=Number(value);
+  const fallback=settings.defaultPercent;
+  if(!Number.isFinite(number)) return fallback;
+  const stepped=Math.round((number-settings.minPercent)/settings.stepPercent)*settings.stepPercent+settings.minPercent;
+  return Math.max(settings.minPercent,Math.min(settings.maxPercent,stepped));
+}
+
+function activityZoomPreferenceKey(email){
+  const normalized=String(email||'').trim().toLowerCase();
+  return normalized?ACTIVITY_ZOOM_STORAGE_PREFIX+encodeURIComponent(normalized):null;
+}
+
+function syncActivityZoomPreferenceForUser(force){
+  const owner=String(state.userEmail||'').trim().toLowerCase();
+  if(!force&&activityZoomPreferenceOwner===owner) return state.activityZoomPercent;
+  activityZoomPreferenceOwner=owner;
+  let value=activityZoomSettings().defaultPercent;
+  const key=activityZoomPreferenceKey(owner);
+  if(key&&activityZoomSettings().persistPreference){
+    try{value=localStorage.getItem(key)||value;}catch(error){/* use configured default */}
+  }
+  state.activityZoomPercent=clampActivityZoomPercent(value);
+  return state.activityZoomPercent;
+}
+
+function persistActivityZoomPreference(){
+  const settings=activityZoomSettings(),key=activityZoomPreferenceKey(state.userEmail);
+  if(!settings.persistPreference||!key) return;
+  try{localStorage.setItem(key,String(state.activityZoomPercent));}catch(error){/* preference remains session-local */}
+}
+
+function applyActivityZoomToElement(element){
+  if(!element) return element;
+  const settings=activityZoomSettings();
+  const percent=settings.enabled?clampActivityZoomPercent(state.activityZoomPercent):100;
+  const factor=percent/100;
+  element.classList.add('activity-zoom-surface');
+  element.style.setProperty('--activity-zoom-factor',String(factor));
+  element.style.zoom=String(factor);
+  element.style.width=`${100/factor}%`;
+  element.setAttribute('data-activity-zoom',String(percent));
+  observeActivityZoomElement(element);
+  return element;
+}
+
+function scheduleActivityZoomGeometryRefresh(){
+  if(activityZoomGeometryFrame!==null||typeof requestAnimationFrame!=='function') return;
+  activityZoomGeometryFrame=requestAnimationFrame(()=>{
+    activityZoomGeometryFrame=null;
+    const item=typeof currentItem==='function'?currentItem():null;
+    if(item&&!item.activityKind){
+      if(typeof drawConnectorLines==='function') drawConnectorLines(item);
+      if(typeof drawDeclarationConnectorLines==='function') drawDeclarationConnectorLines(item);
+      if(typeof drawCanonicalConnectorLines==='function') drawCanonicalConnectorLines(item);
+      if(typeof drawCanonicalProgramConnectorLines==='function') drawCanonicalProgramConnectorLines(item);
+    }
+    const fallingStage=document.querySelector('.falling-token-sort-workspace .fts-stage');
+    const fallingMiddle=fallingStage&&fallingStage.querySelector('.fts-stage-middle');
+    if(fallingMiddle&&typeof ftsFitStageToApp==='function') ftsFitStageToApp(fallingMiddle,fallingStage);
+  });
+}
+
+function observeActivityZoomElement(element){
+  if(typeof ResizeObserver!=='function') return;
+  if(!activityZoomResizeObserver) activityZoomResizeObserver=new ResizeObserver(scheduleActivityZoomGeometryRefresh);
+  activityZoomResizeObserver.observe(element);
+}
+
+function resetActivityZoomObservers(){
+  if(activityZoomResizeObserver) activityZoomResizeObserver.disconnect();
+}
+
+function syncActivityZoomControls(){
+  const settings=activityZoomSettings(),percent=clampActivityZoomPercent(state.activityZoomPercent);
+  document.querySelectorAll('[data-activity-zoom-value]').forEach(element=>element.textContent=`${percent}%`);
+  document.querySelectorAll('[data-activity-zoom-decrease]').forEach(button=>button.disabled=percent<=settings.minPercent);
+  document.querySelectorAll('[data-activity-zoom-increase]').forEach(button=>button.disabled=percent>=settings.maxPercent);
+}
+
+function setActivityZoomPercent(value,options){
+  const settings=activityZoomSettings();
+  if(!settings.enabled) return;
+  const next=clampActivityZoomPercent(value);
+  if(next===state.activityZoomPercent){syncActivityZoomControls();return;}
+  const app=document.getElementById('app');
+  const maxScroll=app?Math.max(0,app.scrollHeight-app.clientHeight):0;
+  const scrollRatio=app&&maxScroll?app.scrollTop/maxScroll:0;
+  state.activityZoomPercent=next;
+  persistActivityZoomPreference();
+  document.querySelectorAll('.activity-zoom-surface').forEach(applyActivityZoomToElement);
+  syncActivityZoomControls();
+  const announcement=document.getElementById('activityZoomStatus');
+  if(announcement) announcement.textContent=`Activity size ${next} percent`;
+  requestAnimationFrame(()=>{
+    if(app){
+      const updatedMax=Math.max(0,app.scrollHeight-app.clientHeight);
+      app.scrollTop=updatedMax*scrollRatio;
+    }
+    scheduleActivityZoomGeometryRefresh();
+  });
+  if(options&&options.focusValue){
+    const reset=document.querySelector('[data-activity-zoom-value]');
+    if(reset) reset.focus();
+  }
+}
+
+function changeActivityZoom(direction){
+  const step=activityZoomSettings().stepPercent;
+  setActivityZoomPercent(state.activityZoomPercent+(direction<0?-step:step));
+}
+
+function resetActivityZoom(){
+  setActivityZoomPercent(activityZoomSettings().defaultPercent,{focusValue:true});
+}
+
+function activityZoomButton(className,label,title,icon,handler,shortcut){
+  const button=document.createElement('button');
+  button.type='button';button.className=className;button.setAttribute('aria-label',label);button.title=title;
+  if(shortcut) button.setAttribute('aria-keyshortcuts',shortcut);
+  button.innerHTML=`<i class="fa-solid ${icon}" aria-hidden="true"></i>`;
+  button.addEventListener('click',handler);return button;
+}
+
+function mountActivityZoom(container){
+  syncActivityZoomPreferenceForUser();
+  resetActivityZoomObservers();
+  const settings=activityZoomSettings();
+  if(settings.enabled&&settings.userControlVisible){
+    const toolbar=document.createElement('div');toolbar.className='activity-zoom-toolbar';
+    toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','Activity size');
+    const label=document.createElement('span');label.className='activity-zoom-label';label.textContent='Activity size';
+    const controls=document.createElement('div');controls.className='activity-zoom-controls';
+    const decrease=activityZoomButton('activity-zoom-button','Decrease activity size',
+      'Decrease activity size (Alt+-)','fa-minus',()=>changeActivityZoom(-1),'Alt+-');
+    decrease.setAttribute('data-activity-zoom-decrease','');
+    const reset=document.createElement('button');reset.type='button';reset.className='activity-zoom-value';
+    reset.setAttribute('data-activity-zoom-value','');reset.setAttribute('aria-label','Reset activity size to 100 percent');
+    reset.setAttribute('aria-keyshortcuts','Alt+0');reset.title='Reset activity size (Alt+0)';reset.addEventListener('click',resetActivityZoom);
+    const increase=activityZoomButton('activity-zoom-button','Increase activity size',
+      'Increase activity size (Alt++)','fa-plus',()=>changeActivityZoom(1),'Alt++');
+    increase.setAttribute('data-activity-zoom-increase','');
+    controls.append(decrease,reset,increase);toolbar.append(label,controls);container.appendChild(toolbar);
+    const status=document.createElement('span');status.id='activityZoomStatus';status.className='visually-hidden';
+    status.setAttribute('role','status');status.setAttribute('aria-live','polite');container.appendChild(status);
+  }
+  const viewport=document.createElement('div');viewport.className='activity-zoom-viewport';
+  const surface=document.createElement('div');applyActivityZoomToElement(surface);
+  viewport.appendChild(surface);container.appendChild(viewport);syncActivityZoomControls();return surface;
+}
 
 function shellAccountInitial(email){
   const value=String(email||'').trim();

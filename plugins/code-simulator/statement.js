@@ -6,6 +6,11 @@ function selectionExpressionResolved(statement){
 
 function syncSelectionOperands(statement,program){
   if(statement.runtime.trace.length) return;
+  if(statement.runtime.originalTree&&typeof applyProgramMemoryToTree==='function'){
+    applyProgramMemoryToTree(statement.runtime.originalTree,program.memory);
+    statement.runtime.expectedValue=evalTree(statement.runtime.originalTree);
+    statement.runtime.canonicalTrace=buildCanonicalTrace(statement.runtime.originalTree);
+  }
   statement.runtime.workingFlat.operands.forEach(function sync(operand){
     if(operand.kind==='unary') return sync(operand.inner);
     if(operand.kind==='variable'||operand.kind==='constant'){

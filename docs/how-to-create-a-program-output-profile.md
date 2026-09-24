@@ -2,8 +2,8 @@
 
 Program Output can obtain its items from authored C or Java source files or
 from the existing seeded generator. The profile stays in `js/profiles.js` and
-selects the content mode. The Program Output plugin owns source loading,
-parsing, interaction, and rendering.
+selects the content mode. Program Output owns output-statement semantics and
+rendering. Code Simulator owns complete-source parsing and program flow.
 
 ## Source file mode
 
@@ -14,21 +14,29 @@ Configure the profile with a language independent exercise set name:
   enabled:true,
   meta:{id:'program-output-source-flow',name:'Source Program Output',description:'...'},
   content:{
-    provider:'program-output',
+    provider:'code-simulator',
     mode:'source-files',
-    recipe:'formatted-values',
+    sourceLibrary:'program-output',
     exerciseSet:'formatted-output',
+    sourceValueMode:'authored',
     presentation:'source-flow',
     selection:{count:'all',shuffle:false},
   },
   scoring:{itemCount:'manifest',pointsPerItem:2},
-  program:{declarations:'interactive',outputLesson:'formatted-values',scoreAssignments:true},
+  program:{
+    declarations:'interactive',
+    outputLesson:'formatted-values',
+    scoreAssignments:true,
+    timelinePresentation:'statement-modal',
+  },
   // shape, operators, and template remain available for generated mode.
 }
 ```
 
-The global app language selects the language folder. The profile's
-`exerciseSet` selects the folder beneath it:
+The global app language selects the language folder. `sourceLibrary` keeps the
+existing Program Output exercise bank as the single authored copy, while Code
+Simulator parses and executes its complete programs. The profile's
+`exerciseSet` selects the folder beneath that library:
 
 ```text
 plugins/program-output/exercises/
@@ -65,8 +73,8 @@ size. `selection.shuffle:true` uses CodeScope's seeded random source, so an Exam
 snapshot restores the chosen items and order.
 
 The browser fetches every listed source file when the session is generated and
-parses that current text into Program IR. Statement order and supported control
-flow must therefore come from the loaded file. The plugin must not keep a
+Code Simulator parses that current text into Program IR. Statement order and
+supported control flow therefore come from the loaded file. The provider must not keep a
 second raw-source catalog, expected statement list, or hardcoded jump target.
 Persisted Exam attempts continue to restore their saved item snapshot so an
 in-progress assessment cannot change when a teacher later edits a file.
@@ -129,9 +137,10 @@ its text to Program Output. An output statement with identifiers still opens
 the trace modal because memory reads and placeholder or concatenation steps
 remain for the learner to perform.
 
-Omit `presentation` or use `presentation:'statement-only'` for the older flow
-that renders only supported statements and retains its established final
-expression check.
+The `program-output-basics` profile continues to use the Program Output content
+provider for its statement-oriented lesson. The complete-source profile uses
+Code Simulator so future supported statements in the same authored files join
+the program flow without another profile migration.
 
 For an output statement with several variables, Guided mode allows every
 unread variable to be selected in any order. Reading one variable unlocks only

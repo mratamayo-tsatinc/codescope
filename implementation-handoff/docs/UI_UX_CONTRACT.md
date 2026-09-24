@@ -113,6 +113,12 @@ New activities must look like members of the existing application.
   the learner to review the result. Dismissal then starts a visible source-line
   transition and returns focus to its destination. Output playback remains
   visible in the main Program Output panel after the modal closes.
+- The visible interaction surface owns its feedback animation. During modal
+  evaluation, statement-to-memory transfers end at the modal memory card and
+  output-command travel plus character playback end in the modal Program Output
+  mirror. The main panels update to the same canonical state without replaying
+  those animations. Direct source actions continue to animate into the main
+  panels.
 - Source flow never snaps directly between executable lines. A direct action
   completes its statement-to-memory transfer and value roll, or its output
   feedback, before any source rerender or line movement. A modal action waits for

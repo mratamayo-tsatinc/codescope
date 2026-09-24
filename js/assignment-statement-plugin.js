@@ -43,6 +43,16 @@ function assignmentDependenciesReady(statement,program){
 function syncAssignmentOperandsFromMemory(statement,program){
   const runtime = statement.runtime;
   if(!runtime || runtime.trace.length>0) return;
+  if(runtime.originalTree&&typeof applyProgramMemoryToTree==='function'){
+    applyProgramMemoryToTree(runtime.originalTree,program.memory);
+    runtime.expectedRhs=evalTree(runtime.originalTree);
+    const target=program.memory[statement.target];
+    if(target&&target.initialized){
+      runtime.expectedBefore=target.value;
+      runtime.expectedAfter=applyAssignmentOperator(statement.operator,target.value,runtime.expectedRhs);
+    }
+    runtime.canonicalTrace=buildCanonicalTrace(runtime.originalTree);
+  }
   runtime.workingFlat.operands.forEach(function sync(operand){
     if(operand.kind==='unary') return sync(operand.inner);
     if(operand.kind==='variable' || operand.kind==='constant'){

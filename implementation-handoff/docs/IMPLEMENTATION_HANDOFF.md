@@ -48,21 +48,28 @@ Last consolidated: 2026-09-21
   all unresolved controls. Exposed variable cards retain their names and values
   in later rows.
 
-### Program Selection
+### Code Simulator
 
-- Added the source-backed `selection-statements-source` profile under Program
-  Statements, with four manifest-ordered exercises for both C and Java.
-- Source-backed Program Output and Selection profiles use
+- `plugins/code-simulator/` owns the complete-source provider. The existing
+  `selection-statements-source` ID is retained for saved progress, while its
+  user-facing name and provider are Code Simulator.
+- `program-output-source-flow` now also uses the Code Simulator provider and
+  statement-modal presentation. Its `sourceLibrary:'program-output'` setting
+  keeps the existing formatted-output C/Java manifests and source files as the
+  single authored bank; Program Output continues to own output semantics.
+- Source-backed Program Output and Code Simulator profiles use
   `selection.count:'all'` with `scoring.itemCount:'manifest'`. The manifest now
   owns membership, item total, order, and category maximum score.
-- Selection sources now allowlist seedable literal declarations with embedded
+- Code Simulator sources allowlist seedable literal declarations with embedded
   `@seed name min=… max=…` metadata. The profile uses
   `sourceValueMode:'seeded'`; switching it to `'authored'` preserves every
   source initializer. Unlisted bindings remain fixed and derived expressions
   recalculate from the materialized declarations.
-- Added a separate `selection` statement plugin for `if`, `if/else`, ordered
-  `else if`, and `switch` with explicit `break` and `default` handling.
-- The selection parser derives sequential successors, branch targets, clause
+- The simulator accepts any listed source containing at least one supported
+  executable statement. It does not require declarations or a selection. It
+  currently parses declarations, assignments, unary updates, output, selection,
+  and C return statements; unsupported lines remain muted source context.
+- The simulator derives sequential successors, branch targets, clause
   exits, and post-decision statements from each current fetched file. Adding a
   supported decision or statement requires only the source edit and manifest
   membership; there is no expected graph in JavaScript.
@@ -76,7 +83,7 @@ Last consolidated: 2026-09-21
   text, and literal multi-character operators do not become ligature glyphs.
   Branch connectors are intentionally hidden, while untaken code remains muted.
 - Random selection-program generation and switch fall-through are deferred.
-- The selection profile opts into
+- The Code Simulator profile opts into
   `program.timelinePresentation:'statement-modal'`. Its complete source remains
   stable in one filename-labelled, syntax-highlighted file panel with a
   continuous line-number gutter. Each statement plugin supplies the active
@@ -87,6 +94,9 @@ Last consolidated: 2026-09-21
   keep inline timelines.
 - The modal has labeled `Back to source` and `Continue program` actions instead
   of an icon-only close control. Completion stays visible until dismissal.
+  While it is open, its memory and Program Output mirrors own transfer and
+  playback animation; the external panels synchronize silently. Direct source
+  actions retain the external panels as their destinations.
   Direct feedback or modal dismissal then starts a source-line transition from
   the completed origin to the semantic destination, including skipped branch
   lines and future backward loop destinations.

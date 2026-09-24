@@ -550,6 +550,24 @@ the seeded `shape`/`template` path instead. Both modes produce the same Program
 IR and use the established Check, feedback, scoring, persistence, and
 correct-solution flow.
 
+Use Code Simulator for a stable complete-source view:
+
+```js
+content:{
+  provider:'code-simulator',
+  mode:'source-files',
+  sourceLibrary:'program-output',
+  exerciseSet:'formatted-output',
+  sourceValueMode:'authored',
+  presentation:'source-flow',
+  selection:{count:'all',shuffle:false},
+}
+```
+
+This is the current `program-output-source-flow` configuration. It reads the
+same Program Output exercise files while Code Simulator owns complete-program
+parsing and flow.
+
 `outputLesson` names a builder in `program-item-builder.js`; adding another
 lesson key requires a builder and tests. Output source syntax and interaction
 semantics remain in `plugins/program-output/`, not in the profile.
@@ -561,21 +579,32 @@ manifest, metadata, supported syntax, selection, and language rules.
 item's existing point budget. Setting it to `false` leaves those writes
 instructional but does not award assignment-check credit.
 
-### Source-backed selection values
+### Code Simulator source programs
 
-A Program Selection profile chooses whether embedded declaration ranges are
-applied:
+A Code Simulator profile selects a language-specific exercise directory and
+chooses whether embedded declaration ranges are applied:
+
+See `docs/how-to-create-a-code-simulator-profile.md` for the complete two-step
+file/manifest workflow, supported statements, and metadata rules.
 
 ```js
 content:{
-  provider:'program-selection',
+  provider:'code-simulator',
   mode:'source-files',
+  sourceLibrary:'code-simulator',
   exerciseSet:'selection-basics',
   sourceValueMode:'seeded', // or 'authored'
   presentation:'source-flow',
   selection:{count:'all',shuffle:false},
 }
 ```
+
+Each manifest-listed source file is parsed independently. It may contain any
+combination of supported declarations, assignments, standalone `++`/`--`,
+output statements, selections, and C `return 0;`. No individual statement kind
+is mandatory. Unsupported lines remain visible as muted context. A file is
+rejected only when it contains no supported executable statement or has invalid
+manifest/seed metadata or invalid references inside recognized statements.
 
 For a source-backed profile whose entire manifest is the activity, use
 `selection.count:'all'` with `scoring.itemCount:'manifest'`. The manifest then

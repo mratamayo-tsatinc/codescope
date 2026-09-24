@@ -184,24 +184,31 @@ derivations never remove consumed source identifiers; they remain visible in a
 muted state while the derived value stays associated with its placeholder or
 concatenation step.
 
-The dedicated `program-output-source-flow` profile renders the complete
-metadata-free file directly in `program-statement-flow`. Supported lines retain
-their semantic renderers and use their authored line numbers. Headers/imports,
-wrappers, braces, blank lines, and unsupported statements stay in place as
-muted read-only source lines. In C source flow, an authored `return 0;` is a
-direct terminal action: the learner clicks it to finish the program. Java
-source flow finishes after its final authored executable statement. Neither
-path appends a synthetic assignment.
+The dedicated `program-output-source-flow` profile uses the Code Simulator
+provider with `sourceLibrary:'program-output'`. It reads the existing
+formatted-output bank and renders one stable, metadata-free source file with
+statement-modal detail views. Supported lines retain their semantic renderers
+and authored line numbers. Headers/imports, wrappers, braces, blank lines, and
+unsupported statements stay in place as muted read-only source lines. In C
+source flow, an authored `return 0;` is a direct terminal action: the learner
+clicks it to finish the program. Java source flow finishes after its final
+authored executable statement. Neither path appends a synthetic assignment.
 
-## Selection statements
+## Code Simulator source programs
 
-`plugins/program-selection/` registers the `selection` statement kind and a
-source-backed content provider. Conditions use the shared expression runtime,
-so identifier reads, relational and Boolean reductions, colors, value cards,
+`plugins/code-simulator/` is the source-backed complete-program provider. It
+parses each manifest-listed live file into Program IR and delegates statements
+to the existing declaration, assignment, unary update, output, selection, and
+return handlers. A source file needs at least one supported executable
+statement; it does not need to contain a declaration or selection. Unsupported
+lines remain visible and muted so the learner still sees one complete program.
+
+The simulator's `selection` handler uses the shared expression runtime, so
+identifier reads, relational and Boolean reductions, colors, value cards,
 Undo, and connector geometry follow the same contract as declarations and
 assignments.
 
-Selection exercise files may define source-specific randomization in their
+Code Simulator exercise files may define source-specific randomization in their
 leading metadata:
 
 ```c

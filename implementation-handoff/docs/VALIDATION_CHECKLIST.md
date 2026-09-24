@@ -75,6 +75,10 @@ coverage, then run the full suite.
       remain in their source positions as muted read-only lines.
 - [ ] Source Program Output adds no synthetic final assignment and finalizes
       scoring after the last authored executable statement.
+- [ ] Source Program Output uses the Code Simulator provider with the
+      `program-output` source library, preserves the formatted-output manifest
+      order in C and Java, uses authored values, and opens multistep statements
+      through statement-modal presentation.
 - [ ] Generated Program Output mode still delegates to seeded profile
       generation and produces the same statement interaction contract.
 - [ ] A serialized source-backed item contains complete Program IR and restores
@@ -85,7 +89,14 @@ coverage, then run the full suite.
 - [ ] Editing a listed live source file changes newly generated statements and
       control-flow edges without a JavaScript catalog change; an unlisted file
       remains absent.
-- [ ] Selection manifests produce four ordered C or Java source-backed items:
+- [ ] Code Simulator accepts a manifest-listed program without requiring a
+      declaration or selection statement. Declarations, assignments, unary
+      updates, output, selections, and C return statements are interactive when
+      present; unsupported source remains visible and muted.
+- [ ] A file with no supported executable statement reports that specific
+      limitation instead of requesting a lesson-specific statement shape.
+- [ ] The current selection-basics manifests produce four ordered C or Java
+      source-backed items:
       `if`, `if/else`, `if/else if`, and `switch`.
 - [ ] In seeded source mode, each `@seed` binding stays within its embedded
       inclusive range; the same session seed reproduces the same materialized
@@ -111,7 +122,7 @@ coverage, then run the full suite.
 - [ ] A false first condition advances to the next `else if`; a true condition
       exits the chain. Switch selects the matching case or `default` and honors
       explicit `break` without fall-through.
-- [ ] The selection profile renders one stable, complete source program and
+- [ ] The Code Simulator profile renders one stable, complete source program and
       exposes an action only on the current executable line; no expression
       timeline is inserted into the main source flow.
 - [ ] The complete source is one bordered file panel showing the real exercise
@@ -126,6 +137,11 @@ coverage, then run the full suite.
 - [ ] A multistep active line mounts its existing registered renderer in the
       shared statement modal with focused memory and Program Output context.
       Memory-to-expression transfers use the modal memory cards.
+- [ ] During modal evaluation, write-back travel and value rolls end at the
+      modal memory card, while output-command travel, character playback, and
+      newline cues occur in the modal Program Output mirror. The main panels
+      synchronize without duplicate travel or playback. Direct source actions
+      still target the main panels.
 - [ ] A selection trace renders only its condition or selector expression; the
       modal does not duplicate the source `if`/`else if`/`switch` wrapper.
 - [ ] Completing a statement leaves the trace modal open in a read-only

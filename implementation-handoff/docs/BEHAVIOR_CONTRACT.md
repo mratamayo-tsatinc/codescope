@@ -177,8 +177,11 @@ unless the user explicitly approves a change.
   snapshot. After the statement completes, the modal remains open in a
   read-only completed state until the learner closes it with the visible close
   action or Escape. Closing returns focus to the next executable source line.
-  Completing an output statement still appends to and animates the main
-  cumulative Program Output panel.
+  While the modal is open, its memory and Program Output mirrors own value
+  transfers, output-command travel, and character playback. The corresponding
+  main panels synchronize to canonical program state without a duplicate
+  animation. Statements executed directly from the source keep the main memory
+  and Program Output panels as their animation destinations.
 - A selection modal shows only the condition or selector expression. The full
   `if`, `else if`, or `switch` statement remains visible in the stable source
   view and is not duplicated inside the close view.

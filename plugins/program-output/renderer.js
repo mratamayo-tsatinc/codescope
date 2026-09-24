@@ -260,24 +260,32 @@ function renderOutputStatement(ctx){
   container.appendChild(card);
 }
 
-function renderProgramOutputPanel(item,program){
+function programOutputAnimationSurface(item,pending){
+  return pending&&typeof programStatementTraceOpenFor==='function'
+    &&programStatementTraceOpenFor(item,pending.event&&pending.event.statementId)?'modal':'main';
+}
+
+function renderProgramOutputPanel(item,program,options){
+  options=options||{};
+  const surface=options.surface==='modal'?'modal':'main';
   const events=(program.events||[]).filter(event=>event&&event.type==='OUTPUT');
   const pending=pendingProgramOutputAnimation&&pendingProgramOutputAnimation.item===item
     ? pendingProgramOutputAnimation:null;
+  const ownsPending=!!(pending&&programOutputAnimationSurface(item,pending)===surface);
   let visibleText=events.map(event=>event.text).join('');
-  if(pending){
+  if(ownsPending){
     const index=events.lastIndexOf(pending.event);
     if(index>=0) visibleText=events.slice(0,index).map(event=>event.text).join('');
   }
   const pre=h('pre',{class:'program-output-screen-text'},visibleText);
   const escape=h('span',{class:'program-output-escape-cue','aria-hidden':'true',
     title:'newline (\\n)'},'↵');
-  const panel=h('aside',{class:'program-output-screen','aria-label':'Program output'},
+  const panel=h('aside',{class:'program-output-screen','aria-label':'Program output','data-output-surface':surface},
     h('div',{class:'program-output-screen-title'},
       h('i',{class:'fa-solid fa-display','aria-hidden':'true'}),h('span',{},'Program Output')),
     h('div',{class:'program-output-screen-body','aria-live':'polite'},pre,escape,
       h('span',{class:'program-output-cursor','aria-hidden':'true'},'▌')));
-  if(pending) requestAnimationFrame(()=>startProgramOutputAnimation(panel,pre,escape,pending));
+  if(ownsPending) requestAnimationFrame(()=>startProgramOutputAnimation(panel,pre,escape,pending));
   return panel;
 }
 

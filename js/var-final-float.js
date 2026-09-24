@@ -95,7 +95,9 @@ let memoryTransferInProgress = false;
 let memoryCometSequence = 0;
 
 function varFinalOutboundAnimationDelay(item){
-  if(!floatVisible||!varFinalPanelShouldRender(item)) return 0;
+  const modalOwnsTransfer=typeof programStatementTraceOpenForItem==='function'
+    &&programStatementTraceOpenForItem(item);
+  if(!modalOwnsTransfer&&(!floatVisible||!varFinalPanelShouldRender(item))) return 0;
   return flyAnimEnabled
     ? flightDurationMs+MEMORY_VALUE_ROLL_FALLBACK_MS
     : MEMORY_VALUE_ROLL_FALLBACK_MS;
@@ -271,7 +273,10 @@ function varFinalPanelShouldRender(item){
 function renderVariableFinalFloat(item){
   const stale = document.querySelector('.var-final-float');
   if(stale) stale.remove();
-  if(!floatVisible || !varFinalPanelShouldRender(item)){
+  const panelVisible=floatVisible&&varFinalPanelShouldRender(item);
+  const modalOpen=typeof programStatementTraceOpenForItem==='function'
+    &&programStatementTraceOpenForItem(item);
+  if(!panelVisible&&!modalOpen){
     floatWasMounted = false; // next time it opens, it should re-enter
     return;
   }
@@ -290,7 +295,11 @@ function renderVariableFinalFloat(item){
   // the comet or (with travel disabled) immediately starts the value roll.
   const built = buildAnimatedVarFinalSection(item);
   if(!built) return;
-  mountVarFinalFloatPanel(built.section, built.flights, isAppearing);
+  if(panelVisible) mountVarFinalFloatPanel(built.section,built.flights,isAppearing);
+  else{
+    floatWasMounted=false;
+    if(built.flights.length) requestAnimationFrame(()=>runVarFinalFlights(built.flights));
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -329,10 +338,21 @@ function buildAnimatedVarFinalSection(item){
     // arrival pulse without manufacturing a same-value roll or comet.
     const staticArrival = b.trigger==='static' && live.committed && !b._flashed;
     const justCommitted = b.trigger!=='static' && live.committed && !b._flashed && !postponeTargetFlight;
+    const originStatementId=live.originStatementId||b.statementId||null;
+    const modalDestination=justCommitted&&typeof programStatementTraceOpenFor==='function'
+      &&programStatementTraceOpenFor(item,originStatementId);
+    if(modalDestination){
+      b._modalTransferPending={statementId:originStatementId,
+        hasValue:b._lastDisplayValue!==undefined,value:b._lastDisplayValue};
+    }
     if(justCommitted || staticArrival) b._flashed = true;
 
     let hasValue, displayValue, flashColor;
-    if(justCommitted || (postponeTargetFlight && live.committed)){
+    if(modalDestination){
+      // The external panel synchronizes silently. The visible value transfer
+      // belongs to the mirror card in the active statement modal.
+      hasValue=live.hasValue;displayValue=live.displayValue;flashColor=null;
+    }else if(justCommitted || (postponeTargetFlight && live.committed)){
       // Pre-commit display — mirrors resolveBindingLive's own "not yet
       // committed" branches (declared value for a variable, "—" for a
       // still-unassigned target), since the flight itself is what's
@@ -386,7 +406,7 @@ function buildAnimatedVarFinalSection(item){
           ? (item.trace.length ? item.trace[item.trace.length-1].resultNodeId : null)
           : b.unaryNodeId;
       }
-      flights.push({originId, statementId:live.originStatementId||b.statementId||null, cardEl:card,binding:b,
+      flights.push({originId,statementId:originStatementId,cardEl:card,binding:b,modalDestination,
         name:b.name, kind:b.kind==='program-constant'?'constant':'variable',
         value:live.displayValue, color:live.flashColor,
         // Compound calculation timing is deliberately fixed and independent
@@ -570,24 +590,28 @@ function runVarFinalFlights(flights){
       setTimeout(()=>runVarFinalFlights([delayed]),f.delayMs);
       return;
     }
+    const modalCard=f.modalDestination&&typeof document!=='undefined'&&document.querySelector
+      ?document.querySelector('#statementTraceModal .statement-trace-memory [data-token-id="vff-'+f.name+'"]')
+      :null;
+    const activeFlight=modalCard?Object.assign({},f,{cardEl:modalCard}):f;
     // Disabling global travel removes only the source-to-memory comet. The
     // value-only roll in the stationary destination card remains mandatory.
     if(!flyAnimEnabled){
-      settleVarFinalFlight(f, f.color);
+      settleVarFinalFlight(activeFlight,activeFlight.color);
       return;
     }
-    const destRect = f.cardEl.getBoundingClientRect();
-    const originEl = findVarFinalOriginEl(f.originId, f.statementId);
+    const destRect = activeFlight.cardEl.getBoundingClientRect();
+    const originEl = findVarFinalOriginEl(activeFlight.originId,activeFlight.statementId);
     if(!originEl){
       // No traceable origin (e.g. a static binding, which was always known
       // from the source rather than "produced" anywhere in the timeline) —
       // fall back to revealing the value in place with the same landing
       // pulse a completed flight ends with, rather than leaving the card
       // blank.
-      settleVarFinalFlight(f, null);
+      settleVarFinalFlight(activeFlight,null);
       return;
     }
-    spawnVarFinalComet(f, originEl.getBoundingClientRect(), destRect);
+    spawnVarFinalComet(activeFlight,originEl.getBoundingClientRect(),destRect);
   });
 }
 
@@ -772,7 +796,14 @@ function rollVarFinalCardValue(cardEl,value,onComplete,oldTextOverride){
 }
 
 function settleVarFinalFlight(f, color){
-  rollVarFinalCardValue(f.cardEl,f.value);
+  const finish=()=>{
+    if(f.binding){
+      f.binding._lastDisplayValue=f.value;
+      delete f.binding._modalTransferPending;
+    }
+    if(f.mergeRuntime) f.mergeRuntime.assignmentMergePending=false;
+  };
+  rollVarFinalCardValue(f.cardEl,f.value,finish);
   if(color && f.cardEl.style && typeof f.cardEl.style.setProperty==='function'){
     f.cardEl.style.setProperty('--step-color',color);
   }
@@ -780,8 +811,6 @@ function settleVarFinalFlight(f, color){
   f.cardEl.setAttribute('title',`${f.name} = ${valueText}`);
   f.cardEl.setAttribute('aria-label',`${f.kind==='constant'?'constant':'variable'} ${f.name}, value ${valueText}`);
   f.cardEl.classList.add('tok-card-flash');
-  if(f.binding) f.binding._lastDisplayValue=f.value;
-  if(f.mergeRuntime) f.mergeRuntime.assignmentMergePending=false;
 }
 
 // ----------------------------------------------------------------------------

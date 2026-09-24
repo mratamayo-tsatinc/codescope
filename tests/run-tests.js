@@ -106,6 +106,10 @@ function testScriptManifestParses(){
   assert(localScripts.indexOf('plugins/simulate-output/plugin.js')
     <localScripts.indexOf('js/state.js'));
   assert(localScripts.includes('plugins/program-output/content.js'));
+  assert(localScripts.includes('plugins/code-simulator/manifest.js'));
+  assert(localScripts.includes('plugins/code-simulator/content.js'));
+  assert(html.includes('plugins/code-simulator/styles.css'));
+  assert(!html.includes('plugins/program-selection/'));
   assert(localScripts.indexOf('js/program-item-builder.js')
     <localScripts.indexOf('plugins/program-output/content.js'));
   assert(localScripts.indexOf('plugins/program-output/content.js')
@@ -2131,7 +2135,12 @@ function testProgramOutputStatementPlugin(){
       generateDefault:()=>['generated-fallback']});
     const javaItems=poGenerateContentItems({profile:sourceProfile,language:'java',generateDefault:()=>[]});
     const javaMulti=javaItems[1].program.statements.find(statement=>statement.kind==='output');
-    const sourceFlowProfile=PROFILES.find(candidate=>candidate.id==='program-output-source-flow');
+    const sourceFlowCatalogProfile=PROFILES.find(candidate=>candidate.id==='program-output-source-flow');
+    const sourceFlowProgram=Object.assign({},sourceFlowCatalogProfile.program);
+    delete sourceFlowProgram.timelinePresentation;
+    const sourceFlowProfile=Object.assign({},sourceFlowCatalogProfile,{id:'program-output-inline-test',
+      content:Object.assign({},sourceFlowCatalogProfile.content,{provider:'program-output'}),program:sourceFlowProgram});
+    PROFILES.push(sourceFlowProfile);
     const sourceFlowItems=poGenerateContentItems({profile:sourceFlowProfile,language:'c',generateDefault:()=>[]});
     const sourceFlowItem=sourceFlowItems[0];
     const sourceFlowAlignmentItem=JSON.parse(JSON.stringify(sourceFlowItem));
@@ -2183,6 +2192,9 @@ function testProgramOutputStatementPlugin(){
       sourceProfileSelectionCount:sourceProfile.content.selection.count,
       sourceFlowItemCount:sourceFlowProfile.scoring.itemCount,
       sourceFlowSelectionCount:sourceFlowProfile.content.selection.count,
+      migratedSourceFlowProvider:sourceFlowCatalogProfile.content.provider,
+      migratedSourceFlowLibrary:sourceFlowCatalogProfile.content.sourceLibrary,
+      migratedSourceFlowTimeline:sourceFlowCatalogProfile.program.timelinePresentation,
       recoveredProgramItems,
       statementCount:kinds.length,
       kinds,
@@ -2238,6 +2250,9 @@ function testProgramOutputStatementPlugin(){
   assert.strictEqual(result.sourceProfileSelectionCount,'all');
   assert.strictEqual(result.sourceFlowItemCount,'manifest');
   assert.strictEqual(result.sourceFlowSelectionCount,'all');
+  assert.strictEqual(result.migratedSourceFlowProvider,'code-simulator');
+  assert.strictEqual(result.migratedSourceFlowLibrary,'program-output');
+  assert.strictEqual(result.migratedSourceFlowTimeline,'statement-modal');
   assert.strictEqual(result.recoveredProgramItems,2);
   assert.strictEqual(result.statementCount,8);
   assert.deepStrictEqual(result.kinds,['declaration','declaration','declaration','output','output','output','output','legacy-expression']);
@@ -2319,23 +2334,23 @@ function testProgramOutputStatementPlugin(){
   assert.strictEqual(result.javaLanguage,'java');
 }
 
-function testProgramSelectionStatementPlugin(){
+function testCodeSimulatorPlugin(){
   const ctx=context();installFakeDom(ctx);
   load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
     'program-ir.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
     'assignment-statement-plugin.js','program-return.js','activity-core.js']);
   loadRelative(ctx,['plugins/program-output/manifest.js','plugins/program-output/statement.js']);
   load(ctx,['program-item-builder.js']);
-  loadRelative(ctx,['plugins/program-output/content.js','plugins/program-selection/manifest.js',
-    'plugins/program-selection/statement.js','plugins/program-selection/content.js']);
+  loadRelative(ctx,['plugins/program-output/content.js','plugins/code-simulator/manifest.js',
+    'plugins/code-simulator/statement.js','plugins/code-simulator/content.js']);
   load(ctx,['state.js','dom-helpers.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
     'render-assignment.js','render-unary-update.js','render-session.js']);
-  loadRelative(ctx,['plugins/program-selection/renderer.js']);
-  const selectionStatementSource=fs.readFileSync(path.join(ROOT,'plugins','program-selection','statement.js'),'utf8');
-  const selectionRendererSource=fs.readFileSync(path.join(ROOT,'plugins','program-selection','renderer.js'),'utf8');
-  const selectionStyles=fs.readFileSync(path.join(ROOT,'plugins','program-selection','styles.css'),'utf8');
+  loadRelative(ctx,['plugins/program-output/renderer.js','plugins/code-simulator/renderer.js']);
+  const selectionStatementSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','statement.js'),'utf8');
+  const selectionRendererSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','renderer.js'),'utf8');
+  const selectionStyles=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','styles.css'),'utf8');
   const sharedStyles=fs.readFileSync(path.join(ROOT,'css','styles.css'),'utf8');
-  ctx.psSeedFixture=`/*
+  ctx.csSeedFixture=`/*
 @codescope
 @title Seed fixture
 @seed score min=10 max=999
@@ -2352,7 +2367,7 @@ int main() {
     }
     return 0;
 }`;
-  ctx.psLiveControlFixture=`/*
+  ctx.csLiveControlFixture=`/*
 @codescope
 @title Live control-flow fixture
 */
@@ -2369,28 +2384,70 @@ int main() {
     printf("After second decision.\\n");
     return 0;
 }`;
-  ctx.psUndeclaredSeedFixture=ctx.psSeedFixture.replace('@seed score min=10 max=999','@seed missing min=1 max=2');
-  ctx.psDerivedSeedFixture=ctx.psSeedFixture.replace('@seed score min=10 max=999','@seed bonus min=1 max=2');
+  ctx.csMixedStatementFixture=`#include <stdio.h>
+int main() {
+    int total = 2;
+    total += 3;
+    total++;
+    printf("Total: %d\\n", total);
+    return 0;
+}`;
+  ctx.csOutputOnlyFixture=`#include <stdio.h>
+int main() {
+    puts("This unsupported call remains visible.");
+    printf("Hello from Code Simulator.\\n");
+    return 0;
+}`;
+  ctx.csUnsupportedOnlyFixture=`#include <stdio.h>
+int main() {
+    mystery();
+}`;
+  ctx.csUndeclaredSeedFixture=ctx.csSeedFixture.replace('@seed score min=10 max=999','@seed missing min=1 max=2');
+  ctx.csDerivedSeedFixture=ctx.csSeedFixture.replace('@seed score min=10 max=999','@seed bonus min=1 max=2');
   ['c','java'].forEach(language=>{
-    const directory=path.join(ROOT,'plugins','program-selection','exercises',language,'selection-basics');
+    const directory=path.join(ROOT,'plugins','code-simulator','exercises',language,'selection-basics');
     const manifest=JSON.parse(fs.readFileSync(path.join(directory,'manifest.json'),'utf8'));
     const rows=manifest.exercises.map(filename=>({filename,raw:fs.readFileSync(path.join(directory,filename),'utf8')}));
-    ctx.psTestManifest=manifest;ctx.psTestRows=rows;
-    evaluate(ctx,`psInstallExerciseBank('plugins/program-selection/exercises/${language}/selection-basics/manifest.json',
-      '${language}','selection-basics',psTestManifest,psTestRows)`);
+    ctx.csTestManifest=manifest;ctx.csTestRows=rows;
+    evaluate(ctx,`csInstallExerciseBank('plugins/code-simulator/exercises/${language}/selection-basics/manifest.json',
+      '${language}','selection-basics',csTestManifest,csTestRows)`);
+  });
+  ['c','java'].forEach(language=>{
+    const directory=path.join(ROOT,'plugins','program-output','exercises',language,'formatted-output');
+    const manifest=JSON.parse(fs.readFileSync(path.join(directory,'manifest.json'),'utf8'));
+    const rows=manifest.exercises.map(filename=>({filename,raw:fs.readFileSync(path.join(directory,filename),'utf8')}));
+    ctx.csOutputManifest=manifest;ctx.csOutputRows=rows;
+    evaluate(ctx,`csInstallExerciseBank('plugins/program-output/exercises/${language}/formatted-output/manifest.json',
+      '${language}','formatted-output',csOutputManifest,csOutputRows)`);
   });
   const result=JSON.parse(evaluate(ctx,`(()=>{
     const profile=PROFILES.find(candidate=>candidate.id==='selection-statements-source');
-    initializeSeededRandom(101);const fixtureA=psParseExercise({filename:'SeedFixture.c',raw:psSeedFixture},'c','seeded');
-    initializeSeededRandom(101);const fixtureRepeat=psParseExercise({filename:'SeedFixture.c',raw:psSeedFixture},'c','seeded');
-    initializeSeededRandom(202);const fixtureB=psParseExercise({filename:'SeedFixture.c',raw:psSeedFixture},'c','seeded');
-    const fixtureAuthored=psParseExercise({filename:'SeedFixture.c',raw:psSeedFixture},'c','authored');
-    const liveControl=psParseExercise({filename:'LiveControl.c',raw:psLiveControlFixture},'c','authored');
-    let undeclaredError='',derivedError='',badRangeError='',duplicateError='';
-    try{psParseExercise({filename:'Undeclared.c',raw:psUndeclaredSeedFixture},'c','seeded');}catch(error){undeclaredError=error.message;}
-    try{psParseExercise({filename:'Derived.c',raw:psDerivedSeedFixture},'c','seeded');}catch(error){derivedError=error.message;}
-    try{psSeedDirectives('@seed x min=9 max=2','BadRange.c');}catch(error){badRangeError=error.message;}
-    try{psSeedDirectives('@seed x min=1 max=2\\n@seed x min=3 max=4','Duplicate.c');}catch(error){duplicateError=error.message;}
+    const sourceOutputProfile=PROFILES.find(candidate=>candidate.id==='program-output-source-flow');
+    initializeSeededRandom(101);const fixtureA=csParseExercise({filename:'SeedFixture.c',raw:csSeedFixture},'c','seeded');
+    initializeSeededRandom(101);const fixtureRepeat=csParseExercise({filename:'SeedFixture.c',raw:csSeedFixture},'c','seeded');
+    initializeSeededRandom(202);const fixtureB=csParseExercise({filename:'SeedFixture.c',raw:csSeedFixture},'c','seeded');
+    const fixtureAuthored=csParseExercise({filename:'SeedFixture.c',raw:csSeedFixture},'c','authored');
+    const liveControl=csParseExercise({filename:'LiveControl.c',raw:csLiveControlFixture},'c','authored');
+    const mixedStatements=csParseExercise({filename:'MixedStatements.c',raw:csMixedStatementFixture},'c','authored');
+    const outputOnly=csParseExercise({filename:'OutputOnly.c',raw:csOutputOnlyFixture},'c','authored');
+    const outputOnlyItem=csBuildItem(profile,{id:'OutputOnly',filename:'OutputOnly.c',raw:csOutputOnlyFixture},'c',99);
+    const dynamicSelectionItem=csBuildItem(profile,{id:'DynamicSelection',filename:'SeedFixture.c',raw:csSeedFixture},'c',100);
+    const dynamicSelection=dynamicSelectionItem.program.statements.find(candidate=>candidate.kind==='selection');
+    dynamicSelectionItem.program.memory.score={name:'score',initialized:true,value:10};
+    dynamicSelectionItem.program.memory.limit={name:'limit',initialized:true,value:75};
+    syncSelectionOperands(dynamicSelection,dynamicSelectionItem.program);
+    const dynamicOutputItem=csBuildItem(profile,{id:'DynamicOutput',filename:'MixedStatements.c',raw:csMixedStatementFixture},'c',101);
+    const dynamicOutput=dynamicOutputItem.program.statements.find(candidate=>candidate.kind==='output');
+    const dynamicOutputPart=programOutputDynamicParts(dynamicOutput)[0];
+    dynamicOutputItem.program.memory.total={name:'total',initialized:true,value:42};
+    statementPluginFor(dynamicOutput).applyAction({statement:dynamicOutput,program:dynamicOutputItem.program,
+      item:dynamicOutputItem,action:{type:'read-output-value',partIndex:dynamicOutputPart.index}});
+    let undeclaredError='',derivedError='',badRangeError='',duplicateError='',unsupportedOnlyError='';
+    try{csParseExercise({filename:'Undeclared.c',raw:csUndeclaredSeedFixture},'c','seeded');}catch(error){undeclaredError=error.message;}
+    try{csParseExercise({filename:'Derived.c',raw:csDerivedSeedFixture},'c','seeded');}catch(error){derivedError=error.message;}
+    try{csSeedDirectives('@seed x min=9 max=2','BadRange.c');}catch(error){badRangeError=error.message;}
+    try{csSeedDirectives('@seed x min=1 max=2\\n@seed x min=3 max=4','Duplicate.c');}catch(error){duplicateError=error.message;}
+    try{csParseExercise({filename:'UnsupportedOnly.c',raw:csUnsupportedOnlyFixture},'c','authored');}catch(error){unsupportedOnlyError=error.message;}
     initializeSeededRandom(2);state.language='c';const items=generateItemsForProfile('selection-statements-source');
     initializeSeededRandom(2);const repeatItems=generateItemsForProfile('selection-statements-source');
     initializeSeededRandom(3);const changedItems=generateItemsForProfile('selection-statements-source');
@@ -2407,7 +2464,8 @@ int main() {
     const activeSourceRows=countNodesWithClass(sourceHost,'is-active');
     const oldTimelineRows=countNodesWithClass(sourceHost,'statement-trace-source-row');
     const inlinePanels=countNodesWithClass(sourceHost,'program-expression-panel');
-    const inlineDefault=programTimelinePresentation({profileId:'program-output-source-flow'});
+    const migratedSourceOutputTimeline=programTimelinePresentation({profileId:'program-output-source-flow'});
+    const inlineDefault=programTimelinePresentation({profileId:'program-output-basics'});
     const firstStatement=first.program.statements[0],firstPlan=statementInteractionPlan(first,firstStatement);
     const selectionPlan=statementInteractionPlan(first,first.program.statements[selectionIndex]);
     const literalOutput=first.program.statements.find(candidate=>candidate.kind==='output'&&programOutputDynamicParts(candidate).length===0);
@@ -2452,12 +2510,39 @@ int main() {
     const elseIfAdvanced=elseIf.program.statements[elseIf.program.cursor].selectionKind;
     const branchUndo=undoProgramAction(elseIf,{undoExpressionAction});
     const branchUndoStatement=elseIf.program.statements[elseIf.program.cursor];
+    state.language='c';const migratedSourceOutputItems=generateItemsForProfile('program-output-source-flow');
+    const modalOutputItem=migratedSourceOutputItems[0];
+    const modalOutputStatement=modalOutputItem.program.statements.find(candidate=>candidate.kind==='output'
+      &&programOutputDynamicParts(candidate).length>0);
+    statementTraceModalState={item:modalOutputItem,statementId:modalOutputStatement.id,focus:'output-values'};
+    const modalOutputEvent={type:'OUTPUT',statementId:modalOutputStatement.id,text:'Modal output sentinel\\n'};
+    modalOutputItem.program.events.push(modalOutputEvent);
+    pendingProgramOutputAnimation={item:modalOutputItem,event:modalOutputEvent,onComplete:null};
+    globalThis.requestAnimationFrame=()=>1;
+    const mainOutputMirror=renderProgramOutputPanel(modalOutputItem,modalOutputItem.program);
+    const modalOutputMirror=renderProgramOutputPanel(modalOutputItem,modalOutputItem.program,{surface:'modal'});
+    const modalOutputSurface=programOutputAnimationSurface(modalOutputItem,pendingProgramOutputAnimation);
+    pendingProgramOutputAnimation=null;
+    const memoryBinding=ensureBindings(modalOutputItem)[0];
+    modalOutputItem.program.memory[memoryBinding.name]={name:memoryBinding.name,kind:memoryBinding.kind,
+      initialized:true,value:314159};
+    memoryBinding._modalTransferPending={statementId:modalOutputStatement.id,hasValue:false,value:undefined};
+    const pendingMemoryMirror=renderStatementTraceMemory(modalOutputItem);
+    delete memoryBinding._modalTransferPending;
+    const settledMemoryMirror=renderStatementTraceMemory(modalOutputItem);
+    statementTraceModalState=null;
+    pendingProgramOutputAnimation={item:modalOutputItem,event:modalOutputEvent,onComplete:null};
+    const directOutputSurface=programOutputAnimationSurface(modalOutputItem,pendingProgramOutputAnimation);
+    pendingProgramOutputAnimation=null;
     initializeSeededRandom(2);state.language='java';const javaItems=generateItemsForProfile('selection-statements-source');
+    const migratedJavaOutputItems=generateItemsForProfile('program-output-source-flow');
     return JSON.stringify({count:items.length,filenames:items.map(item=>item.filename),kinds,
+      profileName:profile.name,profileProvider:profile.content.provider,
       sourceValueMode:profile.content.sourceValueMode,timelinePresentation:profile.program.timelinePresentation,
       profileItemCount:profile.scoring.itemCount,profileSelectionCount:profile.content.selection.count,
-      manifestVersion:PROGRAM_SELECTION_PLUGIN_MANIFEST.version,sourcePanels,sourceRows,firstMemoryNames,
-      sourceLineCount:first.sourceDisplay.lines.length,sourceActions,directActions,modalActions,activeSourceRows,oldTimelineRows,inlinePanels,inlineDefault,
+      manifestVersion:CODE_SIMULATOR_PLUGIN_MANIFEST.version,sourcePanels,sourceRows,firstMemoryNames,
+      sourceLineCount:first.sourceDisplay.lines.length,sourceActions,directActions,modalActions,activeSourceRows,oldTimelineRows,inlinePanels,
+      inlineDefault,migratedSourceOutputTimeline,
       firstPlanMode:firstPlan.mode,firstPlanAction:firstPlan.action.type,directExecution:directExecution.applied,
       selectionPlanMode:selectionPlan.mode,selectionPlanFocus:selectionPlan.focus,
       outputPlanMode:outputPlan.mode,outputPlanAction:outputPlan.action.type,
@@ -2481,10 +2566,18 @@ int main() {
       fixtureSeedA:fixtureA.details.seedValues,fixtureSeedRepeat:fixtureRepeat.details.seedValues,
       fixtureSeedB:fixtureB.details.seedValues,
       fixtureAuthored:fixtureAuthored.declarations,fixtureSeeded:fixtureA.declarations,fixtureSource:fixtureA.details.source,
+      mixedKinds:mixedStatements.statements.map(candidate=>candidate.kind),
+      mixedFinalValue:mixedStatements.memory.total,
+      outputOnlyKinds:outputOnly.statements.map(candidate=>candidate.kind),
+      outputOnlyDeclarations:outputOnly.declarations.length,
+      outputOnlyContextMuted:outputOnly.sourceDisplay.lines.some(line=>line.text.includes('puts(')&&!line.supported),
+      outputOnlyItemStatements:outputOnlyItem.program.statements.map(candidate=>candidate.kind),
+      dynamicSelectionExpected:dynamicSelection.runtime.expectedValue,
+      dynamicOutputExpected:dynamicOutput.runtime.parts[dynamicOutputPart.index].expectedValue,
       liveKinds:liveControl.statements.map(candidate=>candidate.kind),
       liveEdges:Object.fromEntries(liveControl.statements.map(candidate=>[candidate.id,candidate.kind==='selection'
         ?candidate.branches.map(branch=>branch.nextStatementId):candidate.nextStatementId])),
-      undeclaredError,derivedError,badRangeError,duplicateError,
+      undeclaredError,derivedError,badRangeError,duplicateError,unsupportedOnlyError,
       sourceFlow:items.every(item=>item.sourceFlow),branchApplied:branch.applied,selectedLine:statement.runtime.selectedTargetLine,
       compactResults:countNodesWithClass(host,'selection-result-value'),trueBoxes:countNodesWithClass(host,'is-true'),
       compactText:host.textContent,conditionSource:statement.conditionSource,
@@ -2504,11 +2597,25 @@ int main() {
       javaCount:javaItems.length,javaLanguage:javaItems[0].language,
       javaSeeded:javaItems.every(item=>Object.keys(item.sourceSeedValues).length>0),
       javaReturnCounts:javaItems.map(item=>item.program.statements.filter(candidate=>candidate.kind==='program-return').length),
+      sourceOutputProvider:sourceOutputProfile.content.provider,sourceOutputLibrary:sourceOutputProfile.content.sourceLibrary,
+      sourceOutputValueMode:sourceOutputProfile.content.sourceValueMode,
+      modalOutputSurface,directOutputSurface,
+      mainOutputIncludesPending:mainOutputMirror.textContent.includes('Modal output sentinel'),
+      modalOutputWithholdsPending:!modalOutputMirror.textContent.includes('Modal output sentinel'),
+      pendingMemoryText:pendingMemoryMirror.textContent,settledMemoryText:settledMemoryMirror.textContent,
+      modalMemoryBindingName:memoryBinding.name,
+      migratedSourceOutputFilenames:migratedSourceOutputItems.map(item=>item.filename),
+      migratedSourceOutputKinds:migratedSourceOutputItems[0].program.statements.map(candidate=>candidate.kind),
+      migratedSourceOutputHasSynthetic:migratedSourceOutputItems.some(item=>item.program.statements.some(candidate=>candidate.kind==='legacy-expression')),
+      migratedJavaOutputFilenames:migratedJavaOutputItems.map(item=>item.filename),
+      migratedJavaReturnCounts:migratedJavaOutputItems.map(item=>item.program.statements.filter(candidate=>candidate.kind==='program-return').length),
       serializable:!!JSON.parse(JSON.stringify(items[2])).program});
   })()`));
   assert.strictEqual(result.count,4);
   assert.deepStrictEqual(result.filenames,['IfStatement.c','IfElse.c','ElseIfChain.c','SwitchCase.c']);
   assert.deepStrictEqual(result.kinds,[['if'],['if'],['if','else-if','else-if'],['switch']]);
+  assert.strictEqual(result.profileName,'Code Simulator');
+  assert.strictEqual(result.profileProvider,'code-simulator');
   assert.strictEqual(result.sourceValueMode,'seeded');
   assert.strictEqual(result.timelinePresentation,'statement-modal');
   assert.strictEqual(result.profileItemCount,'manifest');
@@ -2524,6 +2631,7 @@ int main() {
   assert.strictEqual(result.oldTimelineRows,0);
   assert.strictEqual(result.inlinePanels,0);
   assert.strictEqual(result.inlineDefault,'inline');
+  assert.strictEqual(result.migratedSourceOutputTimeline,'statement-modal');
   assert.strictEqual(result.firstPlanMode,'direct');
   assert.strictEqual(result.firstPlanAction,'commit-assignment');
   assert(result.directExecution);
@@ -2543,7 +2651,7 @@ int main() {
     &&result.sourceFlowTiming.modalCloseSettleMs>=250);
   assert(result.sourceProgramText.includes('#include <stdio.h>')&&result.sourceProgramText.includes('int main() {')
     &&result.sourceProgramText.includes('return 0;')&&result.sourceProgramText.includes('IfStatement.c'));
-  assert.strictEqual(result.manifestVersion,'1.2.0');
+  assert.strictEqual(result.manifestVersion,'2.0.0');
   assert.deepStrictEqual(result.seededSources,result.repeatSources);
   assert.notDeepStrictEqual(result.seededSources,result.changedSources);
   assert(result.metadataHidden&&result.rangesValid&&result.sourceMemoryAligned
@@ -2556,6 +2664,31 @@ int main() {
   assert.strictEqual(result.fixtureSeeded[3].value,result.fixtureSeeded[2].value+result.fixtureSeeded[1].value);
   assert(result.fixtureSource.includes(`const int adjustment = ${result.fixtureSeeded[1].value};`));
   assert(result.fixtureSource.includes(`int score = ${result.fixtureSeeded[2].value};`));
+  assert.deepStrictEqual(result.mixedKinds,['declaration','assignment','unary-update','output','program-return']);
+  assert.strictEqual(result.mixedFinalValue,6);
+  assert.deepStrictEqual(result.outputOnlyKinds,['output','program-return']);
+  assert.strictEqual(result.outputOnlyDeclarations,0);
+  assert(result.outputOnlyContextMuted);
+  assert.deepStrictEqual(result.outputOnlyItemStatements,result.outputOnlyKinds);
+  assert.strictEqual(result.dynamicSelectionExpected,false);
+  assert.strictEqual(result.dynamicOutputExpected,42);
+  assert.strictEqual(result.sourceOutputProvider,'code-simulator');
+  assert.strictEqual(result.sourceOutputLibrary,'program-output');
+  assert.strictEqual(result.sourceOutputValueMode,'authored');
+  assert.strictEqual(result.modalOutputSurface,'modal');
+  assert.strictEqual(result.directOutputSurface,'main');
+  assert(result.mainOutputIncludesPending&&result.modalOutputWithholdsPending);
+  assert(result.pendingMemoryText.includes(result.modalMemoryBindingName)&&result.pendingMemoryText.includes('—'));
+  assert(result.settledMemoryText.includes(result.modalMemoryBindingName)&&result.settledMemoryText.includes('314159'));
+  assert.deepStrictEqual(result.migratedSourceOutputFilenames,
+    ['BasicValues.c','MultipleValues.c','EmbeddedLines.c','NoTrailingNewline.c','AssignmentThenOutput.c']);
+  assert.deepStrictEqual(result.migratedSourceOutputKinds,
+    ['declaration','declaration','declaration','output','output','output','output','program-return']);
+  assert.strictEqual(result.migratedSourceOutputHasSynthetic,false);
+  assert.deepStrictEqual(result.migratedJavaOutputFilenames,
+    ['BasicValues.java','MultipleValues.java','EmbeddedLines.java','NoTrailingNewline.java','AssignmentThenOutput.java']);
+  assert(result.migratedJavaReturnCounts.every(count=>count===0));
+  assert(result.unsupportedOnlyError.includes('no supported executable statements'));
   assert.deepStrictEqual(result.liveKinds,['declaration','selection','output','output','selection','output','output','program-return']);
   assert.deepStrictEqual(result.liveEdges['selection-1'],['output-1','output-2']);
   assert.strictEqual(result.liveEdges['output-1'],'output-2');
@@ -2631,5 +2764,5 @@ int main() {
 testProfileCategoriesAndScopedScores();
 testModeScopedPersistence();
 testProgramOutputStatementPlugin();
-testProgramSelectionStatementPlugin();
+testCodeSimulatorPlugin();
 run();

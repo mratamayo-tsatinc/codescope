@@ -214,7 +214,11 @@ function buildOutputLessonStatements(item,lesson,memory){
 function applyProgramMemoryToTree(node,memory){
   if(!node) return;
   if(node.kind==='variable'||node.kind==='constant'){
-    if(Object.prototype.hasOwnProperty.call(memory,node.name)) node.declaredValue=memory[node.name];
+    if(Object.prototype.hasOwnProperty.call(memory,node.name)){
+      const stored=memory[node.name];
+      node.declaredValue=stored&&typeof stored==='object'&&Object.prototype.hasOwnProperty.call(stored,'value')
+        ?stored.value:stored;
+    }
     return;
   }
   if(node.kind==='unary') return applyProgramMemoryToTree(node.inner,memory);

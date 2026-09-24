@@ -374,6 +374,10 @@ function programStatementTraceOpenFor(item,statementId){
     &&statementTraceModalState.statementId===statementId);
 }
 
+function programStatementTraceOpenForItem(item){
+  return !!(statementTraceModalState&&statementTraceModalState.item===item);
+}
+
 function statementTraceResult(statement){
   if(!statement||statement.kind!=='selection'||statement.status!=='complete'||!statement.runtime||!statement.runtime.checked) return null;
   if(statement.selectionKind==='switch') return `${formatValue(statement.runtime.assignedValue)} · ${statement.runtime.selectedLabel}`;
@@ -416,9 +420,13 @@ function renderStatementTraceMemory(item){
   const section=h('aside',{class:'statement-trace-memory','aria-label':'Program memory'},
     h('div',{class:'statement-trace-context-title'},h('i',{class:'fa-solid fa-memory','aria-hidden':'true'}),' Program memory'));
   const list=h('div',{class:'statement-trace-memory-list'});
+  const bindings=typeof ensureBindings==='function'?ensureBindings(item):[];
   item.program.statements.filter(statement=>statement.kind==='declaration').forEach(statement=>{
     const name=statement.binding.name,memory=item.program.memory&&item.program.memory[name];
-    const card=renderValueCard({id:`vff-${name}`,name,value:memory&&memory.initialized?memory.value:'—',
+    const binding=bindings.find(candidate=>candidate.name===name);
+    const pending=binding&&binding._modalTransferPending;
+    const value=pending?(pending.hasValue?pending.value:'—'):(memory&&memory.initialized?memory.value:'—');
+    const card=renderValueCard({id:`vff-${name}`,name,value,
       kind:statement.binding.kind==='constant'?'constant':'variable',color:null,isFlash:false});
     list.appendChild(card);
   });
@@ -426,6 +434,11 @@ function renderStatementTraceMemory(item){
 }
 
 function renderStatementTraceOutput(item){
+  if(typeof renderProgramOutputPanel==='function'){
+    const panel=renderProgramOutputPanel(item,item.program,{surface:'modal'});
+    if(panel&&panel.classList) panel.classList.add('statement-trace-output');
+    return panel;
+  }
   const text=(item.program.events||[]).filter(event=>event&&event.type==='OUTPUT').map(event=>event.text).join('');
   return h('aside',{class:'program-output-screen statement-trace-output','aria-label':'Program output'},
     h('div',{class:'program-output-screen-title'},h('i',{class:'fa-solid fa-display','aria-hidden':'true'}),h('span',{},'Program Output')),

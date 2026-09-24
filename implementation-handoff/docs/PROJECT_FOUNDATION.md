@@ -51,7 +51,7 @@ snapshots are stored in the browser.
 | Activity orchestration | `js/activity-core.js` | Activity-plugin registry, profile content-provider registry, and shell lifecycle dispatch. |
 | Token Classification | `plugins/token-classification/` | Language rules, identifier generation/analysis, syntax-position classification, modal, renderer, and feedback. |
 | Falling Token Sort | `plugins/falling-token-sort/` | Configurable bucket sorting using Token Classification's public identifier capabilities. |
-| Program Selection | `plugins/program-selection/` | Source-backed `if`, `if/else`, `else if`, and `switch` condition tracing. |
+| Code Simulator | `plugins/code-simulator/` | Manifest-backed complete C/Java programs that dispatch every supported statement kind through Program Core. |
 | Persistence | `js/settings-persistence.js`, `exam-persistence.js` | Device settings and independently configurable per-student Practice/Exam snapshots. |
 | Verification | `tests/run-tests.js` | Full compatibility and extension suite. |
 
@@ -68,10 +68,12 @@ The global catalog currently contains:
   - `token-program-chain`
 - 1 Falling Token Sort profile:
   - `falling-identifier-sort`
-- 2 Program Output statement profiles:
+- 2 Program Output lesson profiles:
   - `program-output-basics`
   - `program-output-source-flow`
-- 1 Program Selection profile:
+- Code Simulator backs these 2 complete-source profiles, overlapping the
+  lesson families above:
+  - `program-output-source-flow`
   - `selection-statements-source`
 
 Do not duplicate these configurations inside plugin directories.
@@ -84,12 +86,15 @@ When adding or moving a file, preserve dependency order and add a load-order
 test. Do not introduce an ES-module or build-system migration as an incidental
 change.
 
-Program Output registers a profile content provider. In `source-files` mode it
-loads `plugins/program-output/exercises/<language>/<exerciseSet>/manifest.json`
-and parses only the listed C or Java source files into Program IR. In
-`generated` mode it delegates to the existing seeded generator. Source-backed
-items persist the resulting IR, so an active Exam restores its snapshot rather
-than rebuilding its statements from changed source files.
+Program Output registers a profile content provider for statement-oriented and
+generated lessons. Code Simulator owns complete-source parsing. The Source
+Program Output profile uses Code Simulator with `sourceLibrary:'program-output'`
+so it reads the existing
+`plugins/program-output/exercises/<language>/<exerciseSet>/manifest.json`
+bank without duplicating the authored files. Program Output still owns output
+statement behavior and rendering. Source-backed items persist the resulting
+IR, so an active Exam restores its snapshot rather than rebuilding its
+statements from changed source files.
 Profiles that consume the complete bank use `selection.count:'all'` and
 `scoring.itemCount:'manifest'`, allowing the current manifest to own both item
 membership and score totals. Providers parse current fetched source for new
