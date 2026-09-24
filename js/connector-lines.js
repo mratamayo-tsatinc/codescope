@@ -75,7 +75,8 @@ function toggleConnectors(){
 function findConnectorSourceEl(row, step){
   if(step.action==='EVALUATE'){
     if(step.outputAction){
-      return row.querySelector(`[data-token-id="${step.sourceNodeId}"]`);
+      return row.querySelector(`[data-output-combine-id="${step.resultNodeId}"]`)
+        || row.querySelector(`[data-token-id="${step.sourceNodeId}"]`);
     }
     return row.querySelector(`[data-op-left="${step.leftId}"][data-op-right="${step.rightId}"]`);
   }
@@ -107,6 +108,31 @@ function originColorForStep(steps, i){
 // short rows.
 const CONNECTOR_MAX_LEAD = DEFAULT_APP_SETTINGS.shell.connectors.maxLeadPx;
 
+function appendOutputSubstitutionConnector(paths,dots,panelRect,row,step,color,isCurrent){
+  if(step.action!=='EVALUATE'||!step.outputAction) return;
+  const source=row.querySelector(`[data-token-id="${step.sourceNodeId}"]`);
+  const destination=row.querySelector(`[data-token-id="${step.resultNodeId}"]`);
+  if(!source||!destination||source===destination) return;
+  const s=source.getBoundingClientRect(),d=destination.getBoundingClientRect();
+  const x1=s.left+s.width/2-panelRect.left,y1=s.bottom-panelRect.top;
+  const x2=d.left+d.width/2-panelRect.left,y2=d.bottom-panelRect.top;
+  const laneY=Math.max(y1,y2)+22;
+  const stateClass=isCurrent?'connector-line-current':'connector-line-past';
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d',`M ${x1} ${y1} C ${x1} ${laneY}, ${x2} ${laneY}, ${x2} ${y2}`);
+  path.setAttribute('stroke',color);
+  path.setAttribute('stroke-width',isCurrent?'1.75':'1.25');
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke-linecap','round');
+  path.setAttribute('class',`connector-line ${stateClass} connector-line-output-substitution`);
+  paths.push(path);
+  const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  dot.setAttribute('cx',String(x2));dot.setAttribute('cy',String(y2));
+  dot.setAttribute('r',isCurrent?'2.5':'2');dot.setAttribute('fill',color);
+  dot.setAttribute('class',`connector-anchor-dot ${stateClass} connector-dot-output-substitution`);
+  dots.push(dot);
+}
+
 // Shared geometry/color builder used by both timelines below. `steps` is
 // either item.trace or item.canonicalTrace.steps; `rows` is the NodeList of
 // .tl-row elements for whichever panel is being drawn; `visibleCount` is how
@@ -134,9 +160,8 @@ function buildConnectorVisuals(panelRect, rows, steps, visibleCount){
     const x1 = s.left + s.width/2 - panelRect.left, y1 = s.bottom - panelRect.top;
     const x2 = d.left + d.width/2 - panelRect.left, y2 = d.top - panelRect.top;
     const isCurrent = i===lastIndex;
-    // Resolve the semantic step color once, then apply it to both the curve
-    // and its endpoint marker.
-    const color = originColorForStep(steps, i);
+    const semanticColor = originColorForStep(steps, i);
+    const color = step.outputAction ? 'var(--op)' : semanticColor;
 
     const halfGap = (y2 - y1) / 2;
     const lead = Math.min(CONNECTOR_MAX_LEAD, halfGap>0 ? halfGap : 0);
@@ -161,6 +186,7 @@ function buildConnectorVisuals(panelRect, rows, steps, visibleCount){
     dot.setAttribute('fill', color);
     dot.setAttribute('class', 'connector-anchor-dot '+(isCurrent ? 'connector-line-current' : 'connector-line-past'));
     dots.push(dot);
+    appendOutputSubstitutionConnector(paths,dots,panelRect,destRow,step,semanticColor,isCurrent);
   }
 
   return {paths, dots};

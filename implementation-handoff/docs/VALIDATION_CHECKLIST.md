@@ -63,15 +63,98 @@ coverage, then run the full suite.
       combine control paired with each retrieved value.
 - [ ] Strict exposes unresolved identifiers, combine controls, and the output
       command; premature actions use strict invalid-execution handling.
-- [ ] After one value resolves, its source identifier remains visible and muted
-      in every succeeding timeline row.
-- [ ] The metadata-free source overview includes headers/imports, wrappers,
-      braces, returns, and unsupported statements; unsupported lines are muted
-      and read-only.
+- [ ] After one value resolves, its exposed source variable card retains both
+      its name and value in every succeeding timeline row.
+- [ ] Resolving an output placeholder connects the placeholder across rows and
+      separately connects the retained variable to the inserted value along the
+      bottom of the resulting row without crossing the transition line.
+- [ ] Source Program Output renders the complete metadata-free file inside the
+      statement flow with authored line numbers, indentation, whitespace, and
+      blank lines.
+- [ ] Headers/imports, wrappers, braces, returns, and unsupported statements
+      remain in their source positions as muted read-only lines.
+- [ ] Source Program Output adds no synthetic final assignment and finalizes
+      scoring after the last authored executable statement.
 - [ ] Generated Program Output mode still delegates to seeded profile
       generation and produces the same statement interaction contract.
 - [ ] A serialized source-backed item contains complete Program IR and restores
       without reparsing changed source into the active Exam.
+- [ ] `selection.count:'all'` with `scoring.itemCount:'manifest'` loads every
+      current manifest entry and derives the item and category score totals from
+      that manifest length.
+- [ ] Editing a listed live source file changes newly generated statements and
+      control-flow edges without a JavaScript catalog change; an unlisted file
+      remains absent.
+- [ ] Selection manifests produce four ordered C or Java source-backed items:
+      `if`, `if/else`, `if/else if`, and `switch`.
+- [ ] In seeded source mode, each `@seed` binding stays within its embedded
+      inclusive range; the same session seed reproduces the same materialized
+      source, and another seed can change it.
+- [ ] Unlisted variables and constants keep their authored values. Derived
+      initializers keep their expressions and recalculate from seeded values.
+- [ ] Authored source mode ignores random replacement while still validating
+      malformed, duplicate, unknown, and nonliteral `@seed` directives.
+- [ ] The source shown to the learner, Program IR, memory, conditions, canonical
+      results, and persisted item snapshot contain the same materialized values.
+- [ ] Relational and Boolean conditions use the shared expression timeline;
+      variable and operator connectors stay within that panel's coordinate
+      plane, and derived values match their producing operation color.
+- [ ] The final condition reduction advances automatically. The completed
+      condition expression alone receives a result-colored rounded outline;
+      source keyword, parentheses, and brace remain outside. The centered
+      result appears below as unboxed text, and multi-character operators such
+      as `>=`, `<=`, and `!=` remain literal characters. There is no separate
+      branch button.
+- [ ] No connector is drawn between the completed condition and its selected
+      executable statement. The target uses its registered renderer; untaken
+      branch lines remain visible, muted, and inert.
+- [ ] A false first condition advances to the next `else if`; a true condition
+      exits the chain. Switch selects the matching case or `default` and honors
+      explicit `break` without fall-through.
+- [ ] The selection profile renders one stable, complete source program and
+      exposes an action only on the current executable line; no expression
+      timeline is inserted into the main source flow.
+- [ ] The complete source is one bordered file panel showing the real exercise
+      filename, language, every authored line and blank line, preserved
+      indentation, syntax highlighting, and a continuous IDE-style gutter.
+- [ ] The active source row is the sole keyboard-accessible trace control and
+      uses a restrained full-row highlight. Horizontal scrolling stays inside
+      the source viewport on desktop and near 390 px width.
+- [ ] A literal declaration and literal-only output statement execute directly
+      from their active source line, advance once, and preserve their memory or
+      Program Output animation origin. They do not open the trace modal.
+- [ ] A multistep active line mounts its existing registered renderer in the
+      shared statement modal with focused memory and Program Output context.
+      Memory-to-expression transfers use the modal memory cards.
+- [ ] A selection trace renders only its condition or selector expression; the
+      modal does not duplicate the source `if`/`else if`/`switch` wrapper.
+- [ ] Completing a statement leaves the trace modal open in a read-only
+      completed state with its final derivation visible. `Continue program` is
+      disabled until evaluation and output playback finish. Dismissal starts
+      the transition to the next executable source line and leaves the source
+      structure stable.
+- [ ] The modal has labeled `Back to source` and `Continue program` actions,
+      no icon-only X, and no backdrop dismissal. Escape follows the Back
+      behavior; the modal becomes full-screen and remains usable near 390 px.
+- [ ] A direct action completes its memory or character output feedback before
+      the source highlight moves. A modal action waits for dismissal and a
+      settling pause. The completed result remains emphasized during its hold.
+      The full row highlight moves from origin to destination; no line-number
+      dot or second highlighted row appears. The destination stays neutral
+      until arrival, then becomes the only active line for a sequential step,
+      branch skip, or backward edge. Reduced motion uses a short fade.
+- [ ] A declaration or assignment comet starts at the producing statement and
+      reaches the live memory card. Source-flow rerenders do not detach that
+      card or redirect the path toward the viewport origin.
+- [ ] Source-flow memory renders every declared variable or constant exactly
+      once, adds no synthetic result binding, and preserves the identifier's
+      authored casing in the floating panel and statement trace modal.
+- [ ] In C source flow, authored `return 0;` is the final direct action. Before
+      it is clicked the program remains running; clicking it completes the item
+      and triggers the configured completion celebration. Java receives no
+      synthesized return statement.
+- [ ] A program profile without `timelinePresentation:'statement-modal'`
+      continues to render its timeline inline.
 
 ## Token Classification scenarios
 

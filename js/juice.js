@@ -151,6 +151,15 @@
     }catch(e){ return null; }
   }
 
+  function celebrateProgramCompletion(item,referenceEl){
+    try{
+      if(!item||item._programCompletionCelebrated) return;
+      item._programCompletionCelebrated=true;
+      if(item._juicePerfectPlayed||item._juiceFirstCorrectPlayed) return;
+      spawnConfetti(referenceEl||document.body,{count:celebrationSettings.perfectItemCount});
+    }catch(e){ /* purely decorative */ }
+  }
+
   // --- session-level celebration -------------------------------------------
   // Called once from render-done.js, after the summary card is appended to
   // the live DOM. referenceEl is whichever element the confetti should
@@ -169,4 +178,5 @@
 
   root.renderItemCelebration = renderItemCelebration;
   root.renderSessionCelebration = renderSessionCelebration;
+  root.celebrateProgramCompletion = celebrateProgramCompletion;
 })();

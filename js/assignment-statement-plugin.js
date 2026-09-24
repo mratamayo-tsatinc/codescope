@@ -62,6 +62,14 @@ registerStatementPlugin({
   kind:'assignment',
   scoresCommit:true,
 
+  interactionPlan(ctx){
+    const ready=assignmentDependenciesReady(ctx.statement,ctx.program)
+      &&assignmentReadyToApply(ctx.statement);
+    return ready
+      ? {mode:'direct',action:{type:'commit-assignment',statementId:ctx.statement.id},label:'Execute assignment'}
+      : {mode:'modal',focus:'expression',label:'Evaluate assignment'};
+  },
+
   classifyRejectedAction(ctx){
     if(!ctx.action||ctx.action.type!=='commit-assignment') return null;
     if(!assignmentRhsResolved(ctx.statement)) return 'assignment-value-unresolved';

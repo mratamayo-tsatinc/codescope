@@ -147,6 +147,10 @@ browser settings do not override them.
 | `outputPanel.characterAnimation` | `true` | Types each emitted output event into the screen instead of revealing it at once. Reduced-motion preference still disables the animation. |
 | `outputPanel.characterDelayMs` | `55` | Delay between visible output characters. |
 | `outputPanel.escapeDelayMs` | `320` | Total pause used to expose an escape such as `\\n` before applying its control effect. |
+| `sourceFlow.resultHoldMs` | `900` | Pause after visible statement feedback finishes so the completed line and derived result can be read before movement starts. |
+| `sourceFlow.modalCloseSettleMs` | `320` | Additional pause after a trace modal closes before the completed result hold begins. |
+| `sourceFlow.movementDurationMs` | `1100` | Duration of the source flow marker moving from the completed statement to its semantic destination. |
+| `sourceFlow.reducedMotionDurationMs` | `120` | Short transition used when the operating system requests reduced motion; the result hold remains in the sequence. |
 | `compoundAssignment.mergeDurationMs` | `2200` | Compound-assignment convergence duration. |
 | `compoundAssignment.writebackDelayMs` | `2400` | Delay before the merged result is written to memory. Keep this greater than the merge duration. |
 | `solutionPlayback.stepDurationMs` | `1000` | Correct-solution playback interval. |

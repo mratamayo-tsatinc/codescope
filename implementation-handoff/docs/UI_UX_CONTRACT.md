@@ -28,17 +28,47 @@ New activities must look like members of the existing application.
   line number, but should not overpower the active token.
 - Completed statements remain readable. Do not aggressively collapse or mute
   them as though they are void.
-- Source-backed program activities keep one immutable, metadata-free source
-  overview. Unsupported scaffolding or statements are muted but remain visible.
-  Evaluation rows may show derived values, but retain consumed source
-  identifiers so the authored command never appears to have changed.
+- Source-flow program activities render the immutable, metadata-free file in
+  `program-statement-flow`. Each row uses its authored line number and preserves
+  indentation and blank lines. Unsupported scaffolding or statements are muted
+  but remain visible. Evaluation rows may show derived values, but retain
+  consumed source identifiers so the authored command never appears to have
+  changed.
+- Resolving an output placeholder draws the timeline transition from that
+  placeholder to its replacement in the next row. The resulting row also draws
+  a binding-colored connector from the retained source variable card, including
+  its name and value, to the inserted value. It is routed below the code to keep
+  the two relationships visually separate.
 - Classified tokens retain syntax-category colors before and after Check.
 - After Check, use thin muted green or red underlines as an additional
   correctness cue. Incorrect tokens use a restrained wavy red underline.
 - Completion is communicated through line/progress state; do not show a green
   correctness check before verification.
+- Selection conditions reuse the expression timeline, value cards, step colors,
+  line numbers, and connector curves. Opening and closing condition parentheses
+  share one syntax treatment. Variable substitutions and operator reductions
+  use the condition panel's local coordinate plane, and a derived value uses the
+  same color as its producing operator and connector.
+- After the last condition reduction, only the condition expression receives a
+  color-coded rounded outline. The `if`/`else if`/`switch` keyword,
+  parentheses, and block brace remain outside it. The derived Boolean or
+  selector value appears as plain centered text below the condition, with no
+  tab outline. Disable code-font ligatures and contextual alternates in active
+  and completed conditions so `>=`, `<=`, and `!=` remain literal operators.
+  Do not draw a branch connector. The selected statement uses its registered
+  renderer; untaken branches remain readable muted source context.
 - Shared top progress dots remain present where the established activity layout
   uses them.
+- Complete-source lessons that opt into statement-modal presentation keep the
+  full source visually stable inside one IDE-like file panel. Its header shows
+  the actual exercise filename and language; a continuous gutter holds authored
+  line numbers, and blank lines, indentation, syntax colors, and horizontal
+  scrolling remain contained within the code viewport.
+- Only the current executable source row receives an orange marker, restrained
+  background, and trace action. The entire active row is one keyboard-accessible
+  control. Completed state and retained condition results may appear in a small
+  trailing status area without changing the source text or dividing the file
+  into statement cards.
 
 ## Selectable elements
 
@@ -66,6 +96,36 @@ New activities must look like members of the existing application.
   the relevant step color.
 - Assign and Read use a single enlarged destination/named card. A plain assign
   does not show an invented source or connector.
+- The active source line uses a play cue when clicking it performs one direct
+  statement action and an expand cue when clicking it opens a multistep trace.
+- A statement trace modal is a close view of one active source statement. It
+  uses the registered statement renderer, keeps the source line number and
+  statement kind in its heading, and places focused memory and output context
+  next to the trace on desktop. A selection close view renders the condition
+  expression alone; it does not repeat `if`, parentheses, or the block brace.
+- The statement trace modal is full-screen on narrow mobile viewports and has a
+  backdrop plus a two-action footer. `Back to source` dismisses the close view;
+  `Continue program` stays disabled until the statement and any output playback
+  finish. Do not use an icon-only X or backdrop click as the primary close UI.
+  Escape follows the Back behavior.
+- Completing the active statement advances the semantic program while keeping
+  the modal open as a read-only completed trace. A concise completion note asks
+  the learner to review the result. Dismissal then starts a visible source-line
+  transition and returns focus to its destination. Output playback remains
+  visible in the main Program Output panel after the modal closes.
+- Source flow never snaps directly between executable lines. A direct action
+  completes its statement-to-memory transfer and value roll, or its output
+  feedback, before any source rerender or line movement. A modal action waits for
+  dismissal and a modal-close settling pause. The completed origin and derived
+  result receive a readable hold before the full active-line highlight travels
+  between authored line positions. The destination remains visually neutral
+  until the highlight arrives, then becomes the sole active line. No separate
+  line-number marker or simultaneous destination highlight is shown. The motion
+  must represent branch skips and future backward loop edges. Reduced-motion
+  mode preserves the same ordering with a short highlight fade.
+- An active C `return 0;` source row uses the direct-action cue. Clicking it
+  intentionally finishes the program and anchors the configured completion
+  celebration at that source row.
 
 ## Drawers
 
@@ -82,6 +142,12 @@ New activities must look like members of the existing application.
 
 - Constants appear before variables; mobile supports a compact four-column
   arrangement where content permits.
+- Memory cards map one-to-one to actual program storage bindings. Source-flow
+  activities use the declarations parsed from the live exercise and do not add
+  a synthetic result card; a generated legacy-expression target appears only
+  when that statement is present and its identifier is not already declared.
+- Variable and constant labels preserve the exact source spelling and casing.
+  C and Java identifiers must never be uppercased for presentation.
 - Per-card hint text/icons stay removed; animation and consistent color carry
   the context.
 - The header animation control cycles Off → 1s → 2s → 3s → Off.

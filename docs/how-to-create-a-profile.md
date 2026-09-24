@@ -527,13 +527,13 @@ recreating JavaScript data:
   shape:{operandSources:{variable:3},operandRange:{min:2,max:12},allowNegativeOperands:false},
   operators:{allowed:OPS.ADD_SUB},
   template:'operand op operand op operand',
-  scoring:{itemCount:5,pointsPerItem:2},
+  scoring:{itemCount:'manifest',pointsPerItem:2},
   content:{
     provider:'program-output',
     mode:'source-files',
     recipe:'formatted-values',
     exerciseSet:'formatted-output',
-    selection:{count:5,shuffle:false},
+    selection:{count:'all',shuffle:false},
   },
   program:{
     declarations:'interactive',
@@ -560,6 +560,63 @@ manifest, metadata, supported syntax, selection, and language rules.
 `scoreAssignments: true` includes declaration/assignment commit checks in the
 item's existing point budget. Setting it to `false` leaves those writes
 instructional but does not award assignment-check credit.
+
+### Source-backed selection values
+
+A Program Selection profile chooses whether embedded declaration ranges are
+applied:
+
+```js
+content:{
+  provider:'program-selection',
+  mode:'source-files',
+  exerciseSet:'selection-basics',
+  sourceValueMode:'seeded', // or 'authored'
+  presentation:'source-flow',
+  selection:{count:'all',shuffle:false},
+}
+```
+
+For a source-backed profile whose entire manifest is the activity, use
+`selection.count:'all'` with `scoring.itemCount:'manifest'`. The manifest then
+owns both membership and the score maximum; adding or removing a manifest entry
+does not require a matching profile edit. Use numeric values only when the
+profile intentionally selects a fixed subset.
+
+For a complete source program, keep the source rows stable and open the active
+statement's evaluation in the shared trace modal:
+
+```js
+program:{
+  declarations:'interactive',
+  scoreAssignments:true,
+  timelinePresentation:'statement-modal',
+}
+```
+
+Omit `timelinePresentation`, or set it to `'inline'`, to retain the established
+inline timeline used by other profiles. This option changes presentation only;
+the same statement renderer, actions, scoring, Undo, persistence, memory, and
+Program Output behavior are reused.
+
+In the source panel, the active statement plugin determines the click behavior.
+A play icon marks a statement with one immediately available action, such as a
+literal declaration or literal-only output command; clicking the line executes
+it without opening a modal. An expand icon marks a multistep statement. Its
+registered renderer opens in the trace modal. Selection modals show the
+condition expression alone while the complete control statement remains visible
+in the source file.
+
+The source file, rather than the profile, owns each allowed range:
+
+```text
+@seed score min=60 max=100
+@seed absences min=0 max=10
+```
+
+Only listed literal integer declarations are randomized. Variables and
+constants absent from `@seed` keep their authored values. Derived initializers
+keep their expressions and recalculate from any seeded dependencies.
 
 ---
 

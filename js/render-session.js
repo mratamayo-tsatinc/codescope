@@ -170,6 +170,7 @@ function renderExpressionSourcePanel(title, lines, panelClass){
 }
 
 function programStatementSource(statement,item){
+  if(statement&&typeof statement.sourceText==='string') return statement.sourceText;
   if(statement.kind==='declaration'){
     return `${declarationKeyword(statement)} ${statement.binding.name} = ${renderString(statement.runtime.originalTree)};`;
   }
@@ -186,24 +187,333 @@ function programStatementSource(statement,item){
     : `int ${item.resultName||'result'} = ${expression};`;
 }
 
-function renderProgramSourceOverview(item){
-  const fallback=item&&typeof item.source==='string'?{
-    filename:item.filename||'Source program',
-    lines:item.source.split(/\r?\n/).map((text,index)=>({number:index+1,text,supported:false}))
-  }:null;
-  const source=item&&(item.sourceDisplay||fallback);
-  if(!source||!Array.isArray(source.lines)||!source.lines.length) return null;
-  const code=h('code',{class:'program-source-overview-code'});
-  source.lines.forEach(line=>code.appendChild(h('span',{
-    class:`program-source-overview-line ${line.supported?'supported':'unsupported'}`
-  },h('span',{class:'program-source-overview-number','aria-hidden':'true'},String(line.number)),
-  h('span',{class:'program-source-overview-text'},line.text||' '))));
-  return h('section',{class:'program-source-overview','aria-label':`Source program ${source.filename||''}`},
-    h('div',{class:'program-source-overview-title'},
-      h('i',{class:'fa-solid fa-file-code','aria-hidden':'true'}),
-      h('span',{},source.filename||'Source program'),
-      h('span',{class:'program-source-overview-note'},'Unsupported structure remains read-only')),
-    h('pre',{class:'program-source-overview-scroll'},code));
+function programStatementDisplayNumber(statement,statementIndex){
+  return statement&&Number.isInteger(statement.sourceLine)?statement.sourceLine:statementIndex+1;
+}
+
+function programSourceLanguageLabel(language){
+  if(language==='c') return 'C';
+  if(language==='java') return 'Java';
+  return String(language||'Source').replace(/(^|-)([a-z])/g,(_,separator,letter)=>`${separator}${letter.toUpperCase()}`);
+}
+
+function programSourceFragments(line,language){
+  if(language==='c'&&/^\s*#/.test(line)) return [h('span',{class:'program-source-syntax-prep'},line)];
+  const fragments=[];
+  const pattern=/\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:int|char|float|double|void|long|short|const|unsigned|signed|static|boolean|String|public|private|protected|class|final|new|return|if|else|for|while|do|break|continue|switch|case|default|package|import|throws|try|catch|finally)\b|\b\d+(?:\.\d+)?\b|\b[A-Za-z_]\w*(?=\s*\()/g;
+  let cursor=0,match;
+  while((match=pattern.exec(line))){
+    if(match.index>cursor) fragments.push(line.slice(cursor,match.index));
+    const token=match[0];
+    const kind=token.startsWith('//')?'comment':/^[\'"]/.test(token)?'string':/^\d/.test(token)?'number'
+      :/^(int|char|float|double|void|long|short|const|unsigned|signed|boolean|String)$/.test(token)?'type'
+      :/^(static|public|private|protected|class|final|new|return|if|else|for|while|do|break|continue|switch|case|default|package|import|throws|try|catch|finally)$/.test(token)?'keyword':'function';
+    fragments.push(h('span',{class:`program-source-syntax-${kind}`},token));
+    cursor=match.index+token.length;
+  }
+  if(cursor<line.length) fragments.push(line.slice(cursor));
+  return fragments.length?fragments:['\u00a0'];
+}
+
+function renderProgramSourceFilePanel(item,program){
+  const display=item.sourceDisplay,statements=new Map(program.statements.map((statement,index)=>[statement.id,{statement,index}]));
+  const active=program.statements[program.cursor],transition=item._sourceFlowTransition||null;
+  const flowTiming=sourceFlowTimings();
+  const panel=h('section',{class:'program-source-file-panel',
+    'aria-label':`${programSourceLanguageLabel(item.language)} source file ${display.filename||item.filename||''}`});
+  panel.appendChild(h('header',{class:'program-source-file-heading'},
+    h('i',{class:'fa-solid fa-code','aria-hidden':'true'}),
+    h('span',{class:'program-source-file-name'},display.filename||item.filename||'Source'),
+    h('span',{class:'program-source-file-language'},programSourceLanguageLabel(item.language))));
+  const source=h('div',{class:'program-source-file-code',
+    style:`--program-flow-duration:${flowTiming.movementDurationMs}ms;`});
+  display.lines.forEach(line=>{
+    const entry=line.primary&&line.statementId?statements.get(line.statementId):null;
+    const statement=entry&&entry.statement;
+    const isOrigin=!!(statement&&transition&&statement.id===transition.originId);
+    const isDestination=!!(statement&&transition&&statement.id===transition.destinationId);
+    const isActive=!!(statement&&active&&statement.id===active.id&&program.status!=='complete'&&!transition);
+    const interactive=isActive&&!item.checked,plan=interactive?statementInteractionPlan(item,statement):null;
+    const interactionClass=plan?` interaction-${plan.mode}`:'',result=statementTraceResult(statement);
+    const stateClass=statement
+      ?(statement.status==='active'&&transition?'is-pending':`is-${statement.status}`)
+      :'is-context';
+    const transitionClass=isOrigin?` is-flow-origin is-${transition.phase}`:(isDestination?' is-flow-destination':'');
+    const row=h(interactive?'button':'div',{class:`program-source-file-line ${stateClass}${interactive?' is-active':''}${interactionClass}${transitionClass}`,
+      type:interactive?'button':null,'data-source-line':String(line.number),
+      'data-statement-id':statement&&statement.id||null,
+      'aria-label':interactive?`${plan.label}, line ${line.number}`:null,
+      title:interactive?plan.label:null,
+      onclick:interactive?(plan.mode==='direct'
+        ?()=>handleTokenClick(plan.action)
+        :event=>openProgramStatementTrace(item,statement.id,event.currentTarget)):null});
+    row.appendChild(h('span',{class:'program-source-file-number','aria-hidden':'true'},String(line.number)));
+    row.appendChild(h('code',{class:'program-source-file-text'},...programSourceFragments(line.text,item.language)));
+    const state=h('span',{class:'program-source-file-state'});
+    if(result!==null){
+      const resultClass=statement.selectionKind==='switch'?'is-switch':(Boolean(statement.runtime.assignedValue)?'is-true':'is-false');
+      state.appendChild(h('span',{class:`program-source-file-result ${resultClass}`},result));
+    }else if(statement&&statement.status==='complete'){
+      state.appendChild(h('i',{class:'fa-solid fa-check program-source-file-complete',title:'Completed','aria-label':'Completed statement'}));
+    }
+    if(plan){
+      const icon=plan.mode==='direct'?'fa-play':'fa-up-right-and-down-left-from-center';
+      state.appendChild(h('i',{class:`fa-solid ${icon} program-source-file-action ${plan.mode}-action`,'aria-hidden':'true'}));
+    }
+    row.appendChild(state);source.appendChild(row);
+  });
+  if(transition&&transition.phase==='moving'&&transition.destinationId){
+    source.appendChild(h('span',{class:'program-source-flow-highlight','aria-hidden':'true'}));
+  }
+  panel.appendChild(source);
+  if(typeof requestAnimationFrame==='function') requestAnimationFrame(()=>{
+    const highlight=panel.querySelector&&panel.querySelector('.program-source-flow-highlight');
+    const origin=panel.querySelector&&panel.querySelector('.program-source-file-line.is-flow-origin');
+    const destination=panel.querySelector&&panel.querySelector('.program-source-file-line.is-flow-destination');
+    if(highlight&&origin&&destination){
+      highlight.style.top=`${origin.offsetTop}px`;
+      highlight.style.height=`${origin.offsetHeight}px`;
+      highlight.style.width=`${Math.max(source.scrollWidth,origin.offsetWidth,destination.offsetWidth)}px`;
+      highlight.style.setProperty('--program-flow-distance',`${destination.offsetTop-origin.offsetTop}px`);
+      highlight.style.setProperty('--program-flow-target-height',`${destination.offsetHeight}px`);
+      requestAnimationFrame(()=>highlight.classList.add('is-moving'));
+      destination.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});
+    }
+    const current=panel.querySelector&&panel.querySelector('.program-source-file-line.is-active');
+    if(current&&typeof current.scrollIntoView==='function') current.scrollIntoView({block:'nearest',inline:'nearest'});
+  });
+  return panel;
+}
+
+function renderProgramSourceContextLine(line){
+  const blank=!line.text;
+  const card=h('section',{class:`program-statement program-source-context${blank?' blank':''}`,
+    'data-source-line':String(line.number)});
+  const timeline=h('div',{class:'timeline program-source-context-timeline'});
+  const row=h('div',{class:'tl-row program-source-context-row'});
+  row.appendChild(h('div',{class:'tl-dot statement-source-dot source-context-number',
+    title:`Source line ${line.number}`},String(line.number)));
+  row.appendChild(h('div',{class:'code-out program-source-context-code'},
+    h('code',{},line.text||' ')));
+  timeline.appendChild(row);card.appendChild(timeline);
+  return card;
+}
+
+function renderProgramSourceFlow(container,item,program,services,renderStatement){
+  if(!item||!item.sourceFlow||!item.sourceDisplay||!Array.isArray(item.sourceDisplay.lines)) return false;
+  if(programUsesStatementTraceModal(item)){
+    container.appendChild(renderProgramSourceFilePanel(item,program));
+    return true;
+  }
+  const statements=new Map(program.statements.map((statement,index)=>[statement.id,{statement,index}]));
+  const rendered=new Set();
+  item.sourceDisplay.lines.forEach(line=>{
+    const entry=line.primary&&line.statementId?statements.get(line.statementId):null;
+    if(entry){
+      renderStatement(entry.statement,entry.index);
+      rendered.add(entry.statement.id);
+    }else container.appendChild(renderProgramSourceContextLine(line));
+  });
+  program.statements.forEach((statement,index)=>{
+    if(!rendered.has(statement.id)) renderStatement(statement,index);
+  });
+  return true;
+}
+
+let statementTraceModalState=null;
+let statementTraceReturnFocus=null;
+let sourceFlowTransitionTimer=null;
+
+function stageSourceFlowTransition(item,originStatement,phase='waiting'){
+  if(!item||!item.sourceFlow||!item.program||!originStatement||originStatement.status!=='complete') return null;
+  const destination=item.program.status==='running'?item.program.statements[item.program.cursor]:null;
+  if(!destination||destination.id===originStatement.id) return null;
+  const transition={originId:originStatement.id,destinationId:destination.id,phase};
+  item._sourceFlowTransition=transition;return transition;
+}
+
+function sourceFlowTimings(){
+  const configured=DEFAULT_APP_SETTINGS&&DEFAULT_APP_SETTINGS.shell&&DEFAULT_APP_SETTINGS.shell.sourceFlow;
+  return configured||{resultHoldMs:900,modalCloseSettleMs:320,movementDurationMs:1100,reducedMotionDurationMs:120};
+}
+
+function beginSourceFlowTransition(item,settleMs=0){
+  const transition=item&&item._sourceFlowTransition;if(!transition)return false;
+  if(sourceFlowTransitionTimer){clearTimeout(sourceFlowTransitionTimer);sourceFlowTransitionTimer=null;}
+  const timing=sourceFlowTimings();
+  const reduced=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const holdMs=Math.max(0,Number(settleMs)||0)+(reduced?Math.min(timing.resultHoldMs,450):timing.resultHoldMs);
+  const movementMs=reduced?timing.reducedMotionDurationMs:timing.movementDurationMs;
+  transition.phase='holding';render();
+  sourceFlowTransitionTimer=setTimeout(()=>{
+    if(item._sourceFlowTransition!==transition){sourceFlowTransitionTimer=null;return;}
+    transition.phase='moving';render();
+    sourceFlowTransitionTimer=setTimeout(()=>{
+      if(item._sourceFlowTransition===transition)delete item._sourceFlowTransition;
+      sourceFlowTransitionTimer=null;render();
+      if(typeof document!=='undefined'&&document.querySelector){
+        const next=document.querySelector('.program-source-file-line.is-active');
+        if(next&&typeof next.focus==='function')next.focus();
+      }
+    },movementMs);
+  },holdMs);
+  return true;
+}
+
+function programTimelinePresentation(item){
+  const profile=item&&PROFILES.find(candidate=>candidate.id===item.profileId);
+  return profile&&profile.program&&profile.program.timelinePresentation||'inline';
+}
+
+function programUsesStatementTraceModal(item){
+  return programTimelinePresentation(item)==='statement-modal';
+}
+
+function programStatementTraceOpenFor(item,statementId){
+  return !!(statementTraceModalState&&statementTraceModalState.item===item
+    &&statementTraceModalState.statementId===statementId);
+}
+
+function statementTraceResult(statement){
+  if(!statement||statement.kind!=='selection'||statement.status!=='complete'||!statement.runtime||!statement.runtime.checked) return null;
+  if(statement.selectionKind==='switch') return `${formatValue(statement.runtime.assignedValue)} · ${statement.runtime.selectedLabel}`;
+  return formatValue(Boolean(statement.runtime.assignedValue));
+}
+
+function openProgramStatementTrace(item,statementId,trigger){
+  if(!item||!item.program||!programUsesStatementTraceModal(item)) return;
+  const statement=item.program.statements.find(candidate=>candidate.id===statementId);
+  if(!statement||statement.status==='locked'||statement.status==='blocked') return;
+  const plan=statementInteractionPlan(item,statement);
+  if(plan.mode!=='modal') return;
+  statementTraceModalState={item,statementId,focus:plan.focus};
+  statementTraceReturnFocus=trigger&&typeof trigger.focus==='function'?trigger:null;
+  syncStatementTraceModal(item,true);
+}
+
+function closeProgramStatementTrace(restoreFocus=true){
+  const request=statementTraceModalState,transitionItem=request&&request.item;
+  const shouldAdvance=!!(transitionItem&&transitionItem._sourceFlowTransition
+    &&transitionItem._sourceFlowTransition.phase!=='waiting-output');
+  const fallbackFocus=typeof document!=='undefined'&&document.querySelector
+    ? document.querySelector('.program-source-file-line.is-active, .statement-trace-source-row.current') : null;
+  statementTraceModalState=null;
+  const modal=document.getElementById('statementTraceModal');
+  const overlay=document.getElementById('statementTraceOverlay');
+  if(modal) modal.style.display='none';
+  if(overlay) overlay.style.display='none';
+  if(document.body&&document.body.classList) document.body.classList.remove('statement-trace-open');
+  const focusTarget=statementTraceReturnFocus&&statementTraceReturnFocus.isConnected!==false
+    ? statementTraceReturnFocus:fallbackFocus;
+  if(shouldAdvance) beginSourceFlowTransition(transitionItem,sourceFlowTimings().modalCloseSettleMs);
+  else if(restoreFocus&&focusTarget&&typeof focusTarget.focus==='function') focusTarget.focus();
+  statementTraceReturnFocus=null;
+}
+
+function continueProgramStatementTrace(){closeProgramStatementTrace(true);}
+
+function renderStatementTraceMemory(item){
+  const section=h('aside',{class:'statement-trace-memory','aria-label':'Program memory'},
+    h('div',{class:'statement-trace-context-title'},h('i',{class:'fa-solid fa-memory','aria-hidden':'true'}),' Program memory'));
+  const list=h('div',{class:'statement-trace-memory-list'});
+  item.program.statements.filter(statement=>statement.kind==='declaration').forEach(statement=>{
+    const name=statement.binding.name,memory=item.program.memory&&item.program.memory[name];
+    const card=renderValueCard({id:`vff-${name}`,name,value:memory&&memory.initialized?memory.value:'—',
+      kind:statement.binding.kind==='constant'?'constant':'variable',color:null,isFlash:false});
+    list.appendChild(card);
+  });
+  section.appendChild(list);return section;
+}
+
+function renderStatementTraceOutput(item){
+  const text=(item.program.events||[]).filter(event=>event&&event.type==='OUTPUT').map(event=>event.text).join('');
+  return h('aside',{class:'program-output-screen statement-trace-output','aria-label':'Program output'},
+    h('div',{class:'program-output-screen-title'},h('i',{class:'fa-solid fa-display','aria-hidden':'true'}),h('span',{},'Program Output')),
+    h('div',{class:'program-output-screen-body'},h('pre',{class:'program-output-screen-text'},text),
+      h('span',{class:'program-output-cursor','aria-hidden':'true'},'▌')));
+}
+
+function syncStatementTraceModal(item,moveFocus=false){
+  const modal=document.getElementById('statementTraceModal');
+  const overlay=document.getElementById('statementTraceOverlay');
+  const body=document.getElementById('statementTraceBody');
+  const title=document.getElementById('statementTraceTitle');
+  const back=document.getElementById('statementTraceBack');
+  const continueButton=document.getElementById('statementTraceContinue');
+  if(!modal||!overlay||!body||!title) return;
+  const request=statementTraceModalState;
+  if(!request||request.item!==item||!item||!item.program||!programUsesStatementTraceModal(item)){
+    closeProgramStatementTrace(false);return;
+  }
+  const statementIndex=item.program.statements.findIndex(candidate=>candidate.id===request.statementId);
+  const statement=item.program.statements[statementIndex];
+  const isActive=statementIndex===item.program.cursor&&item.program.status!=='complete';
+  const completed=!!(statement&&statement.status==='complete');
+  const waitingForOutput=!!(completed&&item._sourceFlowTransition&&item._sourceFlowTransition.phase==='waiting-output');
+  if(!statement||(!isActive&&!completed)||statement.status==='invalid'){
+    closeProgramStatementTrace(false);return;
+  }
+  body.innerHTML='';
+  const trace=h('div',{class:'statement-trace-detail'});
+  const renderer=statementRendererRegistry.get(statement.kind);
+  if(typeof renderer!=='function') throw new Error(`No renderer registered for statement kind '${statement.kind}'`);
+  renderer({container:trace,item,program:item.program,statement,statementIndex,isActive:!completed,
+    services:{statementTraceModal:true,expressionOnly:request.focus==='condition-expression',
+      preserveCompletedTimeline:completed}});
+  if(completed) trace.appendChild(h('div',{class:'statement-trace-complete-note',role:'status'},
+    h('i',{class:'fa-solid fa-circle-check','aria-hidden':'true'}),
+    h('span',{},'Evaluation complete. Review the result, then continue to the next statement.')));
+  const context=h('div',{class:'statement-trace-context'},renderStatementTraceMemory(item));
+  if(item.program.statements.some(candidate=>candidate.kind==='output')) context.appendChild(renderStatementTraceOutput(item));
+  body.appendChild(h('div',{class:'statement-trace-layout'},trace,context));
+  const line=programStatementDisplayNumber(statement,statementIndex);
+  const kindLabel={declaration:'Declaration',assignment:'Assignment','unary-update':'Update',output:'Output',selection:'Condition'}[statement.kind]||'Statement';
+  title.textContent=`${kindLabel} trace · Line ${line}${completed?' · Complete':''}`;
+  modal.classList.toggle('is-complete',completed);
+  if(back){back.disabled=false;back.querySelector('span').textContent=completed?'Back to source':'Close evaluation';}
+  if(continueButton){continueButton.disabled=!completed||waitingForOutput;
+    continueButton.setAttribute('aria-disabled',completed&&!waitingForOutput?'false':'true');
+    const label=continueButton.querySelector('span');if(label)label.textContent=waitingForOutput?'Finishing output…':'Continue program';}
+  modal.style.display='flex';overlay.style.display='block';
+  if(document.body&&document.body.classList) document.body.classList.add('statement-trace-open');
+  if(moveFocus&&back&&typeof back.focus==='function') back.focus();
+  else if(completed&&continueButton&&typeof continueButton.focus==='function') continueButton.focus();
+  if(typeof requestAnimationFrame==='function') requestAnimationFrame(()=>{
+    if(typeof drawConnectorLines==='function') drawConnectorLines(item);
+    if(typeof drawDeclarationConnectorLines==='function') drawDeclarationConnectorLines(item);
+  });
+}
+
+function renderProgramStatementTraceSource(statement,statementIndex,item,isActive){
+  const number=programStatementDisplayNumber(statement,statementIndex),complete=statement.status==='complete';
+  const result=statementTraceResult(statement),canOpen=isActive&&!item.checked;
+  const card=h('section',{class:`program-statement statement-trace-source-line ${statement.status}${canOpen?' trace-ready':''}`,
+    'data-statement-id':statement.id,'data-source-line':String(number)});
+  const timeline=h('div',{class:'timeline program-summary-timeline'});
+  const row=h('div',{class:`tl-row program-summary-row statement-trace-source-row ${complete?'done':(canOpen?'current':'waiting')}`});
+  row.appendChild(h('div',{class:'tl-dot statement-source-dot',title:`Source line ${number}`},String(number)));
+  const code=h('div',{class:'code-out program-summary-code statement-trace-source-code'},
+    h('code',{},statement.sourceText||programStatementSource(statement,item)));
+  if(result!==null){
+    const resultClass=statement.selectionKind==='switch'?'is-switch':(Boolean(statement.runtime.assignedValue)?'is-true':'is-false');
+    code.appendChild(h('span',{class:`statement-trace-inline-result ${resultClass}`},result));
+  }
+  if(complete) code.appendChild(h('i',{class:'fa-solid fa-circle-check program-summary-status',title:'Completed','aria-label':'Completed statement'}));
+  if(canOpen){
+    const open=h('button',{class:'statement-trace-launch',type:'button',title:`Trace line ${number}`,
+      'aria-label':`Open statement trace for line ${number}`,
+      onclick:event=>{if(event&&event.stopPropagation)event.stopPropagation();openProgramStatementTrace(item,statement.id,event&&event.currentTarget);}},
+      h('i',{class:'fa-solid fa-up-right-and-down-left-from-center','aria-hidden':'true'}));
+    code.appendChild(open);row.setAttribute('role','button');row.setAttribute('tabindex','0');
+    row.setAttribute('aria-label',`Open statement trace for line ${number}`);
+    row.onclick=()=>openProgramStatementTrace(item,statement.id,row);
+    row.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openProgramStatementTrace(item,statement.id,row);}};
+  }
+  row.appendChild(code);timeline.appendChild(row);card.appendChild(timeline);return card;
+}
+
+if(typeof document!=='undefined'&&document.addEventListener){
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&statementTraceModalState)closeProgramStatementTrace();});
 }
 
 function renderProgramWorkspaceShell(container,item,program){
@@ -211,9 +521,8 @@ function renderProgramWorkspaceShell(container,item,program){
     h('div',{class:'session-meta'},h('b',{},`Item ${state.itemIndex+1}`),` / ${state.items.length}  ·  ${currentProfile().name}`)));
   const examBar=renderExamItemBar(item);
   if(examBar) container.appendChild(examBar);
-  const workspace=h('section',{class:'program-workspace','aria-label':'Program execution'});
-  const sourceOverview=renderProgramSourceOverview(item);
-  if(sourceOverview) workspace.appendChild(sourceOverview);
+  const workspace=h('section',{class:'program-workspace'+(item.sourceFlow?' source-program-workspace':''),
+    'aria-label':'Program execution'});
   const completionMode=program.progressMode==='completion';
   const completedStatements=program.statements.filter(statement=>statement.status==='complete'||statement.status==='invalid').length;
   const progress=h('div',{class:'program-progress-visual',role:'progressbar',
@@ -225,7 +534,7 @@ function renderProgramWorkspaceShell(container,item,program){
       :(statement.status==='invalid'?'invalid':(statement.status==='blocked'?'blocked'
         :(statement.status==='partial'?'partial':(index===program.cursor?'current':'waiting'))));
     progress.appendChild(h('span',{class:`program-progress-dot ${status}`,
-      title:`Statement ${index+1}: ${status}`,'aria-hidden':'true'}));
+      title:`Line ${programStatementDisplayNumber(statement,index)}: ${status}`,'aria-hidden':'true'}));
   });
   workspace.appendChild(progress);
   const flow=h('div',{class:'program-statement-flow'});
@@ -268,28 +577,30 @@ function toggleProgramStatementDetails(statement){
 }
 
 function renderProgramStatementSummary(statement,statementIndex,source){
+  const displayNumber=programStatementDisplayNumber(statement,statementIndex);
   const complete=statement.status==='complete';
   const blocked=statement.status==='blocked';
   const timeline=h('div',{class:'timeline program-summary-timeline'});
   const row=h('div',{class:`tl-row program-summary-row ${complete?'done':(blocked?'blocked':'waiting')}`});
   row.appendChild(h('div',{class:'tl-dot statement-source-dot',
-    title:complete?'Completed statement':(blocked?'Not executed':'Waiting statement')},String(statementIndex+1)));
+    title:complete?'Completed statement':(blocked?'Not executed':'Waiting statement')},String(displayNumber)));
   const statusIcon=h('i',{class:`fa-solid ${complete?'fa-circle-check':(blocked?'fa-ban':'fa-lock')} program-summary-status`,
     title:complete?'Completed':(blocked?'Not executed after invalid action':'Waiting'),
     'aria-label':complete?'Completed statement':(blocked?'Statement not executed':'Waiting statement')});
   const action=complete?h('button',{class:'program-summary-toggle',type:'button',
-    title:'Show evaluation steps','aria-label':`Show evaluation steps for statement ${statementIndex+1}`,
+    title:'Show evaluation steps','aria-label':`Show evaluation steps for line ${displayNumber}`,
     onclick:()=>toggleProgramStatementDetails(statement)},
     h('i',{class:'fa-solid fa-chevron-down','aria-hidden':'true'})):null;
   row.appendChild(h('div',{class:'code-out program-summary-code'},statusIcon,
-    h('code',{},source),action));
+    h('code',{},statement&&typeof statement.sourceText==='string'?statement.sourceText:source),action));
   timeline.appendChild(row);
   return timeline;
 }
 
 function renderCollapseStatementAction(statement,statementIndex){
+  const displayNumber=programStatementDisplayNumber(statement,statementIndex);
   return h('button',{class:'inline-eval-action program-collapse-action',type:'button',
-    title:'Collapse evaluation steps','aria-label':`Collapse statement ${statementIndex+1}`,
+    title:'Collapse evaluation steps','aria-label':`Collapse line ${displayNumber}`,
     onclick:()=>toggleProgramStatementDetails(statement)},
     h('i',{class:'fa-solid fa-chevron-up','aria-hidden':'true'}));
 }
@@ -641,8 +952,9 @@ function renderExpressionEvaluationPanel(options){
     : [renderAssignLabel(context.showLabel,labelText,labelCh),
       h('span',{class:context.isSource?'source-assignment-equals':'continuation-equals',
         title:context.isSource?'Assignment operator':'Equivalent evaluation step'},equalsNode(context.ready,context)),' '];
-  const terminator = context=>options.continuationStyle
-    ? (context.isSource?';':'') : ';';
+  const terminator = context=>typeof options.renderTerminator==='function'
+    ? options.renderTerminator(context)
+    : (options.continuationStyle?(context.isSource?';':''):';');
   const trailingActions = context=>typeof options.renderTrailingActions==='function'
     ? options.renderTrailingActions(context) : null;
   // Statement adapters may replace only the fully-resolved final value while
@@ -665,7 +977,7 @@ function renderExpressionEvaluationPanel(options){
   if(runtime.trace.length===0){
     const unresolved = collectUnresolvedFlat(runtime.workingFlat,[]).length>0;
     const ready = canInteract && resolved();
-    initRow.appendChild(h('div',{class:'code-out'},renderBadgeSlot(null),
+    initRow.appendChild(h('div',{class:'code-out'},renderBadgeSlot(null),options.sourceIndent||'',
       prefixNodes({showLabel:true,isSource:true,ready,isCurrent:true,isFinalRow:resolved(),activeColor:stepColor(0),
         stepCount:0,pendingStep:null,currentStep:null,flashId:null}),
       canInteract
@@ -675,7 +987,7 @@ function renderExpressionEvaluationPanel(options){
   } else {
     const firstColor = stepVisualColor(runtime.trace[0],0);
     const pending = pendingFlatWithColor(runtime.trace[0],firstColor);
-    initRow.appendChild(h('div',{class:'code-out'},renderBadgeSlot(null),
+    initRow.appendChild(h('div',{class:'code-out'},renderBadgeSlot(null),options.sourceIndent||'',
       prefixNodes({showLabel:true,isSource:true,ready:false,isCurrent:false,isFinalRow:false,activeColor:firstColor,
         stepCount:0,pendingStep:runtime.trace[0],currentStep:null,flashId:null}),
       renderStaticFlatExpr(runtime.originalFlat,new Map(),null,pending),terminator({isSource:true})));
@@ -703,7 +1015,7 @@ function renderExpressionEvaluationPanel(options){
       const customFinalValue=isFinalRow ? finalValueNode({
         runtime,step,index,flashId,color,isCurrent,isFinalRow
       }) : null;
-      row.appendChild(h('div',{class:'code-out'+enterClass},renderBadgeSlot(badge),
+      row.appendChild(h('div',{class:'code-out'+enterClass},renderBadgeSlot(badge),options.sourceIndent||'',
         prefixNodes({showLabel:false,isSource:false,ready:canInteract&&isFinalRow,isCurrent:true,isFinalRow,
           activeColor:stepColor(runtime.trace.length),stepCount:index+1,pendingStep:null,
           currentStep:step,flashId}),
@@ -715,7 +1027,7 @@ function renderExpressionEvaluationPanel(options){
       const nextStep = runtime.trace[index+1];
       const nextColor = stepVisualColor(nextStep,index+1);
       const pending = pendingFlatWithColor(nextStep,nextColor);
-      row.appendChild(h('div',{class:'code-out'},renderBadgeSlot(badge),
+      row.appendChild(h('div',{class:'code-out'},renderBadgeSlot(badge),options.sourceIndent||'',
         prefixNodes({showLabel:false,isSource:false,ready:false,isCurrent:false,isFinalRow:false,activeColor:nextColor,
           stepCount:index+1,pendingStep:nextStep,currentStep:step,flashId}),
         renderStaticFlatExpr(runtime.history[index+1],colors,flashId,pending),terminator({isSource:false,isFinalRow:false})));
@@ -838,7 +1150,8 @@ function renderCanonicalStatementSegment(segment,localIndex,globalIndex){
     'data-canonical-statement-id':statement.id});
   card.appendChild(renderExpressionEvaluationPanel({runtime,labelText,labelCh:labelText.length+1,
     title:null,panelClass:'canonical-program-expression-panel',statementId:statement.id,
-    statementNumber:segment.index+1,continuationStyle:true,interactive:false,
+    statementNumber:programStatementDisplayNumber(statement,segment.index),sourceIndent:statement.sourceIndent||'',
+    continuationStyle:true,interactive:false,
     rowsComplete:commitVisible,
     isFullyResolved:()=>statement.kind==='unary-update'
       &&typeof unaryUpdateRuntimeResolved==='function'&&unaryUpdateRuntimeResolved(runtime),

@@ -46,6 +46,21 @@ unless the user explicitly approves a change.
 - Every item captures its language. Changing the live setting must not alter an
   already-generated or restored item.
 
+## Source-backed activities
+
+- The active language manifest is the membership and order authority. A source
+  file that is not listed is not an item.
+- A new session fetches and parses the current listed source files. Supported
+  statements, their order, and selection edges are derived from that text; a
+  plugin must not rely on a copied raw catalog, fixed statement count, or
+  hardcoded jump target.
+- `selection.count:'all'` with `scoring.itemCount:'manifest'` makes the current
+  manifest length the item and score total. Numeric counts remain valid only
+  for an intentionally fixed subset.
+- Persisted Exam attempts restore the saved item and Program IR snapshot. Live
+  file edits apply to newly generated sessions, never midway through a saved
+  attempt.
+
 ## Scoring principles
 
 - Score semantic actions/checks once through the canonical assessment model.
@@ -103,14 +118,72 @@ unless the user explicitly approves a change.
   exposes every unresolved output control and applies the normal strict policy
   to premature actions.
 - Resolving one output value does not remove its source identifier from later
-  timeline rows. The identifier remains visible and muted while the derived
-  value stays associated with its output position.
+  timeline rows. The exposed variable card retains its name and value while the
+  derived value stays associated with its output position.
 - Source-backed items display the complete metadata-free source. Structures
   and statements without registered behavior remain present, muted, and
   read-only rather than disappearing or gaining inferred semantics.
+- A source-flow profile renders those contextual lines directly within the
+  ordered program statement flow, preserves authored line numbers and spacing,
+  and adds no synthetic final assignment. In C, an authored exact `return 0;`
+  is a direct terminal action that the learner must click; completing it emits
+  `RETURN`, finalizes the item, and runs the configured program-completion
+  celebration. Java completes after its final authored executable statement
+  and does not receive a synthesized return.
 - Generated Program Output remains selectable through profile configuration;
   changing content sources does not change statement actions, scoring, Undo,
   output playback, or persistence semantics.
+
+## Selection statements
+
+- Selection lessons are loaded from manifest-listed C or Java source files;
+  the initial profile does not generate random selection programs.
+- A selection source may opt individual literal `int` declarations into
+  deterministic seeding with `@seed <name> min=<integer> max=<integer>` in its
+  leading `@codescope` metadata. Unlisted variables and constants retain their
+  authored initializers, while derived declarations retain their expressions
+  and recalculate from seeded dependencies.
+- The profile selects `sourceValueMode:'authored'` or `'seeded'`. Seeded mode
+  updates the displayed source, Program IR, memory, conditions, and canonical
+  results together. Persisted items retain the materialized source and values.
+- `if`, `if/else`, and `else if` conditions reuse the established expression
+  substitution and evaluation workflow for relational and Boolean expressions.
+- The final condition reduction automatically transfers control to the selected
+  authored statement. There is no separate branch button. The chosen branch
+  statement uses its registered statement plugin, including the existing
+  Program Output interaction for `printf` and `System.out.print/println`.
+- A completed condition returns to one compact, source-faithful condition box.
+  Only the condition expression is outlined; the statement keyword,
+  parentheses, and block brace remain outside as ordinary source. The derived
+  Boolean or selector result appears as plain, centered, unboxed text below the
+  condition. Multi-character operators retain their literal source characters
+  rather than font ligature glyphs. No branch connector is displayed;
+  unselected branch content remains visible and read-only.
+- Else-if conditions are visited in source order until a true condition is
+  reached or the final else path is selected.
+- `switch` evaluates its selector and traces to the matching explicit case or
+  `default`. The initial lesson supports explicit `break` and does not model
+  fall-through.
+- A complete-source profile may opt into
+  `program.timelinePresentation:'statement-modal'`. The authored source then
+  remains one stable file view with its exercise filename, language, continuous
+  line-number gutter, preserved whitespace, and source syntax highlighting.
+  Only the current executable line is interactive, and evaluation rows are not
+  inserted into the source. A statement with one immediately available action
+  executes from that line. A statement with learner choices or derivation steps
+  opens the detailed trace modal.
+- The statement modal reuses the active statement's registered renderer and
+  semantic actions. It shows focused program memory and a Program Output
+  snapshot. After the statement completes, the modal remains open in a
+  read-only completed state until the learner closes it with the visible close
+  action or Escape. Closing returns focus to the next executable source line.
+  Completing an output statement still appends to and animates the main
+  cumulative Program Output panel.
+- A selection modal shows only the condition or selector expression. The full
+  `if`, `else if`, or `switch` statement remains visible in the stable source
+  view and is not duplicated inside the close view.
+- Profiles that omit `timelinePresentation` retain the established inline
+  timeline.
 
 ## Token Classification
 

@@ -41,6 +41,14 @@ registerStatementPlugin({
   kind: 'declaration',
   scoresCommit: true,
 
+  interactionPlan(ctx){
+    const ready=declarationDependenciesReady(ctx.statement,ctx.program)
+      &&declarationInitializerResolved(ctx.statement);
+    return ready
+      ? {mode:'direct',action:{type:'commit-assignment',statementId:ctx.statement.id},label:'Execute declaration'}
+      : {mode:'modal',focus:'expression',label:'Evaluate declaration'};
+  },
+
   classifyRejectedAction(ctx){
     if(ctx.action&&ctx.action.type==='commit-assignment'
       &&!declarationInitializerResolved(ctx.statement)) return 'initializer-unresolved';

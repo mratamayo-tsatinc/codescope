@@ -94,6 +94,13 @@ let dragOffsetX = 0, dragOffsetY = 0;
 let memoryTransferInProgress = false;
 let memoryCometSequence = 0;
 
+function varFinalOutboundAnimationDelay(item){
+  if(!floatVisible||!varFinalPanelShouldRender(item)) return 0;
+  return flyAnimEnabled
+    ? flightDurationMs+MEMORY_VALUE_ROLL_FALLBACK_MS
+    : MEMORY_VALUE_ROLL_FALLBACK_MS;
+}
+
 // Whether the panel was already showing as of the LAST render — used to
 // tell "just appeared" (toggled on, or first render of the session) apart
 // from "still open, just being rebuilt because the student clicked an
@@ -159,7 +166,8 @@ function animateVarFinalMemoryToExpression(item, action, applyAction){
     tokenId=action.id;
   }
 
-  const source = document.querySelector('.var-final-float [data-token-id="vff-'+named.name+'"]');
+  const source = document.querySelector('.statement-trace-memory [data-token-id="vff-'+named.name+'"]')
+    ||document.querySelector('.var-final-float [data-token-id="vff-'+named.name+'"]');
   const scope = statement&&statement.kind==='output'
     ? '[data-statement-id="'+statement.id+'"].program-output-statement'
     : statement && statement.kind!=='legacy-expression'
@@ -595,7 +603,10 @@ function findVarFinalOriginEl(id, statementId){
     ? '.program-expression-panel[data-statement-id="'+statementId+'"]'
     : '.eval-panel';
   const matches = document.querySelectorAll(scope+' [data-token-id="'+id+'"]');
-  return matches.length ? matches[matches.length-1] : null;
+  if(matches.length) return matches[matches.length-1];
+  return statementId
+    ? document.querySelector('.program-source-file-line[data-statement-id="'+statementId+'"]')
+    : null;
 }
 
 function spawnVarFinalComet(f, originRect, destRect){

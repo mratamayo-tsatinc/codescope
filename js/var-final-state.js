@@ -13,16 +13,15 @@
 // ----------------------------------------------------------------------------
 // BINDING MODEL
 // ----------------------------------------------------------------------------
-// Every named storage slot the statement touches — every declared variable
-// AND the statement's own assignment target (item.resultName, a randomly
-// (seeded) chosen name per item — see generator.js's RESULT_NAMES/
-// pickResultName) — is represented as one BINDING, built once per item and
-// cached on item._bindings. Treating the assignment target as just another
-// binding (rather than a hardcoded special case) is what keeps this
-// agnostic to future changes: a later version that evaluates several
-// statements in sequence would only need to append one more target-kind
-// binding per statement, using the exact same three trigger types below —
-// nothing about resolution/render/flash logic needs to know how many
+// Every named storage slot the program actually declares is represented as one
+// BINDING, built once per item and cached on item._bindings. Generated legacy
+// expression programs also include their real assignment target when it is a
+// separate identifier. Source-flow programs derive their complete storage
+// model from the parsed declarations and never synthesize another card.
+// Treating an actual assignment target as just another binding keeps this
+// agnostic to future changes: later statement kinds can append target bindings
+// using the same trigger types below; resolution/render/flash logic does not
+// need to know how many
 // statements exist.
 //
 // binding = {
@@ -76,14 +75,20 @@ function buildBindingsForItem(item){
         finalValue:statement.runtime.expectedValue,
         unaryNodeId:null, op:null, form:null, _flashed:false
       }));
-    // A declaration chain still ends in the same assignment expression as a
-    // legacy item. Keep its target in the same memory model for consistent
-    // pending, commit, pulse and fly-in behavior across every profile.
-    bindings.push({
-      name:item.resultName || 'result', kind:'target', trigger:'statement-complete',
-      declaredValue:undefined, finalValue:undefined,
-      unaryNodeId:null, op:null, form:null, _flashed:false
-    });
+    // Generated statement chains may end in an authored legacy expression
+    // target. Source-flow programs do not: their complete storage model is the
+    // declarations parsed from the live source file. Only add that target when
+    // the corresponding statement actually exists, and never create a second
+    // card for a declaration with the same (case-sensitive) identifier.
+    const hasLegacyTarget=item.program.statements.some(statement=>statement.kind==='legacy-expression');
+    const targetName=item.resultName || 'result';
+    if(hasLegacyTarget&&!bindings.some(binding=>binding.name===targetName)){
+      bindings.push({
+        name:targetName, kind:'target', trigger:'statement-complete',
+        declaredValue:undefined, finalValue:undefined,
+        unaryNodeId:null, op:null, form:null, _flashed:false
+      });
+    }
     return bindings;
   }
   const bindings = [];

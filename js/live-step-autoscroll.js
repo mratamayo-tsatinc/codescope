@@ -37,12 +37,17 @@ function liveStepProgress(item){
 
 function newestLiveStepRow(){
   const rows = document.querySelectorAll(
-    '#app .program-expression-panel .tl-row, #app .eval-panel .tl-row');
+    '#app .program-expression-panel .tl-row, #app .eval-panel .tl-row, #statementTraceBody .program-expression-panel .tl-row');
   return rows.length ? rows[rows.length-1] : null;
 }
 
+function liveStepScroller(target){
+  return target&&target.closest&&target.closest('.statement-trace-modal-body')
+    ||document.getElementById('app');
+}
+
 function liveStepScrollOverflow(target){
-  const scroller = document.getElementById('app');
+  const scroller = liveStepScroller(target);
   if(!scroller || !target || !target.isConnected) return null;
   const viewport = scroller.getBoundingClientRect();
   const row = target.getBoundingClientRect();
@@ -108,7 +113,7 @@ function prepareLiveStepStage(item,action,commit){
   const lastRow = newestLiveStepRow();
   const panel = lastRow && lastRow.closest
     ? lastRow.closest('.program-expression-panel, .eval-panel') : null;
-  const scroller = document.getElementById('app');
+  const scroller = liveStepScroller(lastRow);
   if(!panel || !scroller){
     commit();
     return true;

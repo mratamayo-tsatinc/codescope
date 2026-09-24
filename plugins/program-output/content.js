@@ -62,7 +62,7 @@ function poMetadataAndSource(raw,filename){
   const result=/@result\s+([A-Za-z_][A-Za-z0-9_]*)/.exec(metadata);
   const title=/@title\s+([^\n]+)/.exec(metadata);
   if(!source.trim()) throw new Error(`${filename}: source code is required`);
-  return {source,resultName:result?result[1]:null,title:title?title[1].trim():filename.replace(/\.[^.]+$/,'')};
+  return {source,metadata,resultName:result?result[1]:null,title:title?title[1].trim():filename.replace(/\.[^.]+$/,'')};
 }
 
 function poFindMatchingBrace(source,openIndex,filename){
@@ -268,21 +268,34 @@ function poParseJavaOutput(text,memory,filename,line,index){
 
 function poParseSourceExercise(exercise,language){
   const details=poMetadataAndSource(exercise.raw,exercise.filename);
+  const sourceLines=details.source.split('\n');
   const region=poProgramBody(details.source,language,exercise.filename);
   const rows=poSplitStatements(region.body,exercise.filename,region.baseLine);
   const memory={},kinds={},declarations=[],statements=[];
-  const supportedLines=new Set();
-  const markSupported=row=>{
-    for(let line=row.line;line<=row.endLine;line++) supportedLines.add(line);
+  const supportedLines=new Map();
+  const markSupported=(row,statement)=>{
+    statement.sourceLine=row.line;
+    statement.sourceEndLine=row.endLine;
+    statement.sourceText=sourceLines.slice(row.line-1,row.endLine).join('\n');
+    statement.sourceIndent=(sourceLines[row.line-1]||'').match(/^\s*/)[0];
+    for(let line=row.line;line<=row.endLine;line++){
+      supportedLines.set(line,{statementId:statement.id,primary:line===row.line});
+    }
   };
   let declarationIndex=0,assignmentIndex=0,unaryIndex=0,outputIndex=0;
   rows.forEach(row=>{
-    if(/^return\b/.test(row.text)) return;
+    if(/^return\b/.test(row.text)){
+      if(language==='c'&&/^return\s+0$/.test(row.text)){
+        const statement=programReturnStatement({id:'program-return',value:0});
+        markSupported(row,statement);statements.push(statement);
+      }
+      return;
+    }
     try{
     const output=language==='c'
       ?poParseCOutput(row.text,memory,exercise.filename,row.line,outputIndex)
       :poParseJavaOutput(row.text,memory,exercise.filename,row.line,outputIndex);
-    if(output){markSupported(row);outputIndex++;statements.push(output);return;}
+    if(output){markSupported(row,output);outputIndex++;statements.push(output);return;}
     const declarationPattern=language==='c'
       ?/^(const\s+)?int\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([\s\S]+)$/
       :/^(final\s+)?int\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([\s\S]+)$/;
@@ -296,19 +309,21 @@ function poParseSourceExercise(exercise,language){
       const statement=declarationStatement({id:`declaration-${++declarationIndex}`,name,dataType:'int',mutable:kind!=='constant',initializer:engineNodeToProgramIr(tree)});
       statement.binding.kind=kind;statement.runtime=buildDeclarationRuntime(tree,value);
       statement.dependencies=[...collectExpressionDependencies(statement.initializer)];
-      markSupported(row);statements.push(statement);return;
+      markSupported(row,statement);statements.push(statement);return;
     }
     const unary=/^(?:([+]{2}|[-]{2})\s*([A-Za-z_][A-Za-z0-9_]*)|([A-Za-z_][A-Za-z0-9_]*)\s*([+]{2}|[-]{2}))$/.exec(row.text);
     if(unary){
       const prefix=!!unary[1],name=unary[2]||unary[3],operator=unary[1]||unary[4];
       if(kinds[name]!=='variable') throw new Error(`${exercise.filename}:${row.line}: unary update requires a mutable variable`);
-      markSupported(row);statements.push(buildUnaryUpdateStatementRuntime(name,operator,prefix?'prefix':'postfix',memory,unaryIndex++));return;
+      const statement=buildUnaryUpdateStatementRuntime(name,operator,prefix?'prefix':'postfix',memory,unaryIndex++);
+      markSupported(row,statement);statements.push(statement);return;
     }
     const assignment=/^([A-Za-z_][A-Za-z0-9_]*)\s*(=|\+=|-=|\*=|\/=|%=)\s*([\s\S]+)$/.exec(row.text);
     if(assignment){
       if(kinds[assignment[1]]!=='variable') throw new Error(`${exercise.filename}:${row.line}: assignment requires a mutable variable`);
       const tree=poParseExpression(assignment[3],memory,kinds,exercise.filename,row.line);
-      markSupported(row);statements.push(buildAssignmentStatementRuntime(assignment[1],assignment[2],tree,memory,assignmentIndex++));return;
+      const statement=buildAssignmentStatementRuntime(assignment[1],assignment[2],tree,memory,assignmentIndex++);
+      markSupported(row,statement);statements.push(statement);return;
     }
     return;
     }catch(error){
@@ -320,14 +335,18 @@ function poParseSourceExercise(exercise,language){
     throw new Error(`${exercise.filename}: at least one declaration and one output statement are required`);
   const resultName=details.resultName||declarations[declarations.length-1].name;
   if(!Object.prototype.hasOwnProperty.call(memory,resultName)) throw new Error(`${exercise.filename}: @result '${resultName}' is not declared`);
-  const sourceDisplay={filename:exercise.filename,lines:details.source.split('\n').map((text,index)=>({
-    number:index+1,text,supported:supportedLines.has(index+1)
-  }))};
+  const sourceDisplay={filename:exercise.filename,lines:sourceLines.map((text,index)=>{
+    const support=supportedLines.get(index+1);
+    return {number:index+1,text,supported:!!support,
+      statementId:support&&support.statementId||null,primary:!!(support&&support.primary)};
+  })};
   return {details,declarations,statements,memory,kinds,resultName,sourceDisplay};
 }
 
 function poBuildSourceItem(profile,exercise,language,itemNumber){
   const parsed=poParseSourceExercise(exercise,language);
+  const sourceFlow=poContentConfig(profile).presentation==='source-flow';
+  const programStatements=sourceFlow?parsed.statements:parsed.statements.filter(statement=>statement.kind!=='program-return');
   const resultKind=parsed.kinds[parsed.resultName]||'variable';
   const originalTree=makeNamed(resultKind,parsed.resultName,parsed.memory[parsed.resultName]);
   const originalFlat=flattenInstance(originalTree);
@@ -335,7 +354,8 @@ function poBuildSourceItem(profile,exercise,language,itemNumber){
   while(Object.prototype.hasOwnProperty.call(parsed.memory,resultTarget)) resultTarget=`result${suffix++}`;
   const item={
     profileId:profile.id,itemNumber,exerciseId:exercise.id,filename:exercise.filename,
-    exerciseTitle:parsed.details.title,source:parsed.details.source,sourceDisplay:parsed.sourceDisplay,language,
+    exerciseTitle:parsed.details.title,source:parsed.details.source,sourceDisplay:parsed.sourceDisplay,
+    sourceFlow,language,
     originalTree,originalFlat,decls:parsed.declarations,resultName:resultTarget,
     correctFinalValue:parsed.memory[parsed.resultName],canonicalTrace:buildCanonicalTrace(originalTree),
     workingFlat:deepCloneFlat(originalFlat),history:[deepCloneFlat(originalFlat)],trace:[],
@@ -343,8 +363,8 @@ function poBuildSourceItem(profile,exercise,language,itemNumber){
     wasCorrectFinal:null,showSolution:false,playback:null,flagged:false,lockedAt:null,
     examActionLog:[],examSequenceFailure:null,practiceInvalidExecution:null,_bindings:null
   };
-  parsed.statements.push({id:'final-expression',kind:'legacy-expression',status:'locked'});
-  item.program=createProgram(parsed.statements,{id:`${profile.id}-${exercise.id}`,language});
+  if(!sourceFlow) programStatements.push({id:'final-expression',kind:'legacy-expression',status:'locked'});
+  item.program=createProgram(programStatements,{id:`${profile.id}-${exercise.id}`,language});
   item.program.mode='interactive-program';item.program.scoreAssignments=profile.program.scoreAssignments!==false;
   return item;
 }
@@ -405,8 +425,12 @@ function poValidateContentProfile(profile){
     throw new Error(`${profile.id}: content.selection.count must be 'all' or a positive integer`);
   if(Number.isInteger(selection.count)&&selection.count!==profile.itemCount)
     throw new Error(`${profile.id}: content.selection.count must match scoring.itemCount`);
+  if(selection.count==='all'&&profile.itemCount!=='manifest')
+    throw new Error(`${profile.id}: scoring.itemCount must be 'manifest' when content.selection.count is 'all'`);
   if(selection.shuffle!==undefined&&typeof selection.shuffle!=='boolean')
     throw new Error(`${profile.id}: content.selection.shuffle must be a boolean`);
+  if(content.presentation!==undefined&&!['statement-only','source-flow'].includes(content.presentation))
+    throw new Error(`${profile.id}: content.presentation must be 'statement-only' or 'source-flow'`);
 }
 
 function poGenerateContentItems({profile,language,generateDefault}){
@@ -417,7 +441,7 @@ function poGenerateContentItems({profile,language,generateDefault}){
   const selection=content.selection||{},ordered=selection.shuffle?poShuffle(bank.exercises):bank.exercises.slice();
   const count=selection.count==='all'?ordered.length:(selection.count||profile.itemCount);
   if(count>ordered.length) throw new Error(`${profile.id}: requested ${count} items from a ${ordered.length}-exercise manifest`);
-  if(count!==profile.itemCount)
+  if(profile.itemCount!=='manifest'&&count!==profile.itemCount)
     throw new Error(`${profile.id}: selected item count ${count} must match scoring.itemCount ${profile.itemCount}`);
   const items=ordered.slice(0,count).map((exercise,index)=>poBuildSourceItem(profile,exercise,bank.language,index+1));
   if(typeof assignManualResponsePlans==='function') assignManualResponsePlans(profile,items);

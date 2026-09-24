@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="plugins/falling-token-sort/styles.css">
 <link rel="stylesheet" href="plugins/simulate-output/styles.css">
 <link rel="stylesheet" href="plugins/program-output/styles.css">
+<link rel="stylesheet" href="plugins/program-selection/styles.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -241,6 +242,24 @@
   </div>
 </div>
 
+<div id="statementTraceModal" class="modal statement-trace-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="statementTraceTitle">
+  <div class="modal-content statement-trace-modal-content">
+    <div class="modal-header statement-trace-modal-header">
+      <h2 id="statementTraceTitle">Statement trace</h2>
+    </div>
+    <div id="statementTraceBody" class="modal-body statement-trace-modal-body"></div>
+    <div class="statement-trace-actions" aria-label="Statement trace actions">
+      <button id="statementTraceBack" class="statement-trace-action secondary" type="button" onclick="closeProgramStatementTrace()">
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i><span>Close evaluation</span>
+      </button>
+      <button id="statementTraceContinue" class="statement-trace-action primary" type="button" onclick="continueProgramStatementTrace()" disabled aria-disabled="true">
+        <span>Continue program</span><i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+</div>
+<div id="statementTraceOverlay" class="modal-overlay statement-trace-overlay" style="display:none"></div>
+
 <div id="manualResponseModal" class="manual-response-modal" style="display:none" role="dialog" aria-modal="true" aria-labelledby="manualResponseTitle">
   <div class="manual-response-card">
     <div class="manual-response-heading"><i id="manualResponseIcon" class="fa-solid fa-calculator" aria-hidden="true"></i><h2 id="manualResponseTitle">Evaluate</h2></div>
@@ -433,10 +452,14 @@
 <script src="js/declaration-statement-plugin.js"></script>
 <script src="js/assignment-statement-plugin.js"></script>
 <script src="js/unary-update-statement-plugin.js"></script>
+<script src="js/program-return.js"></script>
 <script src="plugins/program-output/manifest.js"></script>
 <script src="plugins/program-output/statement.js"></script>
 <script src="js/program-item-builder.js"></script>
 <script src="plugins/program-output/content.js"></script>
+<script src="plugins/program-selection/manifest.js"></script>
+<script src="plugins/program-selection/statement.js"></script>
+<script src="plugins/program-selection/content.js"></script>
 <script src="plugins/token-classification/manifest.js"></script>
 <script src="plugins/token-classification/languages/c.js"></script>
 <script src="plugins/token-classification/languages/java.js"></script>
@@ -485,6 +508,7 @@
 <script src="js/render-unary-update.js"></script>
 <script src="js/render-session.js"></script>
 <script src="plugins/program-output/renderer.js"></script>
+<script src="plugins/program-selection/renderer.js"></script>
 <script src="js/render-done.js"></script>
 <script src="js/login.js"></script>
 <script src="js/main.js"></script>

@@ -44,13 +44,14 @@ snapshots are stored in the browser.
 | Layer | Primary files | Responsibility |
 |---|---|---|
 | Static shell | `index.html`, `css/`, shared `js/` | Application framing and reusable services. |
-| Profile catalog | `js/profiles.js` | All 35 profile configurations. No plugin-local profiles. |
+| Profile catalog | `js/profiles.js` | All 36 profile configurations. No plugin-local profiles. |
 | Expression engine | `js/engine.js`, `flat-model.js`, `template-engine.js`, `generator.js` | Seeded expression construction and evaluation. |
 | Program runtime | `js/program-ir.js`, `program-core.js`, `program-item-builder.js` | Ordered statement programs and dispatch. |
 | Statement semantics | Existing statement files in `js/`; Program Output in `plugins/program-output/` | Expression, declaration, assignment, unary update, and language-neutral output behavior. |
 | Activity orchestration | `js/activity-core.js` | Activity-plugin registry, profile content-provider registry, and shell lifecycle dispatch. |
 | Token Classification | `plugins/token-classification/` | Language rules, identifier generation/analysis, syntax-position classification, modal, renderer, and feedback. |
 | Falling Token Sort | `plugins/falling-token-sort/` | Configurable bucket sorting using Token Classification's public identifier capabilities. |
+| Program Selection | `plugins/program-selection/` | Source-backed `if`, `if/else`, `else if`, and `switch` condition tracing. |
 | Persistence | `js/settings-persistence.js`, `exam-persistence.js` | Device settings and independently configurable per-student Practice/Exam snapshots. |
 | Verification | `tests/run-tests.js` | Full compatibility and extension suite. |
 
@@ -67,8 +68,11 @@ The global catalog currently contains:
   - `token-program-chain`
 - 1 Falling Token Sort profile:
   - `falling-identifier-sort`
-- 1 Program Output statement profile:
+- 2 Program Output statement profiles:
   - `program-output-basics`
+  - `program-output-source-flow`
+- 1 Program Selection profile:
+  - `selection-statements-source`
 
 Do not duplicate these configurations inside plugin directories.
 
@@ -86,6 +90,14 @@ and parses only the listed C or Java source files into Program IR. In
 `generated` mode it delegates to the existing seeded generator. Source-backed
 items persist the resulting IR, so an active Exam restores its snapshot rather
 than rebuilding its statements from changed source files.
+Profiles that consume the complete bank use `selection.count:'all'` and
+`scoring.itemCount:'manifest'`, allowing the current manifest to own both item
+membership and score totals. Providers parse current fetched source for new
+sessions; they do not maintain copied raw catalogs or fixed statement graphs.
+`presentation:'source-flow'` interleaves supported statement renderers with
+the file's complete contextual source, using authored line numbers and without
+adding a synthetic final assignment. An authored exact C `return 0;` is parsed
+as the explicit terminal action; Java does not receive a synthetic return.
 
 ## Shared services
 

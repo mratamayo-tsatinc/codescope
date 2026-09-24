@@ -104,6 +104,17 @@ function outputStatement(spec){
   };
 }
 
+function programReturnStatement(spec){
+  spec=spec||{};
+  return {
+    id:spec.id||null,
+    kind:'program-return',
+    value:spec.value==null?0:spec.value,
+    sourceSpan:spec.sourceSpan||null,
+    runtime:{checked:false}
+  };
+}
+
 function collectExpressionDependencies(expression, out){
   out = out || new Set();
   if(!expression || typeof expression !== 'object') return out;

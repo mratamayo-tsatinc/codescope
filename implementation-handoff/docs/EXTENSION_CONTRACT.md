@@ -99,14 +99,59 @@ See `docs/identifier-generation.md` for the precise configuration contract.
 ## Statement plugins
 
 Program Core dispatches each statement by `statement.kind`. Current statement
-plugins are legacy expression, declaration, assignment, unary update, and
-output. One profile can generate a sequence that uses several statement kinds.
+plugins are legacy expression, declaration, assignment, unary update, output,
+selection, and program return. One profile can generate a sequence that uses
+several statement kinds.
 
 Program Output lives in `plugins/program-output/` and renders the same
 language-neutral output IR as C `printf` or Java
 `System.out.print`/`System.out.println`. Profiles select a source-file exercise
 set or a generated recipe; they do not embed source text, canonical answers, or
 language-specific interaction logic.
+
+Program Selection source files own lesson-specific value seeding. Their leading
+`@codescope` block may explicitly allowlist literal integer declarations with
+`@seed <name> min=<integer> max=<integer>`. The profile only selects authored or
+seeded rendering through `content.sourceValueMode`; it must not redefine the
+per-binding ranges. Unlisted bindings remain authored. The content provider
+must reject malformed ranges, duplicate or unknown names, and annotated
+nonliteral initializers before an item enters a session.
+
+Program Selection lives in `plugins/program-selection/` and registers the
+`selection` statement kind separately from Program Output. Its source provider
+uses deterministic language-specific manifests, while condition evaluation
+delegates to the shared expression runtime. Branch targets that match a
+registered statement capability are parsed into the same Program IR and run by
+that existing plugin. The initial selection exercises therefore reuse Program
+Output for authored `printf` and `System.out.print/println` branch bodies;
+unsupported branch content remains source context.
+
+The provider must derive supported statement order and control-flow edges from
+the current fetched source. This includes sequential successors, branch entry
+targets, clause exits, and the statement after the complete decision. Do not
+encode an expected statement count, copied source text, or filename-specific
+jump table in plugin JavaScript. `selection.count:'all'` pairs with
+`scoring.itemCount:'manifest'` when a manifest owns the complete activity.
+
+Complete-source profiles may set
+`program.timelinePresentation:'statement-modal'`. This is a shell presentation
+choice: Program Core keeps the authored source stable and mounts the current
+registered statement renderer inside the shared trace modal. Statement plugins
+must not add modal-specific semantic paths or duplicate their renderer. The
+default remains `'inline'`, preserving existing profiles.
+
+A statement plugin may define `interactionPlan({item, program, statement})` for
+the source-file presentation. Return `{mode:'direct', action}` only when the
+source-line click is the statement's sole remaining action. Return
+`{mode:'modal', focus}` for multistep work. The shell routes direct actions
+through the normal semantic action handler and defaults plugins without this
+hook to the modal. `focus:'condition-expression'` tells the selection renderer
+to omit the already-visible control-statement wrapper from the close view.
+
+The shared `program-return` statement plugin represents an authored exact C
+`return 0;`. It supplies one direct `return-program` action and emits `RETURN`
+with `nextStatementId:'$end'`. Content providers must not invent this statement
+for Java or for source that does not author it.
 
 External profile content is registered through the generic content-provider
 API in `js/activity-core.js`. A provider owns configuration validation, content

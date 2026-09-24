@@ -41,7 +41,8 @@ function renderUnaryUpdateStatement(ctx){
   card.appendChild(renderExpressionEvaluationPanel({
     runtime,labelText:'',labelCh:0,title:null,
     panelClass:'unary-update-eval-panel program-expression-panel',
-    statementId:statement.id,statementNumber:statementIndex+1,
+    statementId:statement.id,statementNumber:programStatementDisplayNumber(statement,statementIndex),
+    sourceIndent:statement.sourceIndent||'',
     continuationStyle:true,
     interactive:isActive&&!runtime.checked&&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked(),
     revealCorrectness:runtime.checked&&state.mode!=='exam',

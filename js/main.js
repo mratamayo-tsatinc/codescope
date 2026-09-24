@@ -86,6 +86,7 @@ function render(){
   // Mount at the program boundary so this authoritative panel refreshes for
   // legacy expressions and for every declaration in a statement chain.
   if(typeof renderVariableFinalFloat === 'function') renderVariableFinalFloat(activeItem);
+  if(typeof syncStatementTraceModal==='function') syncStatementTraceModal(activeItem);
 
   if(state.screen==='session'){
     // Save the current mode only when its deployment switch is enabled.

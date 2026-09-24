@@ -45,7 +45,7 @@ function renderDeclarationStatement(ctx){
     title:null,
     panelClass:'declaration-eval-panel program-expression-panel',
     statementId:statement.id,
-    statementNumber:statementIndex+1,
+    statementNumber:programStatementDisplayNumber(statement,statementIndex),sourceIndent:statement.sourceIndent||'',
     continuationStyle:true,
     interactive:isActive && !runtime.checked && !item.checked && !item.practiceInvalidExecution&&!examInteractionLocked(),
     revealCorrectness:runtime.checked&&state.mode!=='exam',

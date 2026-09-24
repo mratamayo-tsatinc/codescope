@@ -50,7 +50,8 @@ function createProgram(statements, opts){
     cursor: Math.max(0, Math.min(normalized.length-1, opts.cursor || 0)),
     status: opts.status || 'running',
     memory: opts.memory || {},
-    events: opts.events || []
+    events: opts.events || [],
+    executionHistory: Array.isArray(opts.executionHistory)?opts.executionHistory.slice():[]
   };
 }
 
@@ -70,6 +71,7 @@ function ensureProgramEnvelope(item){
   if(item.program.schemaVersion == null) item.program.schemaVersion = PROGRAM_SCHEMA_VERSION;
   if(!item.program.memory) item.program.memory = {};
   if(!Array.isArray(item.program.events)) item.program.events = [];
+  if(!Array.isArray(item.program.executionHistory)) item.program.executionHistory = [];
   return item.program;
 }
 
@@ -87,16 +89,43 @@ function statementPluginFor(statement){
   return statement ? statementPluginRegistry.get(statement.kind) || null : null;
 }
 
-function advanceProgram(program){
+// Source-flow presentations ask the owning statement plugin how a line should
+// respond. This keeps the shell free of declaration/output/selection rules.
+function statementInteractionPlan(item,statement){
+  const program=ensureProgramEnvelope(item),plugin=statementPluginFor(statement);
+  if(!program||!plugin||typeof plugin.interactionPlan!=='function'){
+    return {mode:'modal',focus:'statement',label:'Open statement trace'};
+  }
+  const plan=plugin.interactionPlan({item,program,statement})||{};
+  if(plan.mode==='direct'&&plan.action){
+    return {mode:'direct',action:plan.action,label:plan.label||'Execute statement'};
+  }
+  return {mode:'modal',focus:plan.focus||'statement',label:plan.label||'Open statement trace'};
+}
+
+function advanceProgram(program,nextStatementId){
   const current = program.statements[program.cursor];
+  const requestedNext=nextStatementId===undefined&&current?current.nextStatementId:nextStatementId;
   if(current){
+    if(!Array.isArray(program.executionHistory)) program.executionHistory=[];
+    program.executionHistory.push(current.id);
     current.status = 'complete';
     // Keep the completed derivation visible long enough for its result and
     // memory handoff to be perceived. The next valid statement action clears
     // this transient presentation flag.
     current._uiJustCompleted = true;
   }
-  if(program.cursor < program.statements.length-1){
+  if(requestedNext==='$end'){
+    program.status='complete';
+  }else if(typeof requestedNext==='string'){
+    const nextIndex=program.statements.findIndex(statement=>statement.id===requestedNext);
+    if(nextIndex<0) throw new Error(`Unknown next statement '${requestedNext}'`);
+    program.statements.forEach((statement,index)=>{
+      if(index>program.cursor&&index<nextIndex) statement.status='blocked';
+    });
+    program.cursor=nextIndex;
+    program.statements[program.cursor].status='active';
+  }else if(program.cursor < program.statements.length-1){
     program.cursor++;
     program.statements[program.cursor].status = 'active';
   } else {
@@ -122,7 +151,7 @@ function dispatchProgramAction(item, action, services){
   }
   if(result.event) program.events.push(result.event);
   if(Array.isArray(result.events)) program.events.push(...result.events);
-  if(result.completed) advanceProgram(program);
+  if(result.completed) advanceProgram(program,result.nextStatementId);
   return result;
 }
 
@@ -154,7 +183,7 @@ function canUndoProgram(item){
   const statement = currentProgramStatement(item);
   const plugin = statementPluginFor(statement);
   if(plugin && typeof plugin.canUndo === 'function' && plugin.canUndo({program, statement, item})) return true;
-  return !!(program && program.cursor > 0);
+  return !!(program&&(program.executionHistory.length||program.cursor>0));
 }
 
 function undoProgramAction(item, services){
@@ -165,17 +194,22 @@ function undoProgramAction(item, services){
     const local = plugin.undo({program, statement, item, services:services||{}}) || {applied:false};
     if(local.applied) return local;
   }
-  if(!program || program.cursor <= 0) return {applied:false};
+  if(!program) return {applied:false};
 
   const current = program.statements[program.cursor];
-  const previous = program.statements[program.cursor-1];
+  const previousId=program.executionHistory.length?program.executionHistory[program.executionHistory.length-1]:null;
+  const previousIndex=previousId==null?program.cursor-1
+    :program.statements.findIndex(candidate=>candidate.id===previousId);
+  if(previousIndex<0) return {applied:false};
+  const previous = program.statements[previousIndex];
   const previousPlugin = statementPluginFor(previous);
   if(!previousPlugin || typeof previousPlugin.rollbackCompletion !== 'function') return {applied:false};
   const result = previousPlugin.rollbackCompletion({program, statement:previous, item, services:services||{}}) || {applied:false};
   if(!result.applied) return result;
+  if(previousId!=null) program.executionHistory.pop();
   if(current) current.status = 'locked';
   previous.status = 'active';
-  program.cursor--;
+  program.cursor=previousIndex;
   program.status = 'running';
   return result;
 }
@@ -198,6 +232,8 @@ function resetProgramAction(item, services){
   program.status = 'running';
   program.memory = {};
   program.events = [];
+  program.executionHistory = [];
+  if(item._sourceFlowTransition) delete item._sourceFlowTransition;
   return {applied:changed};
 }
 
@@ -212,15 +248,24 @@ function renderProgramItem(container, item, services){
     && typeof renderProgramWorkspaceShell==='function'
       ? renderProgramWorkspaceShell(container,item,program)
       : container;
-  program.statements.forEach((statement, index)=>{
+  const renderStatement=(statement,index)=>{
+    const isActive=index===program.cursor&&program.status!=='complete';
+    if(typeof programUsesStatementTraceModal==='function'&&programUsesStatementTraceModal(item)
+      &&typeof renderProgramStatementTraceSource==='function'){
+      statementContainer.appendChild(renderProgramStatementTraceSource(statement,index,item,isActive));
+      return;
+    }
     const renderer = statementRendererRegistry.get(statement.kind);
     if(typeof renderer !== 'function') throw new Error(`No renderer registered for statement kind '${statement.kind}'`);
     renderer({
       container:statementContainer, item, program, statement, statementIndex:index,
-      isActive:index===program.cursor && program.status!=='complete',
+      isActive,
       services:services||{}
     });
-  });
+  };
+  if(item.sourceFlow&&typeof renderProgramSourceFlow==='function'
+    &&renderProgramSourceFlow(statementContainer,item,program,services||{},renderStatement)) return;
+  program.statements.forEach(renderStatement);
 }
 
 function buildCanonicalProgramTrace(item, services){

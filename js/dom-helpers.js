@@ -146,10 +146,11 @@ function buildColorMap(steps, count){
     const step = steps[i];
     const id = step.resultNodeId;
     const color = stepVisualColor(step,i);
-    // SUBSTITUTE and UNARY intentionally share a node id. The first row is a
-    // binding-colored retrieval card; after UNARY fires, that same node is a
-    // newly derived literal and must adopt the operator step's color.
-    if(step.action==='UNARY' || !map.has(id)) map.set(id,color);
+    // Substitution keeps a binding's identity color until an operator derives
+    // a new value at that node. Binary and unary reductions must then replace
+    // the earlier color so operator, connector and result remain one visual
+    // operation even when the engine reuses an operand id for the result.
+    if(step.action==='EVALUATE'||step.action==='UNARY'||!map.has(id)) map.set(id,color);
   }
   return map;
 }

@@ -5,9 +5,9 @@ let programOutputAnimationTimer=null;
 
 function programOutputInteractionLocked(){return programOutputAnimationActive;}
 
-function queueProgramOutputAnimation(item,event){
+function queueProgramOutputAnimation(item,event,onComplete){
   if(!item||!event||event.type!=='OUTPUT') return;
-  pendingProgramOutputAnimation={item,event};
+  pendingProgramOutputAnimation={item,event,onComplete:typeof onComplete==='function'?onComplete:null};
 }
 
 function outputEscapeLiteral(value){
@@ -81,9 +81,9 @@ function programOutputResolveActionable(interactive,partState){
 
 function renderProgramOutputConsumedIdentifier(statement,entry,partState,showDerived){
   const name=programOutputPartName(entry.part);
-  const nodes=[h('span',{class:'program-output-source-identifier binding-identity',
-    style:bindingIdentityStyle(name,'variable'),
-    'data-token-id':programOutputReadTokenId(statement,entry.index)},name)];
+  const nodes=[renderValueCard({id:programOutputReadTokenId(statement,entry.index),name,
+    value:partState.stagedValue,kind:'variable',color:bindingIdentityColor(name,'variable'),
+    isFlash:false})];
   if(showDerived) nodes.push(h('span',{class:'program-output-derived-value binding-identity',
     style:bindingIdentityStyle(name,'variable'),
     'data-token-id':programOutputResultTokenId(statement,entry.index)},`→ ${partState.resolvedValue}`));
@@ -99,6 +99,7 @@ function renderProgramOutputState(statement,item,program,options){
   const readyToPrint=interactive&&(resolved||programOutputStrictControls());
   const command=language==='c'?'printf':(statement.newline?'System.out.println':'System.out.print');
   const code=h('code',{class:'program-output-code'});
+  if(options.sourceIndent) code.appendChild(h('span',{class:'program-source-indent'},options.sourceIndent));
   code.appendChild(outputActionToken(command,{
     class:'program-output-token output-command tok '+(readyToPrint?'tok-op-active':'tok-static'),
     'data-output-command-source':options.commandAnchor?statement.id:null,
@@ -202,16 +203,18 @@ function renderProgramOutputTimeline(statement,item,program,statementIndex,isAct
     const isSource=traceCount===0;
     const isLatest=traceCount===visualTrace.length;
     const isCurrent=isActive&&isLatest&&!statement.runtime.checked;
-    const row=h('div',{class:`tl-row ${isSource?'source-row ':''}${isCurrent?'current':'done'}`});
     const previousStep=traceCount>0?visualTrace[traceCount-1]:null;
+    const substitutionRow=!!(previousStep&&previousStep.action==='EVALUATE'&&previousStep.outputAction);
+    const row=h('div',{class:`tl-row ${isSource?'source-row ':''}${isCurrent?'current':'done'}${substitutionRow?' output-substitution-row':''}`});
     const color=previousStep?stepVisualColor(previousStep,traceCount-1):'#4b5364';
     row.appendChild(h('div',{class:'tl-dot'+(isSource?' statement-source-dot':''),
       style:`background:${color};`,title:isSource?'Original statement':'Evaluation step'},
-    isSource?String(statementIndex+1):null));
+    isSource?String(programStatementDisplayNumber(statement,statementIndex)):null));
     const code=h('div',{class:'code-out program-output-timeline-code'});
     const currentStep=isLatest?previousStep:null;
     code.appendChild(renderProgramOutputState(statement,item,program,{
       traceCount,interactive:isCurrent,commandAnchor:isLatest,
+      sourceIndent:statement.sourceIndent||'',
       flashRead:!!(currentStep&&currentStep.action==='READ_OUTPUT_VALUE'&&!currentStep._outputFlashed),
       flashPartIndex:currentStep&&currentStep.partIndex
     }));
@@ -283,11 +286,14 @@ function startProgramOutputAnimation(panel,pre,escape,pending){
   pendingProgramOutputAnimation=null;
   const text=pending.event.text||'';
   const reduced=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const finish=()=>{programOutputAnimationActive=false;programOutputAnimationTimer=null;
-    escape.classList.remove('is-visible');panel.classList.remove('is-printing');};
+  let finished=false;
+  const finish=()=>{if(finished)return;finished=true;programOutputAnimationActive=false;programOutputAnimationTimer=null;
+    escape.classList.remove('is-visible');panel.classList.remove('is-printing');
+    if(pending.onComplete)pending.onComplete();};
   if(reduced||!PROGRAM_OUTPUT_SETTINGS.characterAnimation){pre.textContent+=text;finish();return;}
   programOutputAnimationActive=true;panel.classList.add('is-printing');
-  const source=document.querySelector(`[data-output-command-source="${pending.event.statementId}"]`);
+  const source=document.querySelector(`[data-output-command-source="${pending.event.statementId}"]`)
+    ||document.querySelector(`.program-source-file-line[data-statement-id="${pending.event.statementId}"]`);
   const begin=()=>{
     let index=0;
     const step=()=>{

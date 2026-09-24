@@ -8,7 +8,7 @@ Last consolidated: 2026-09-21
 - Temporary icon/logo: original **Precedify** artwork pending an approved
   CodeScope replacement.
 - Runtime: static vanilla HTML/CSS/classic JavaScript.
-- Profile count: 35, all in `js/profiles.js`.
+- Profile count: 36, all in `js/profiles.js`.
 - Activity plugins: `token-classification` 1.1.0 and `falling-token-sort` 1.7.0.
 - Statement plugins: legacy expression, declaration, assignment, unary update,
   and Program Output.
@@ -39,12 +39,57 @@ Last consolidated: 2026-09-21
 - Runtime parsing supports the current beginner declaration, expression,
   assignment, unary update, `printf`, and `System.out.print/println` subset,
   including multiple identifiers in one output statement.
-- Source-backed items store serializable Program IR and retain the established
-  final expression check.
-- The complete metadata-free source is displayed read-only; source structures
-  without registered behavior remain muted. Output variables can be read in
+- Source-backed items store serializable Program IR. The dedicated Source
+  Program Output profile renders the complete file in the statement flow,
+  preserves source line numbers and indentation, and does not append a
+  synthetic final assignment.
+- Source structures without registered behavior remain muted. Output variables can be read in
   any order, Guided unlocks their matching combine controls, and Strict exposes
-  all unresolved controls. Consumed identifiers remain visible in later rows.
+  all unresolved controls. Exposed variable cards retain their names and values
+  in later rows.
+
+### Program Selection
+
+- Added the source-backed `selection-statements-source` profile under Program
+  Statements, with four manifest-ordered exercises for both C and Java.
+- Source-backed Program Output and Selection profiles use
+  `selection.count:'all'` with `scoring.itemCount:'manifest'`. The manifest now
+  owns membership, item total, order, and category maximum score.
+- Selection sources now allowlist seedable literal declarations with embedded
+  `@seed name min=… max=…` metadata. The profile uses
+  `sourceValueMode:'seeded'`; switching it to `'authored'` preserves every
+  source initializer. Unlisted bindings remain fixed and derived expressions
+  recalculate from the materialized declarations.
+- Added a separate `selection` statement plugin for `if`, `if/else`, ordered
+  `else if`, and `switch` with explicit `break` and `default` handling.
+- The selection parser derives sequential successors, branch targets, clause
+  exits, and post-decision statements from each current fetched file. Adding a
+  supported decision or statement requires only the source edit and manifest
+  membership; there is no expected graph in JavaScript.
+- Conditions reuse the expression runtime and timeline. The final condition
+  action emits `BRANCH` and advances immediately without a separate branch
+  control.
+- Authored C and Java output branch bodies are parsed as normal `output`
+  statements and reuse Program Output. A completed condition retains a
+  result-colored rounded outline around the condition expression only; keyword
+  and punctuation stay outside. Its result appears centered below as unboxed
+  text, and literal multi-character operators do not become ligature glyphs.
+  Branch connectors are intentionally hidden, while untaken code remains muted.
+- Random selection-program generation and switch fall-through are deferred.
+- The selection profile opts into
+  `program.timelinePresentation:'statement-modal'`. Its complete source remains
+  stable in one filename-labelled, syntax-highlighted file panel with a
+  continuous line-number gutter. Each statement plugin supplies the active
+  row's interaction plan: a one-step declaration or literal output executes in
+  place, while multistep work opens the shared close-view modal using the
+  existing statement renderer, focused memory, and Program Output context.
+  Selection close views show the condition expression alone. Existing profiles
+  keep inline timelines.
+- The modal has labeled `Back to source` and `Continue program` actions instead
+  of an icon-only close control. Completion stays visible until dismissal.
+  Direct feedback or modal dismissal then starts a source-line transition from
+  the completed origin to the semantic destination, including skipped branch
+  lines and future backward loop destinations.
 
 ### Identifier activities
 

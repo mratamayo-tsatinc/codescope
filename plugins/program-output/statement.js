@@ -58,6 +58,12 @@ registerStatementPlugin({
   kind:'output',
   scoresCommit:true,
 
+  interactionPlan(ctx){
+    return programOutputResolved(ctx.statement)
+      ? {mode:'direct',action:{type:'emit-output',statementId:ctx.statement.id},label:'Run output statement'}
+      : {mode:'modal',focus:'output-values',label:'Evaluate output statement'};
+  },
+
   classifyRejectedAction(ctx){
     const action=ctx.action||{};
     if(action.type==='emit-output'&&!programOutputResolved(ctx.statement)) return 'output-unresolved';

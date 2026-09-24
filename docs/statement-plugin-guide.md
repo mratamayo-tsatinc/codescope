@@ -159,7 +159,7 @@ those parts as `printf` with format placeholders in C or as
 Items may come from the seeded `formatted-values` builder or from C/Java source
 files selected by an exercise-set manifest. The runtime parser converts the
 supported beginner source subset into the same declaration, assignment, unary,
-output, and final-expression IR. Source loading and parsing belong to
+and output IR. Source loading and parsing belong to
 `plugins/program-output/content.js`; statement execution remains independent of
 where the item came from.
 
@@ -184,14 +184,136 @@ derivations never remove consumed source identifiers; they remain visible in a
 muted state while the derived value stays associated with its placeholder or
 concatenation step.
 
-Source-backed items also carry the complete metadata-free source. The shared
-program workspace shows it as a read-only overview. Lines without registered
-statement semantics remain muted instead of being omitted or treated as if the
-application executed them.
+The dedicated `program-output-source-flow` profile renders the complete
+metadata-free file directly in `program-statement-flow`. Supported lines retain
+their semantic renderers and use their authored line numbers. Headers/imports,
+wrappers, braces, blank lines, and unsupported statements stay in place as
+muted read-only source lines. In C source flow, an authored `return 0;` is a
+direct terminal action: the learner clicks it to finish the program. Java
+source flow finishes after its final authored executable statement. Neither
+path appends a synthetic assignment.
+
+## Selection statements
+
+`plugins/program-selection/` registers the `selection` statement kind and a
+source-backed content provider. Conditions use the shared expression runtime,
+so identifier reads, relational and Boolean reductions, colors, value cards,
+Undo, and connector geometry follow the same contract as declarations and
+assignments.
+
+Selection exercise files may define source-specific randomization in their
+leading metadata:
+
+```c
+/*
+@codescope
+@title Attendance qualification
+@seed score min=60 max=100
+@seed absences min=0 max=10
+*/
+```
+
+Each directive allowlists one literal initialized `int`, `const int`, or Java
+`final int`. Its range is inclusive. Declarations without `@seed` remain
+authored, and declarations such as `int total = x + y;` retain their expression
+and recalculate normally. Duplicate directives, unknown names, reversed ranges,
+and annotated nonliteral initializers are load errors.
+
+The profile chooses `content.sourceValueMode:'seeded'` to apply these ranges or
+`'authored'` to preserve all source initializers. The profile does not carry the
+ranges. Seeded generation rewrites the displayed declaration before parsing so
+the visible source, Program IR, memory, conditions, output, scoring, and saved
+item snapshot share one value.
+
+The final reduction chooses a branch and completes the selection statement in
+the same semantic action. Program Core follows that branch's statement ID; no
+extra branch-confirmation action is rendered. The completed condition
+expression alone receives a result-colored rounded outline. Its source keyword,
+parentheses, and brace remain outside the outline; the derived result is plain,
+centered, unboxed text below the condition. Selection code disables font
+ligatures so multi-character operators remain literal source characters. No
+connector is drawn to the selected statement.
+
+The provider parses supported branch bodies into existing Program IR kinds.
+The initial C and Java lessons therefore run authored `printf` and
+`System.out.print/println` lines through the Program Output plugin. Unsupported
+branch statements remain visible source context until a matching statement
+plugin is registered.
+
+For each new session, the provider parses the current files listed by the
+active language manifest. It derives sequential edges, branch entry targets,
+clause exits, and the statement after each decision from source structure. A
+source edit may add another supported decision or statement without changing a
+JavaScript catalog or expected graph. Files absent from `manifest.json` remain
+out of the activity. A restored Exam uses its persisted Program IR snapshot.
+
+Complete-source profiles can keep that program view stable while the learner
+examines one active statement in a close-view modal:
+
+```js
+program:{
+  declarations:'interactive',
+  scoreAssignments:true,
+  timelinePresentation:'statement-modal',
+}
+```
+
+`timelinePresentation` is optional. Omit it, or use `'inline'`, for the
+established statement-by-statement layout. The modal mounts the same registered
+renderer, so semantic actions, scoring, Undo, persistence, memory reads, and
+Program Output events remain unchanged. A statement plugin must not add a
+modal-only semantic path.
+
+For a source-flow item, the statement-modal presentation uses the shell's
+shared source-file panel. It renders `item.sourceDisplay.filename`, the item
+language, and every `sourceDisplay.lines` row inside one continuous code
+viewport. The panel does not reconstruct source from Program IR or insert
+derived timeline rows.
+
+The active line asks its statement plugin for an optional interaction plan:
+
+```js
+interactionPlan({statement, program}) {
+  return alreadyResolved
+    ? {mode:'direct', action:{type:'commit-assignment', statementId:statement.id}}
+    : {mode:'modal', focus:'expression'};
+}
+```
+
+Use `direct` only when the click represents the statement's sole remaining
+action. The shell sends that semantic action through the normal action handler,
+so scoring, persistence, animation, and interaction policies stay intact. Use
+`modal` for statements that require learner choices or several derivation
+steps. A selection statement uses `focus:'condition-expression'`; its modal
+shows only the condition expression because the full `if`, `else if`, or
+`switch` line remains visible in the source panel. Plugins without this hook
+default to the modal.
+
+Completing a multistep statement keeps the modal open in a read-only completed
+state so the learner can connect the derived result to the source program. Its
+footer has two labeled actions: `Back to source` and `Continue program`.
+`Continue program` remains disabled until evaluation and any output playback
+finish. There is no icon-only X or backdrop dismissal. Escape follows the Back
+behavior. Direct actions do not open a modal.
+
+Program Core advances semantically when an action completes, while the source
+panel stages that change visually. A direct action first finishes its memory or
+output feedback. A modal action waits for an explicit dismissal. The source
+then retains the completed origin and emphasizes its derived result for the
+configured hold. Its semantic destination remains neutral while one flow marker
+moves between the authored line positions. The destination becomes active and
+receives focus only after arrival. Branches may move past skipped lines, and
+the same destination model permits a future loop to move upward. Reduced-motion
+mode keeps the state sequence but shortens the movement.
+
+The shared `program-return` statement kind handles an authored C `return 0;`.
+Its source-line interaction emits the semantic `RETURN` event, finalizes the
+item, and runs the configured completion celebration. It is not synthesized
+for Java or for a C file that does not contain that exact terminal statement.
 
 ## Future statements
 
-Input, selection and looping should be separate registrations. Program
+Input and looping should be separate registrations. Program
 IR may later allow statement-owned blocks (`then`, `else`, `body`) while
 Program Core grows a program-counter stack. Do not embed those semantics in the
 declaration or expression plugins.

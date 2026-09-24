@@ -31,6 +31,12 @@ const DEFAULT_SHELL_SETTINGS = Object.freeze({
     characterDelayMs:55,
     escapeDelayMs:320
   }),
+  sourceFlow:Object.freeze({
+    resultHoldMs:900,
+    modalCloseSettleMs:320,
+    movementDurationMs:1100,
+    reducedMotionDurationMs:120
+  }),
   compoundAssignment: Object.freeze({
     mergeDurationMs: 2200,
     writebackDelayMs: 2400
@@ -131,6 +137,7 @@ function cloneDefaultAppSettings(){
         })
       }),
       outputPanel:Object.assign({},DEFAULT_APP_SETTINGS.shell.outputPanel),
+      sourceFlow:Object.assign({},DEFAULT_APP_SETTINGS.shell.sourceFlow),
       compoundAssignment:Object.assign({},DEFAULT_APP_SETTINGS.shell.compoundAssignment),
       solutionPlayback:Object.assign({},DEFAULT_APP_SETTINGS.shell.solutionPlayback),
       liveStepScroll:Object.assign({},DEFAULT_APP_SETTINGS.shell.liveStepScroll),
@@ -361,6 +368,36 @@ function itemFullyResolved(item){
   return item.workingFlat.operands.length===1 && isFlatOperandReady(item.workingFlat.operands[0]);
 }
 
+function finalizeSourceProgramItem(item){
+  if(!item||!item.sourceFlow||item.checked||!item.program||item.program.status!=='complete') return false;
+  let correctChecks=0,totalChecks=0;
+  item.program.statements.forEach(statement=>{
+    const plugin=statementPluginFor(statement),runtime=statement.runtime;
+    if(!plugin||!plugin.scoresCommit||!runtime||!runtime.checked) return;
+    correctChecks+=runtime.correctSteps||0;
+    totalChecks+=runtime.totalOpSteps||0;
+    totalChecks++;
+    if(runtime.wasCorrectAssignment===true) correctChecks++;
+  });
+  const manualFacts=typeof manualResponseFacts==='function'?manualResponseFacts(item):{correct:0,total:0};
+  correctChecks+=manualFacts.correct;totalChecks+=manualFacts.total;
+  const finalCorrect=totalChecks===0||correctChecks===totalChecks;
+  const profile=PROFILES.find(candidate=>candidate.id===item.profileId)||currentProfile();
+  const score=scoreItem({correctSteps:correctChecks,totalOpSteps:totalChecks,
+    wasCorrectFinal:finalCorrect},profile.pointsPerItem);
+  item.checked=true;item.studentFinal=item.correctFinalValue;
+  item.correctSteps=0;item.totalOpSteps=0;item.wasCorrectFinal=finalCorrect;
+  item.points=score.points;item.maxPoints=score.maxPoints;
+  item.itemScore=score.maxPoints>0?score.points/score.maxPoints:0;
+  item.programScoreFacts={programCorrectChecks:correctChecks,programTotalChecks:totalChecks,
+    declarationCorrectChecks:correctChecks,declarationTotalChecks:totalChecks,
+    expressionCorrectSteps:0,expressionTotalSteps:0,finalCorrect};
+  if(state.mode==='exam'){
+    item.lockedAt=Date.now();item.flagged=false;item.showSolution=false;item.playback=null;
+  }
+  return true;
+}
+
 // action is {type:'substitute', id}, {type:'evaluate', leftId, rightId}, or
 // the assignment plugin's {type:'reveal-assignment-target'} command.
 // Any ready operator anywhere in the expression (not just a single
@@ -388,6 +425,13 @@ function handleTokenClick(action){
       const producedStep=runtime&&runtime.trace&&runtime.trace.length>traceLength
         ? runtime.trace[runtime.trace.length-1] : null;
       const event=result.event||null;
+      const modalOwnsCompletion=!!(result.completed&&typeof programStatementTraceOpenFor==='function'
+        &&programStatementTraceOpenFor(item,statement&&statement.id));
+      const transition=result.completed&&typeof stageSourceFlowTransition==='function'
+        ?stageSourceFlowTransition(item,statement,event&&event.type==='OUTPUT'?'waiting-output':'waiting'):null;
+      const outboundMemoryDelay=transition&&event&&event.action==='ASSIGN'
+        &&typeof varFinalOutboundAnimationDelay==='function'
+        ?varFinalOutboundAnimationDelay(item):0;
       const scoredAction=!!((producedStep&&producedStep.action==='EVALUATE')
         ||(event&&(event.action==='ASSIGN'||event.action==='PRINT')));
       const actionWasCorrect=producedStep&&producedStep.action==='EVALUATE'
@@ -404,9 +448,26 @@ function handleTokenClick(action){
         manualResponseKey:action.manualResponse&&action.manualResponse.key
       });
       if(event&&event.type==='OUTPUT'&&typeof queueProgramOutputAnimation==='function'){
-        queueProgramOutputAnimation(item,event);
+        queueProgramOutputAnimation(item,event,()=>{
+          if(!transition)return;
+          transition.phase='waiting';
+          if(typeof programStatementTraceOpenFor==='function'
+            &&programStatementTraceOpenFor(item,statement&&statement.id))render();
+          else beginSourceFlowTransition(item);
+        });
       }
+      finalizeSourceProgramItem(item);
       render();
+      if(transition&&!modalOwnsCompletion&&(!event||event.type!=='OUTPUT')){
+        if(outboundMemoryDelay>0) setTimeout(()=>beginSourceFlowTransition(item),outboundMemoryDelay);
+        else beginSourceFlowTransition(item);
+      }
+      if(event&&event.type==='RETURN'&&typeof celebrateProgramCompletion==='function'){
+        const celebrate=()=>celebrateProgramCompletion(item,
+          document.querySelector(`[data-statement-id="${event.statementId}"]`)||document.body);
+        if(typeof requestAnimationFrame==='function') requestAnimationFrame(celebrate);
+        else celebrate();
+      }
     } else if(!result.ignored&&strictSequenceEnabled()){
       const reason=strictSequenceInvalidAttemptReason(item,statement,runtime,action);
       if(reason){
@@ -990,6 +1051,7 @@ function handleRetrySameItem(){
   item._feedbackAnimated = false;
   item._bindings = null;
   item.programScoreFacts = null;
+  item._programCompletionCelebrated = false;
   if(itemHasInteractiveProgram(item)){
     resetProgramAction(item, {resetExpressionAction});
   }
