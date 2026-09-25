@@ -1,0 +1,12 @@
+{
+    "title":"C Basic Output Statements",
+    "exercises":[
+        "TaskAlpha.c",
+        "TaskBravo.c",
+        "TaskCharlie.c",
+        "TaskDelta.c",
+        "TaskEcho.c",
+        "TaskFoxtrot.c",
+        "TaskGolph.c"
+    ]
+}

@@ -390,6 +390,9 @@ function openProgramStatementTrace(item,statementId,trigger){
   if(!statement||statement.status==='locked'||statement.status==='blocked') return;
   const plan=statementInteractionPlan(item,statement);
   if(plan.mode!=='modal') return;
+  // Multi-step traces begin by exposing or reading operands. On compact
+  // screens, put that resource in view before the modal is painted.
+  setProgramContextTab('memory');
   statementTraceModalState={item,statementId,focus:plan.focus};
   statementTraceReturnFocus=trigger&&typeof trigger.focus==='function'?trigger:null;
   syncStatementTraceModal(item,true);
@@ -446,6 +449,72 @@ function renderStatementTraceOutput(item){
       h('span',{class:'program-output-cursor','aria-hidden':'true'},'▌')));
 }
 
+let programContextActiveTab='memory';
+let programContextItemRef=null;
+let programContextSequence=0;
+
+function setProgramContextTab(tab){
+  if(tab!=='memory'&&tab!=='output') return;
+  programContextActiveTab=tab;
+  if(typeof document==='undefined'||!document.querySelectorAll) return;
+  document.querySelectorAll('[data-program-context]').forEach(context=>{
+    const available=context.querySelector(`[data-program-context-panel="${tab}"]`);
+    if(!available) return;
+    context.setAttribute('data-active-context',tab);
+    context.querySelectorAll('[data-program-context-tab]').forEach(button=>{
+      const active=button.getAttribute('data-program-context-tab')===tab;
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-selected',String(active));
+      button.setAttribute('tabindex',active?'0':'-1');
+    });
+    context.querySelectorAll('[data-program-context-panel]').forEach(panel=>{
+      panel.classList.toggle('active',panel.getAttribute('data-program-context-panel')===tab);
+    });
+  });
+}
+
+function renderProgramContextShell(memoryPanel,outputPanel,surface){
+  const available=[];
+  if(memoryPanel) available.push('memory');
+  if(outputPanel) available.push('output');
+  if(!available.length) return null;
+  const active=available.includes(programContextActiveTab)?programContextActiveTab:available[0];
+  programContextActiveTab=active;
+  const contextId=`program-context-${surface}-${++programContextSequence}`;
+  const tabs=h('div',{class:'program-context-tabs',role:'tablist','aria-label':'Program context'});
+  const context=h('aside',{class:`program-context-dock program-context-${surface}${available.length>1?' has-tabs':''}`,
+    'data-program-context':'','data-active-context':active});
+  const activate=(name,moveFocus=false)=>{
+    setProgramContextTab(name);
+    if(moveFocus){
+      const button=tabs.querySelector(`[data-program-context-tab="${name}"]`);
+      if(button&&typeof button.focus==='function') button.focus();
+    }
+  };
+  const addPanel=(name,label,icon,node)=>{
+    if(!node) return;
+    const panelId=`${contextId}-${name}`;
+    const selected=active===name;
+    tabs.appendChild(h('button',{class:`program-context-tab${selected?' active':''}`,type:'button',role:'tab',
+      'data-program-context-tab':name,'aria-controls':panelId,'aria-selected':String(selected),
+      tabindex:selected?'0':'-1',onclick:()=>activate(name),onkeydown:event=>{
+        if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+        event.preventDefault();
+        const index=available.indexOf(name);
+        const next=event.key==='Home'?available[0]:(event.key==='End'?available[available.length-1]
+          :available[(index+(event.key==='ArrowRight'?1:-1)+available.length)%available.length]);
+        activate(next,true);
+      }},
+      h('i',{class:`fa-solid ${icon}`,'aria-hidden':'true'}),h('span',{},label)));
+    context.appendChild(h('div',{id:panelId,class:`program-context-panel${selected?' active':''}`,role:'tabpanel',
+      'data-program-context-panel':name},node));
+  };
+  context.appendChild(tabs);
+  addPanel('memory','Memory','fa-memory',memoryPanel);
+  addPanel('output','Output','fa-display',outputPanel);
+  return context;
+}
+
 function syncStatementTraceModal(item,moveFocus=false){
   const modal=document.getElementById('statementTraceModal');
   const overlay=document.getElementById('statementTraceOverlay');
@@ -476,9 +545,13 @@ function syncStatementTraceModal(item,moveFocus=false){
   if(completed) trace.appendChild(h('div',{class:'statement-trace-complete-note',role:'status'},
     h('i',{class:'fa-solid fa-circle-check','aria-hidden':'true'}),
     h('span',{},'Evaluation complete. Review the result, then continue to the next statement.')));
-  const context=h('div',{class:'statement-trace-context'},renderStatementTraceMemory(item));
-  if(item.program.statements.some(candidate=>candidate.kind==='output')) context.appendChild(renderStatementTraceOutput(item));
-  body.appendChild(h('div',{class:'statement-trace-layout'},trace,context));
+  const modalOutput=item.program.statements.some(candidate=>candidate.kind==='output')
+    ?renderStatementTraceOutput(item):null;
+  const context=renderProgramContextShell(renderStatementTraceMemory(item),modalOutput,'modal');
+  if(context&&context.classList) context.classList.add('statement-trace-context');
+  const layout=h('div',{class:'statement-trace-layout'},trace,context);
+  if(typeof applyActivityZoomToElement==='function') applyActivityZoomToElement(layout);
+  body.appendChild(layout);
   const line=programStatementDisplayNumber(statement,statementIndex);
   const kindLabel={declaration:'Declaration',assignment:'Assignment','unary-update':'Update',output:'Output',selection:'Condition'}[statement.kind]||'Statement';
   title.textContent=`${kindLabel} trace · Line ${line}${completed?' · Complete':''}`;
@@ -551,11 +624,18 @@ function renderProgramWorkspaceShell(container,item,program){
   });
   workspace.appendChild(progress);
   const flow=h('div',{class:'program-statement-flow'});
+  if(programContextItemRef!==item){programContextItemRef=item;programContextActiveTab='memory';}
   const hasOutput=program.statements.some(statement=>statement.kind==='output')
     &&DEFAULT_APP_SETTINGS.shell.outputPanel.visible;
-  if(hasOutput&&typeof renderProgramOutputPanel==='function'){
-    workspace.appendChild(h('div',{class:'program-workspace-layout'},flow,renderProgramOutputPanel(item,program)));
-  }else workspace.appendChild(flow);
+  const hasMemory=typeof varFinalPanelVisibleForItem==='function'
+    ?varFinalPanelVisibleForItem(item)
+    :(typeof varFinalPanelShouldRender==='function'&&varFinalPanelShouldRender(item));
+  const memoryHost=hasMemory?h('div',{class:'program-memory-dock-host','aria-live':'polite'}):null;
+  const outputPanel=hasOutput&&typeof renderProgramOutputPanel==='function'
+    ?renderProgramOutputPanel(item,program):null;
+  const context=renderProgramContextShell(memoryHost,outputPanel,'main');
+  if(context) workspace.appendChild(h('div',{class:'program-workspace-layout'},flow,context));
+  else workspace.appendChild(flow);
   container.appendChild(workspace);
   return flow;
 }

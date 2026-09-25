@@ -159,9 +159,15 @@ New activities must look like members of the existing application.
 - The header animation control cycles Off → 1s → 2s → 3s → Off.
 - Off disables transfer travel but not the value-roll update.
 - Transfers in both directions use the selected duration.
-- Programs containing output statements show one cumulative Program Output
-  panel. Desktop places it beside the statement flow when space permits;
-  mobile places it above the flow without horizontal page overflow.
+- Program activities place Memory and the cumulative Program Output in one
+  docked context rail beside the statement flow. Memory is not draggable in
+  this workspace. Legacy expression-only activities may retain their floating
+  final-state panel because they have no program context rail.
+- At phone widths, the context rail becomes one tabbed panel above the flow.
+  Memory and Output remain manually selectable. Reading or writing a binding
+  selects Memory before transfer geometry is measured; executing a print
+  selects Output before command travel and character playback. The statement
+  trace modal uses the same responsive tabs.
 - Output command execution reuses the curved transfer cue, then reveals text
   character by character. Escape notation is exposed before its control effect;
   reduced motion reveals the completed event immediately.
@@ -216,3 +222,22 @@ New activities must look like members of the existing application.
 Every UI change must be checked at desktop width and at approximately 390 px
 mobile width. Verify readable text, reachable actions, wrapping, modal fit,
 drawer scrolling, and absence of page-level horizontal overflow.
+
+## Activity size controls
+
+- A compact Activity size control appears above the learning surface during a
+  session. It provides decrease, percentage/reset, and increase actions from
+  80% through 140% in 10% steps.
+- Activity sizing applies only to the learning content, statement trace modal
+  contents, and memory card contents. The app header, sidebar, pagination,
+  drawers, modal frame and actions, legacy floating-memory frame, and the size
+  control itself remain at the normal shell size.
+- The percentage action resets to the configured default. `Alt+-`, `Alt++`,
+  and `Alt+0` provide the same operations outside editable controls.
+- Connector geometry and fitted activity layouts must refresh after every size
+  change. Enlarging content must reflow within its available area without
+  creating page-level horizontal overflow.
+- Mobile presents the control as a compact floating group above the pagination.
+  It hides the text label but
+  retains accessible 40 px icon controls and a visible percentage. The chosen
+  size is stored per signed-in student on the current browser.

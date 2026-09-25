@@ -58,10 +58,11 @@ function render(){
     return;
   }
   const activeItem=currentItem();
-  if(activeItem&&activeItem.activityKind) renderActivityItem(container,activeItem);
-  else renderProgramItem(container, activeItem);
+  const activitySurface=typeof mountActivityZoom==='function'?mountActivityZoom(container):container;
+  if(activeItem&&activeItem.activityKind) renderActivityItem(activitySurface,activeItem);
+  else renderProgramItem(activitySurface, activeItem);
   if(state.mode==='exam'&&state.examExpired){
-    container.prepend(h('div',{class:'exam-time-expired-notice',role:'status'},
+    activitySurface.prepend(h('div',{class:'exam-time-expired-notice',role:'status'},
       h('i',{class:'fa-solid fa-lock','aria-hidden':'true'}),
       h('span',{},h('b',{},'Time expired.'),' Answers and scoring are locked. Use the Score/QR button beside each category to view your result.')));
   }

@@ -50,6 +50,24 @@ function buildDeclarationRuntime(tree, expectedValue){
   };
 }
 
+function buildUninitializedDeclarationRuntime(){
+  const empty={operands:[],operators:[]};
+  return {
+    originalTree:null,
+    originalFlat:empty,
+    workingFlat:deepCloneFlat(empty),
+    history:[deepCloneFlat(empty)],
+    trace:[],
+    canonicalTrace:{steps:[],finalValue:null,treeStates:[]},
+    expectedValue:null,
+    checked:false,
+    correctSteps:0,
+    totalOpSteps:0,
+    wasCorrectAssignment:null,
+    assignedValue:null
+  };
+}
+
 function namedValueTree(declaration,memory){
   return makeNamed(declaration.kind,declaration.name,memory[declaration.name]);
 }

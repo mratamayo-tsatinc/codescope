@@ -76,6 +76,33 @@ and writes for that mode; it does not delete its existing records. The other
 mode's records are unaffected. **Clear all local application data** deletes
 both modes' records.
 
+## Activity size controls
+
+Configure the activity-only zoom in `DEFAULT_SHELL_SETTINGS.activityZoom` in
+`js/state.js`:
+
+```js
+activityZoom: Object.freeze({
+  enabled: true,
+  userControlVisible: true,
+  defaultPercent: 100,
+  minPercent: 80,
+  maxPercent: 140,
+  stepPercent: 10,
+  persistPreference: true,
+}),
+```
+
+The control changes the learning surface, statement trace contents, and memory
+card contents. It does not resize the sidebar, app header, pagination, drawers,
+or modal controls. Students can use the on-screen minus, percentage/reset, and
+plus actions or `Alt+-`, `Alt+0`, and `Alt++`.
+
+When `persistPreference` is enabled, the browser stores the selected percentage
+under the signed-in student's normalized email. **Clear all local application
+data** removes these preferences. Keep the range and step values aligned so
+both endpoints can be reached in whole steps.
+
 ## Complete configuration
 
 ```js
@@ -300,11 +327,11 @@ and the page explains that the deployment controls them.
 
 ## Local data and the Danger Zone
 
-| Action | Settings | Saved login | Exam attempts | Practice progress |
-|---|---:|---:|---:|---:|
-| Clear all exam progress | Keep | Keep | Delete | Keep |
-| Reset application settings | Reset to `state.js` defaults | Keep | Keep | Keep |
-| Clear all local application data | Delete/reset | Delete | Delete | Delete |
+| Action | Settings | Saved login | Exam attempts | Practice progress | Activity size |
+|---|---:|---:|---:|---:|---:|
+| Clear all exam progress | Keep | Keep | Delete | Keep | Keep |
+| Reset application settings | Reset to `state.js` defaults | Keep | Keep | Keep | Keep |
+| Clear all local application data | Delete/reset | Delete | Delete | Delete | Reset |
 
 These actions affect only the current browser/device. The application has no
 backend database or central dashboard, so clearing browser storage cannot be

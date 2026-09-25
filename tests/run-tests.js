@@ -118,8 +118,25 @@ function testScriptManifestParses(){
   assert(localScripts.indexOf('js/program-return.js')<localScripts.indexOf('plugins/program-output/content.js'));
   const stateSource=fs.readFileSync(path.join(ROOT,'js','state.js'),'utf8');
   const juiceSource=fs.readFileSync(path.join(ROOT,'js','juice.js'),'utf8');
+  const shellSource=fs.readFileSync(path.join(ROOT,'js','shell-ui.js'),'utf8');
+  const mainSource=fs.readFileSync(path.join(ROOT,'js','main.js'),'utf8');
+  const settingsPersistenceSource=fs.readFileSync(path.join(ROOT,'js','settings-persistence.js'),'utf8');
+  const sharedStylesSource=fs.readFileSync(path.join(ROOT,'css','styles.css'),'utf8');
   assert(stateSource.includes("event&&event.type==='RETURN'&&typeof celebrateProgramCompletion==='function'"));
   assert(juiceSource.includes('function celebrateProgramCompletion(item,referenceEl)'));
+  assert(stateSource.includes('activityZoom:Object.freeze({'));
+  assert(stateSource.includes('minPercent:80')&&stateSource.includes('maxPercent:140'));
+  assert(shellSource.includes("const ACTIVITY_ZOOM_STORAGE_PREFIX='precedifyActivityZoom:'"));
+  assert(shellSource.includes('function mountActivityZoom(container)'));
+  assert(shellSource.includes("element.classList.add('activity-zoom-surface')"));
+  assert(shellSource.includes("element.style.removeProperty('width')"));
+  assert(!shellSource.includes('element.style.width=`${100/factor}%`'));
+  assert(shellSource.includes("event.altKey")&&shellSource.includes("event.key==='0'"));
+  assert(mainSource.includes("mountActivityZoom(container)"));
+  assert(settingsPersistenceSource.includes("key.indexOf('precedifyActivityZoom:')===0"));
+  assert(sharedStylesSource.includes('.activity-zoom-toolbar{'));
+  assert(sharedStylesSource.includes('.activity-zoom-surface{'));
+  assert(sharedStylesSource.includes('@media (max-width:768px)'));
   assert(html.includes('id="statementTraceModal"'));
   assert(html.includes('id="statementTraceBody"'));
   assert(html.includes('id="statementTraceOverlay"'));
@@ -204,6 +221,8 @@ function testScriptManifestParses(){
   assert(memoryRenderer.includes("class:'var-final-group var-final-group-variables'"));
   assert(!memoryRenderer.includes('renderBindingInfoTrigger'));
   assert(memoryFloatRenderer.includes('function cycleVarFinalFlyAnimation()'));
+  assert(memoryFloatRenderer.includes('function mountVarFinalDockPanel('));
+  assert(memoryFloatRenderer.includes("setProgramContextTab('memory')"));
   assert(memoryFloatRenderer.includes('Off -> 1s -> 2s -> 3s'));
   assert(!memoryFloatRenderer.includes('renderVarFinalSpeedToggle'));
   assert(!memoryFloatRenderer.includes('var-final-float-speed-row'));
@@ -887,7 +906,7 @@ function testDeclarationChain(){
     });
   })()`));
   assert.deepStrictEqual(result, {
-    profileCount:33,
+    profileCount:34,
     declarationCount:4,
     statementCount:5,
     dependencyCounts:[0,1,1,1],
@@ -1229,7 +1248,7 @@ function testOldExamSaveGainsNewProfile(){
     });
   })()`));
   assert.deepStrictEqual(result, {
-    resumed:true, profileCount:33, preservedScore:0.75,policyMigrated:true,
+    resumed:true, profileCount:34, preservedScore:0.75,policyMigrated:true,
     addedKind:'interactive-declarations',addedAssignmentKind:'interactive-program'
   });
 }
@@ -1349,6 +1368,7 @@ function testExamSettingsAndTimeoutPolicy(){
 
 function run(){
   testScriptManifestParses();
+  testConnectorCoordinatesRespectActivityZoom();
   testPracticeRetryPlacement();
   testTokenClassificationPlugin();
   testFallingTokenSortMultiple();
@@ -1374,6 +1394,22 @@ function run(){
   testManualResponseProfilesAndPropagation();
   testManualResponseResolvedUnaryOperands();
   console.log('All CodeScope compatibility and extension tests passed.');
+}
+
+function testConnectorCoordinatesRespectActivityZoom(){
+  const ctx=context();
+  ctx.DEFAULT_APP_SETTINGS={shell:{connectors:{maxLeadPx:32,userControlVisible:true}}};
+  ctx.state={showConnectors:true};
+  load(ctx,['connector-lines.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    function pointFor(width,height,clientX,clientY){
+      const panel={offsetWidth:200,offsetHeight:100,scrollLeft:10,scrollTop:5,
+        getBoundingClientRect(){return {left:100,top:50,width,height};}};
+      return connectorLocalPoint(connectorContentRect(panel),clientX,clientY);
+    }
+    return JSON.stringify({normal:pointFor(200,100,150,100),zoomed:pointFor(280,140,170,120)});
+  })()`));
+  assert.deepStrictEqual(result,{normal:{x:60,y:55},zoomed:{x:60,y:55}});
 }
 
 function testTokenClassificationPlugin(){
@@ -1936,7 +1972,8 @@ function testProfileCategoriesAndScopedScores(){
       &&document.getElementById('scoreSummaryTotal').textContent==='12.6 / 31';
     populateProfileSidebar();
     const categories=document.getElementById('profileList').children;
-    const grouped=categories.length===4 && categories.every(category=>category.children.length===2);
+    const grouped=categories.length===enabledCategories().length
+      &&categories.every(category=>category.children.length===2);
     const professionalHierarchy=categories.every(category=>{
       const heading=category.children[0],expand=heading.children[0],results=heading.children[1];
       return expand.children[1].className==='category-nav-label'
@@ -2039,6 +2076,10 @@ function testModeScopedPersistence(){
 function testProgramOutputStatementPlugin(){
   const rendererSource=fs.readFileSync(path.join(ROOT,'plugins','program-output','renderer.js'),'utf8');
   const outputStyles=fs.readFileSync(path.join(ROOT,'plugins','program-output','styles.css'),'utf8');
+  assert(rendererSource.includes("setProgramContextTab('output')"));
+  assert(outputStyles.includes('.program-context-main{position:sticky'));
+  assert(outputStyles.includes('.program-context-dock.has-tabs .program-context-panel{display:none;}'));
+  assert(outputStyles.includes('.program-context-dock.has-tabs .program-context-panel.active{display:block;}'));
   const ctx=context();
   installFakeDom(ctx);
   load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
@@ -2173,6 +2214,9 @@ function testProgramOutputStatementPlugin(){
       &&sourceFlowText.includes('    #include')===false;
     const sourceContextRows=countNodesWithClass(sourceFlowHost,'program-source-context');
     const sourceFlowProgramRows=countNodesWithClass(sourceFlowHost,'program-statement');
+    const sourceFlowContextDocks=countNodesWithClass(sourceFlowHost,'program-context-main');
+    const sourceFlowContextTabs=countNodesWithClass(sourceFlowHost,'program-context-tab');
+    const sourceFlowMemoryHosts=countNodesWithClass(sourceFlowHost,'program-memory-dock-host');
     const sourceFlowReturnIndex=sourceFlowItem.program.statements.findIndex(statement=>statement.kind==='program-return');
     const sourceFlowReturn=sourceFlowItem.program.statements[sourceFlowReturnIndex];
     sourceFlowItem.program.statements.slice(0,sourceFlowReturnIndex).forEach(statement=>{
@@ -2230,7 +2274,7 @@ function testProgramOutputStatementPlugin(){
         &&tolerant.sourceDisplay.lines.some(line=>line.text.includes('mystery(x)')&&!line.supported),
       sourceFlowStatementCount,sourceFlowHasSynthetic,sourceFlowLineNumbers,sourceFlowIndentPreserved,
       sourceFlowTimelineIndentCount,
-      sourceContextRows,sourceFlowProgramRows,
+      sourceContextRows,sourceFlowProgramRows,sourceFlowContextDocks,sourceFlowContextTabs,sourceFlowMemoryHosts,
       sourceFlowRunningBeforeReturn,sourceFlowReturnMode:sourceFlowReturnPlan.mode,
       sourceFlowReturnAction:sourceFlowReturnPlan.action.type,sourceFlowReturned:sourceFlowReturned.applied,
       sourceFlowCompletedAfterReturn:sourceFlowItem.program.status==='complete',
@@ -2324,6 +2368,11 @@ function testProgramOutputStatementPlugin(){
   assert.strictEqual(result.sourceFlowTimelineIndentCount,3);
   assert(result.sourceContextRows>0);
   assert.strictEqual(result.sourceFlowProgramRows,result.supportedSourceLines+result.mutedSourceLines);
+  assert.strictEqual(result.sourceFlowContextDocks,1);
+  assert(result.sourceFlowContextTabs>=1);
+  // var-final-float.js is covered by the code-simulator harness above; this
+  // plugin-only harness loads the Output side of the shared context dock.
+  assert.strictEqual(result.sourceFlowMemoryHosts,0);
   assert(result.sourceFlowRunningBeforeReturn&&result.sourceFlowReturned&&result.sourceFlowCompletedAfterReturn);
   assert.strictEqual(result.sourceFlowReturnMode,'direct');
   assert.strictEqual(result.sourceFlowReturnAction,'return-program');
@@ -2464,6 +2513,9 @@ int main() {
     const activeSourceRows=countNodesWithClass(sourceHost,'is-active');
     const oldTimelineRows=countNodesWithClass(sourceHost,'statement-trace-source-row');
     const inlinePanels=countNodesWithClass(sourceHost,'program-expression-panel');
+    const contextDocks=countNodesWithClass(sourceHost,'program-context-main');
+    const contextTabs=countNodesWithClass(sourceHost,'program-context-tab');
+    const memoryDockHosts=countNodesWithClass(sourceHost,'program-memory-dock-host');
     const migratedSourceOutputTimeline=programTimelinePresentation({profileId:'program-output-source-flow'});
     const inlineDefault=programTimelinePresentation({profileId:'program-output-basics'});
     const firstStatement=first.program.statements[0],firstPlan=statementInteractionPlan(first,firstStatement);
@@ -2542,6 +2594,7 @@ int main() {
       profileItemCount:profile.scoring.itemCount,profileSelectionCount:profile.content.selection.count,
       manifestVersion:CODE_SIMULATOR_PLUGIN_MANIFEST.version,sourcePanels,sourceRows,firstMemoryNames,
       sourceLineCount:first.sourceDisplay.lines.length,sourceActions,directActions,modalActions,activeSourceRows,oldTimelineRows,inlinePanels,
+      contextDocks,contextTabs,memoryDockHosts,
       inlineDefault,migratedSourceOutputTimeline,
       firstPlanMode:firstPlan.mode,firstPlanAction:firstPlan.action.type,directExecution:directExecution.applied,
       selectionPlanMode:selectionPlan.mode,selectionPlanFocus:selectionPlan.focus,
@@ -2630,6 +2683,11 @@ int main() {
   assert.strictEqual(result.activeSourceRows,1);
   assert.strictEqual(result.oldTimelineRows,0);
   assert.strictEqual(result.inlinePanels,0);
+  assert.strictEqual(result.contextDocks,1);
+  // This isolated harness does not load var-final-float.js, so it exercises
+  // the Output side of the shared dock; memory mounting is asserted above.
+  assert.strictEqual(result.contextTabs,1);
+  assert.strictEqual(result.memoryDockHosts,0);
   assert.strictEqual(result.inlineDefault,'inline');
   assert.strictEqual(result.migratedSourceOutputTimeline,'statement-modal');
   assert.strictEqual(result.firstPlanMode,'direct');

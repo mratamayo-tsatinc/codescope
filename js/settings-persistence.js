@@ -107,10 +107,12 @@ function clearAllPrecedifyLocalData(){
       const key=localStorage.key(i);
       if(key&&(key==='precedifyLogin'||key===APP_SETTINGS_KEY
         ||key.indexOf('precedifyExamProgress:')===0
-        ||key.indexOf('precedifyPracticeProgress:')===0)) keys.push(key);
+        ||key.indexOf('precedifyPracticeProgress:')===0
+        ||key.indexOf('precedifyActivityZoom:')===0)) keys.push(key);
     }
     keys.forEach(key=>{localStorage.removeItem(key);removed++;});
   }catch(e){ /* return whatever was removed before the failure */ }
   appSettings=cloneDefaultAppSettings();
+  if(typeof resetActivityZoomPreference==='function') resetActivityZoomPreference();
   return removed;
 }

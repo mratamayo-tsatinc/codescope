@@ -2102,7 +2102,37 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
 .timer-container{height:36px;white-space:nowrap;}
 
 /* Session context now belongs to the persistent shell header. */
-#app>.session-bar{display:none;}
+#app .activity-zoom-surface>.session-bar{display:none;}
+
+/* Activity-local size controls. The shell, pagination and floating panel frame
+   remain at their normal size while learning content follows this scale. */
+.visually-hidden{
+  position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;
+  overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;
+}
+.activity-zoom-toolbar{
+  position:sticky;top:0;z-index:25;display:flex;align-items:center;justify-content:flex-start;gap:8px;
+  min-height:38px;margin:-6px 0 10px;padding:4px 0;
+  background:linear-gradient(180deg,var(--bg) 72%,transparent);
+}
+.activity-zoom-label{color:var(--text-mute);font:650 11px/1 var(--ui);letter-spacing:.03em;}
+.activity-zoom-controls{
+  display:inline-flex;align-items:center;padding:2px;border:1px solid var(--line);border-radius:8px;
+  background:var(--panel);box-shadow:0 3px 12px rgba(0,0,0,.12);
+}
+.activity-zoom-button,.activity-zoom-value{
+  appearance:none;display:inline-flex;align-items:center;justify-content:center;height:30px;margin:0;border:0;border-radius:6px;
+  background:transparent;color:var(--text-dim);font:700 11px/1 var(--ui);cursor:pointer;
+}
+.activity-zoom-button{width:30px;}
+.activity-zoom-value{min-width:50px;padding:0 7px;color:var(--text);font-family:var(--mono);}
+.activity-zoom-button:hover,.activity-zoom-value:hover,
+.activity-zoom-button:focus-visible,.activity-zoom-value:focus-visible{
+  outline:0;background:var(--panel-alt);color:var(--op-glow);box-shadow:inset 0 0 0 1px var(--line);
+}
+.activity-zoom-button:disabled{opacity:.35;cursor:not-allowed;background:transparent;color:var(--text-mute);box-shadow:none;}
+.activity-zoom-viewport{min-width:0;overflow:visible;}
+.activity-zoom-surface{box-sizing:border-box;min-width:0;transform-origin:top left;}
 
 .item-pagination-container{
   padding:8px 12px max(8px,env(safe-area-inset-bottom));
@@ -2150,6 +2180,15 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   .timer-display{min-width:44px;font-size:14px;}
   .mode-tag{min-height:28px;padding:3px 7px;font-size:10px;}
   #app{padding-top:1rem;}
+  .activity-zoom-toolbar{
+    position:fixed;top:auto;right:auto;bottom:calc(72px + env(safe-area-inset-bottom));left:12px;z-index:930;
+    width:max-content;min-height:44px;margin:0;padding:3px;border-radius:9px;background:var(--bg);
+    box-shadow:0 4px 18px rgba(0,0,0,.32);
+  }
+  .activity-zoom-label{display:none;}
+  .activity-zoom-button,.activity-zoom-value{height:40px;}
+  .activity-zoom-button{width:40px;}
+  .activity-zoom-value{min-width:58px;}
   .item-pagination-container{padding:7px 10px max(7px,env(safe-area-inset-bottom));}
   .item-pagination{max-width:420px;padding:6px 8px;gap:6px;flex-wrap:nowrap;}
   .item-page-first,.item-page-last{display:none;}

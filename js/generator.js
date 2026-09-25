@@ -245,10 +245,10 @@ function countComparisonOps(node){
 // ----------------------------------------------------------------------------
 function validateProfiles(profiles){
   for(const p of profiles){
-    // Activity profiles are declarative shell entries whose domain-specific
-    // shape is validated by their registered activity plugin. They do not
-    // carry an expression template, operands, or operators.
-    if(p.activity) continue;
+    // Activity and source-file profiles delegate their domain-specific shape
+    // to a registered owner. Only generated expression profiles require the
+    // legacy template, operands, and operators contract.
+    if(p.activity||(p.content&&p.content.mode==='source-files')) continue;
     let ast;
     try{ ast = parseTemplate(p.template); }
     catch(e){ throw new Error(`Profile "${p.meta.id}": template parse error: ${e.message}`); }
@@ -361,7 +361,9 @@ function finalizeProfile(raw){
     template: raw.template,
     enabled: raw.enabled!==false,
   };
-  p._ast = parseTemplate(p.template);
+  p._ast = p.content&&p.content.mode==='source-files'
+    ?null
+    :parseTemplate(p.template);
   p.id = p.meta.id;
   p.name = p.meta.name;
   p.description = p.meta.description;

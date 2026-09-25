@@ -114,8 +114,10 @@ function appendOutputSubstitutionConnector(paths,dots,panelRect,row,step,color,i
   const destination=row.querySelector(`[data-token-id="${step.resultNodeId}"]`);
   if(!source||!destination||source===destination) return;
   const s=source.getBoundingClientRect(),d=destination.getBoundingClientRect();
-  const x1=s.left+s.width/2-panelRect.left,y1=s.bottom-panelRect.top;
-  const x2=d.left+d.width/2-panelRect.left,y2=d.bottom-panelRect.top;
+  const sourcePoint=connectorLocalPoint(panelRect,s.left+s.width/2,s.bottom);
+  const destinationPoint=connectorLocalPoint(panelRect,d.left+d.width/2,d.bottom);
+  const x1=sourcePoint.x,y1=sourcePoint.y;
+  const x2=destinationPoint.x,y2=destinationPoint.y;
   const laneY=Math.max(y1,y2)+22;
   const stateClass=isCurrent?'connector-line-current':'connector-line-past';
   const path=document.createElementNS('http://www.w3.org/2000/svg','path');
@@ -157,8 +159,10 @@ function buildConnectorVisuals(panelRect, rows, steps, visibleCount){
     if(!srcEl || !dstEl) continue;
 
     const s = srcEl.getBoundingClientRect(), d = dstEl.getBoundingClientRect();
-    const x1 = s.left + s.width/2 - panelRect.left, y1 = s.bottom - panelRect.top;
-    const x2 = d.left + d.width/2 - panelRect.left, y2 = d.top - panelRect.top;
+    const sourcePoint=connectorLocalPoint(panelRect,s.left+s.width/2,s.bottom);
+    const destinationPoint=connectorLocalPoint(panelRect,d.left+d.width/2,d.top);
+    const x1=sourcePoint.x,y1=sourcePoint.y;
+    const x2=destinationPoint.x,y2=destinationPoint.y;
     const isCurrent = i===lastIndex;
     const semanticColor = originColorForStep(steps, i);
     const color = step.outputAction ? 'var(--op)' : semanticColor;
@@ -225,10 +229,10 @@ function drawManualResponseConnector(){
   const panelRect=connectorContentRect(panel);
   const sourceRect=source.getBoundingClientRect();
   const destinationRect=destination.getBoundingClientRect();
-  const x1=sourceRect.left+sourceRect.width/2-panelRect.left;
-  const y1=sourceRect.bottom-panelRect.top;
-  const x2=destinationRect.left+destinationRect.width/2-panelRect.left;
-  const y2=destinationRect.top-panelRect.top;
+  const sourcePoint=connectorLocalPoint(panelRect,sourceRect.left+sourceRect.width/2,sourceRect.bottom);
+  const destinationPoint=connectorLocalPoint(panelRect,destinationRect.left+destinationRect.width/2,destinationRect.top);
+  const x1=sourcePoint.x,y1=sourcePoint.y;
+  const x2=destinationPoint.x,y2=destinationPoint.y;
   const halfGap=(y2-y1)/2;
   const lead=Math.min(CONNECTOR_MAX_LEAD,halfGap>0?halfGap:0);
   const color=manualResponseConnectorColor||'#ffa35c';
@@ -286,10 +290,25 @@ function clearManualResponseConnector(){
 // connector redraw; only a genuine layout change does.
 function connectorContentRect(panel){
   const rect=panel.getBoundingClientRect();
+  const layoutWidth=panel.offsetWidth||rect.width||1;
+  const layoutHeight=panel.offsetHeight||rect.height||1;
   return {
-    left:rect.left-(panel.scrollLeft||0),
-    top:rect.top-(panel.scrollTop||0),
-    right:rect.right,bottom:rect.bottom,width:rect.width,height:rect.height
+    left:rect.left,
+    top:rect.top,
+    scaleX:rect.width/layoutWidth||1,
+    scaleY:rect.height/layoutHeight||1,
+    scrollLeft:panel.scrollLeft||0,
+    scrollTop:panel.scrollTop||0
+  };
+}
+
+// getBoundingClientRect() reports zoomed viewport coordinates while the SVG
+// overlay uses the panel's unzoomed layout pixels. Convert every measured
+// endpoint back into that shared local coordinate plane before drawing.
+function connectorLocalPoint(panelRect,clientX,clientY){
+  return {
+    x:(clientX-panelRect.left)/panelRect.scaleX+panelRect.scrollLeft,
+    y:(clientY-panelRect.top)/panelRect.scaleY+panelRect.scrollTop
   };
 }
 

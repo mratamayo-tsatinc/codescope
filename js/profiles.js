@@ -276,7 +276,7 @@ const PROFILES_RAW = [
     meta:{id:'program-output-basics',name:'Output Statements',
       description:'Build values in memory, format or concatenate them, then trace C or Java output one character at a time.'},
     shape:{operandSources:{variable:3},operandRange:{min:2,max:12},allowNegativeOperands:false},
-    operators:{allowed:OPS.ADD_SUB},
+
     template:'operand op operand op operand',
     scoring:{itemCount:'manifest',pointsPerItem:2},
     content:{provider:'program-output',mode:'source-files',recipe:'formatted-values',
@@ -305,6 +305,17 @@ const PROFILES_RAW = [
     operators:{allowed:[...OPS.COMPARISON,...OPS.LOGICAL]},template:'operand cmp operand',
     scoring:{itemCount:'manifest',pointsPerItem:2},
     content:{provider:'code-simulator',mode:'source-files',exerciseSet:'selection-basics',sourceValueMode:'seeded',
+      presentation:'source-flow',selection:{count:'all',shuffle:false}},
+    program:{declarations:'interactive',scoreAssignments:true,timelinePresentation:'statement-modal'},
+  },
+  {
+    enabled:true,
+    meta:{id:'test-basic-output',name:'Test Basic Output',
+      description:'Trigger each supported statement and trace the actual flow through a complete C source program.'},
+    shape:{operandSources:{variable:1,literal:1},operandRange:{min:1,max:100},allowNegativeOperands:false},
+    operators:{allowed:[...OPS.COMPARISON,...OPS.LOGICAL]},template:'operand cmp operand',
+    scoring:{itemCount:'manifest',pointsPerItem:2},
+    content:{provider:'code-simulator',mode:'source-files',exerciseSet:'output-basics',sourceValueMode:'seeded',
       presentation:'source-flow',selection:{count:'all',shuffle:false}},
     program:{declarations:'interactive',scoreAssignments:true,timelinePresentation:'statement-modal'},
   },
@@ -625,6 +636,14 @@ const PROFILES_RAW = [
 // Categories are authored here alongside the profiles. A profile belongs to
 // exactly one category; removing a category or profile ID is validated at load.
 const PROFILE_CATEGORIES = [
+  {
+    id:'output-statements',name:'Output Statements',enabled:true,
+    profileIds:[
+      'program-output-basics',
+      'program-output-source-flow',
+      'selection-statements-source',
+      'test-basic-output',
+  ]},
   {id:'expressions',name:'Expressions',enabled:true,profileIds:[
     'direct-ltr','mult-precedence','same-precedence-assoc','full-basic-precedence','modulus',
     'parens-override','parens-override-multi','parens-override-dual','variables-arithmetic',
@@ -633,7 +652,7 @@ const PROFILE_CATEGORIES = [
     'relational-boolean-mix'
   ]},
   {id:'program-statements',name:'Program Statements',enabled:true,profileIds:[
-    'declaration-chain','program-output-basics','program-output-source-flow','selection-statements-source','assignment-basic','assignment-add-sub','assignment-multiply',
+    'declaration-chain','assignment-basic','assignment-add-sub','assignment-multiply',
     'assignment-div-mod','assignment-rhs-expression','assignment-sequential',
     'assignment-dependent','assignment-advanced-chain','unary-update-sequence',
     'assignment-unary-advanced-chain','relational-logical-student-derived'

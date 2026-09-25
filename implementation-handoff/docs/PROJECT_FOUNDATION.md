@@ -113,6 +113,8 @@ Activity plugins may use these shell capabilities without reimplementing them:
 - scoring aggregation and Score Summary;
 - Console and Feedback drawers;
 - modal shell and connector conventions;
+- activity-local sizing, per-student preference, and post-resize connector
+  refresh;
 - mode-scoped session persistence;
 - Undo, Check, Try again, and solution disclosure policy;
 - shared design tokens, accessibility primitives, and animation services.

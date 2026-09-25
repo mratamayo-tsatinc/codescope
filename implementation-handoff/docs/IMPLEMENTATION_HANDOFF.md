@@ -100,6 +100,11 @@ Last consolidated: 2026-09-21
   Direct feedback or modal dismissal then starts a source-line transition from
   the completed origin to the semantic destination, including skipped branch
   lines and future backward loop destinations.
+- Program workspaces now dock Memory and Program Output together beside the
+  statement flow. At 768 px and below the dock and modal context become
+  Memory/Output tabs. Memory reads and writes activate Memory; print playback
+  activates Output before transfer coordinates are captured. The legacy
+  floating final-state panel remains available to expression-only activities.
 
 ### Identifier activities
 
@@ -139,10 +144,15 @@ Last consolidated: 2026-09-21
 
 - Practice and Exam settings/persistence policy in `js/state.js`.
 - Manual student-derived values with responsive origin connectors.
-- Compact memory panel and animation speed cycle.
+- Docked program memory, compact mobile context tabs, and the animation speed
+  cycle; legacy expression-only activities retain the floating final-state
+  panel.
 - Strict-sequence invalid-execution policy.
 - Feedback drawer auto-open and Practice-only solution toggle.
 - Downloadable Score Summary PNG with export-safe score styling.
+- Activity-only size controls from 80% to 140%, with keyboard shortcuts,
+  per-student browser persistence, responsive mobile controls, and connector
+  refresh. The shell and navigation remain at their normal size.
 
 ## Deliberate limitations and deferred work
 

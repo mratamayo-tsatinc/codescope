@@ -19,6 +19,8 @@ function declarationInitializerResolved(statement){
     && isFlatOperandReady(runtime.workingFlat.operands[0]));
 }
 
+function declarationHasInitializer(statement){return statement&&statement.initialized!==false;}
+
 function syncDeclarationOperandsFromMemory(statement, program){
   const runtime = statement.runtime;
   if(!runtime || runtime.trace.length>0) return;
@@ -47,6 +49,9 @@ registerStatementPlugin({
   scoresCommit: true,
 
   interactionPlan(ctx){
+    if(!declarationHasInitializer(ctx.statement)){
+      return {mode:'direct',action:{type:'declare-binding',statementId:ctx.statement.id},label:'Declare variable'};
+    }
     const ready=declarationDependenciesReady(ctx.statement,ctx.program)
       &&declarationInitializerResolved(ctx.statement);
     return ready
@@ -65,6 +70,24 @@ registerStatementPlugin({
     const runtime = statement.runtime;
     if(!runtime || runtime.checked || !declarationDependenciesReady(statement, program)) return {applied:false};
     syncDeclarationOperandsFromMemory(statement, program);
+
+    if(action.type==='declare-binding'&&!declarationHasInitializer(statement)){
+      runtime.checked=true;
+      runtime.wasCorrectAssignment=true;
+      program.memory[statement.binding.name]={
+        name:statement.binding.name,
+        kind:statement.binding.kind,
+        dataType:statement.binding.dataType,
+        mutable:statement.binding.mutable,
+        initialized:false,
+        value:null,
+        lastStatementId:statement.id
+      };
+      return {applied:true,completed:true,event:{
+        type:'DECLARE',action:'DECLARE',statementId:statement.id,
+        target:statement.binding.name,dataType:statement.binding.dataType,wasCorrect:true
+      }};
+    }
 
     if(action.type === 'commit-assignment'){
       if(!declarationInitializerResolved(statement)) return {applied:false};
@@ -159,6 +182,10 @@ registerStatementPlugin({
   buildCanonicalTrace(ctx){
     const runtime = ctx.statement.runtime;
     if(!runtime || !runtime.canonicalTrace) return [];
+    if(!declarationHasInitializer(ctx.statement)) return [{
+      type:'DECLARE',action:'DECLARE',statementId:ctx.statement.id,
+      target:ctx.statement.binding.name,dataType:ctx.statement.binding.dataType,wasCorrect:true
+    }];
     const steps = runtime.canonicalTrace.steps.map(step=>Object.assign({statementId:ctx.statement.id}, step));
     steps.push({
       type:'ASSIGN', action:'ASSIGN', statementId:ctx.statement.id,

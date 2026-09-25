@@ -29,7 +29,8 @@ function binaryExpression(operator, left, right, opts){
 function declarationStatement(spec){
   spec = spec || {};
   if(!spec.name) throw new Error('Declaration statement requires a name');
-  if(!spec.initializer) throw new Error(`Declaration '${spec.name}' requires an initializer`);
+  const initialized=spec.initialized!==false;
+  if(initialized&&!spec.initializer) throw new Error(`Declaration '${spec.name}' requires an initializer`);
   return {
     id: spec.id || null,
     kind: 'declaration',
@@ -38,7 +39,8 @@ function declarationStatement(spec){
       dataType: spec.dataType || 'int',
       mutable: spec.mutable !== false
     },
-    initializer: spec.initializer,
+    initialized,
+    initializer: initialized?spec.initializer:null,
     sourceSpan: spec.sourceSpan || null
   };
 }

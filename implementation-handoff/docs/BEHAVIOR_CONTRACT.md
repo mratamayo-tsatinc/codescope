@@ -182,6 +182,11 @@ unless the user explicitly approves a change.
   main panels synchronize to canonical program state without a duplicate
   animation. Statements executed directly from the source keep the main memory
   and Program Output panels as their animation destinations.
+- Main program memory and Program Output share a docked context rail. At phone
+  widths they share one tabbed viewport: binding reads and writes activate
+  Memory, while `PRINT` activates Output. Learners may also switch either tab
+  manually. The same semantic switching applies to the modal mirrors so a
+  hidden panel is made visible before transfer endpoints are measured.
 - A selection modal shows only the condition or selector expression. The full
   `if`, `else if`, or `switch` statement remains visible in the stable source
   view and is not duplicated inside the close view.
@@ -262,3 +267,15 @@ Canonical classification is contextual, not merely lexical.
 - Exam never exposes this toggle.
 - Activity feedback must be readable on desktop and mobile and must wrap rather
   than create horizontal overflow.
+
+## Activity size preference
+
+- Activity zoom is presentation state. Changing it must not regenerate an
+  item, change answers, advance program flow, affect scoring, or alter Practice
+  or Exam persistence.
+- The shell clamps the configured percentage to the declared minimum, maximum,
+  and step. The preference is keyed by normalized student email and is restored
+  when that student starts or resumes a session on the same browser.
+- Clearing all local application data removes activity-size preferences and
+  restores the configured default. Resetting only application settings does not
+  impersonate or merge one student's preference with another student's.

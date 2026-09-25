@@ -142,6 +142,13 @@ coverage, then run the full suite.
       newline cues occur in the modal Program Output mirror. The main panels
       synchronize without duplicate travel or playback. Direct source actions
       still target the main panels.
+- [ ] On desktop, program Memory and Program Output are both docked beside the
+      statement flow and the memory panel cannot be dragged over activity
+      content.
+- [ ] Near 390 px, Memory and Output share one tabbed context panel in the main
+      workspace and statement modal. Manual switching works; a binding read or
+      write selects Memory, and print execution selects Output before its
+      transfer and character animation begin.
 - [ ] A selection trace renders only its condition or selector expression; the
       modal does not duplicate the source `if`/`else if`/`switch` wrapper.
 - [ ] Completing a statement leaves the trace modal open in a read-only
@@ -164,7 +171,7 @@ coverage, then run the full suite.
       card or redirect the path toward the viewport origin.
 - [ ] Source-flow memory renders every declared variable or constant exactly
       once, adds no synthetic result binding, and preserves the identifier's
-      authored casing in the floating panel and statement trace modal.
+      authored casing in the docked panel and statement trace modal.
 - [ ] In C source flow, authored `return 0;` is the final direct action. Before
       it is clicked the program remains running; clicking it completes the item
       and triggers the configured completion celebration. Java receives no
@@ -232,6 +239,23 @@ coverage, then run the full suite.
 - [ ] Downloaded PNG contains the same score.
 - [ ] Practice and Exam solid backgrounds remain distinguishable in the PNG.
 - [ ] Download action is prominent and keyboard accessible.
+
+## Activity size scenarios
+
+- [ ] Decrease and increase stop at 80% and 140% and move in 10% steps; the
+      percentage action and `Alt+0` restore 100%.
+- [ ] `Alt+-` and `Alt++` work during a session but do not intercept typing in
+      an input, textarea, select, or editable element.
+- [ ] The app header, sidebar, pagination, drawers, modal frame/actions,
+      legacy floating-memory frame, and Activity size toolbar do not change
+      size.
+- [ ] The main activity, statement modal trace, docked memory, and legacy
+      floating-memory contents use the selected size. Expression, assignment,
+      output, and falling-token connectors remain attached after each change.
+- [ ] The preference survives reload for the same student, does not carry to a
+      different student, and is removed by Clear all local application data.
+- [ ] Around 390 px, the label is hidden, every control remains reachable, and
+      enlarging the activity creates no page-level horizontal overflow.
 
 ## Handoff report
 

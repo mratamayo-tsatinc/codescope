@@ -292,6 +292,7 @@ function renderProgramOutputPanel(item,program,options){
 function startProgramOutputAnimation(panel,pre,escape,pending){
   if(!panel||!panel.isConnected||pendingProgramOutputAnimation!==pending) return;
   pendingProgramOutputAnimation=null;
+  if(typeof setProgramContextTab==='function') setProgramContextTab('output');
   const text=pending.event.text||'';
   const reduced=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   let finished=false;

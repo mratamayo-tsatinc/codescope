@@ -47,6 +47,12 @@ function persistActivityZoomPreference(){
   try{localStorage.setItem(key,String(state.activityZoomPercent));}catch(error){/* preference remains session-local */}
 }
 
+function resetActivityZoomPreference(){
+  activityZoomPreferenceOwner=null;
+  state.activityZoomPercent=clampActivityZoomPercent(activityZoomSettings().defaultPercent);
+  syncActivityZoomControls();
+}
+
 function applyActivityZoomToElement(element){
   if(!element) return element;
   const settings=activityZoomSettings();
@@ -55,7 +61,10 @@ function applyActivityZoomToElement(element){
   element.classList.add('activity-zoom-surface');
   element.style.setProperty('--activity-zoom-factor',String(factor));
   element.style.zoom=String(factor);
-  element.style.width=`${100/factor}%`;
+  // CSS zoom already reduces the element's layout width so its visual box
+  // continues to fill the parent. Inverse width compensation shrinks that box
+  // a second time and creates a growing empty region at larger percentages.
+  element.style.removeProperty('width');
   element.setAttribute('data-activity-zoom',String(percent));
   observeActivityZoomElement(element);
   return element;
@@ -109,13 +118,15 @@ function setActivityZoomPercent(value,options){
   syncActivityZoomControls();
   const announcement=document.getElementById('activityZoomStatus');
   if(announcement) announcement.textContent=`Activity size ${next} percent`;
-  requestAnimationFrame(()=>{
+  const afterLayout=()=>{
     if(app){
       const updatedMax=Math.max(0,app.scrollHeight-app.clientHeight);
       app.scrollTop=updatedMax*scrollRatio;
     }
     scheduleActivityZoomGeometryRefresh();
-  });
+  };
+  if(typeof requestAnimationFrame==='function') requestAnimationFrame(afterLayout);
+  else afterLayout();
   if(options&&options.focusValue){
     const reset=document.querySelector('[data-activity-zoom-value]');
     if(reset) reset.focus();
@@ -274,6 +285,19 @@ document.addEventListener('pointerdown',event=>{
 });
 
 document.addEventListener('keydown',event=>{
+  const target=event.target;
+  const editing=target&&target.closest&&target.closest('input,textarea,select,[contenteditable="true"]');
+  if(state.screen==='session'&&activityZoomSettings().enabled&&event.altKey&&!event.ctrlKey&&!event.metaKey&&!editing){
+    if(event.key==='-'||event.code==='NumpadSubtract'){
+      event.preventDefault();changeActivityZoom(-1);return;
+    }
+    if(event.key==='+'||event.key==='='||event.code==='NumpadAdd'){
+      event.preventDefault();changeActivityZoom(1);return;
+    }
+    if(event.key==='0'||event.code==='Numpad0'){
+      event.preventDefault();resetActivityZoom();return;
+    }
+  }
   if(event.key!=='Escape') return;
   const menu=document.getElementById('accountMenu');
   if(menu&&!menu.hidden){

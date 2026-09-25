@@ -168,7 +168,9 @@ function animateVarFinalMemoryToExpression(item, action, applyAction){
     tokenId=action.id;
   }
 
+  if(typeof setProgramContextTab==='function') setProgramContextTab('memory');
   const source = document.querySelector('.statement-trace-memory [data-token-id="vff-'+named.name+'"]')
+    ||document.querySelector('.program-memory-dock [data-token-id="vff-'+named.name+'"]')
     ||document.querySelector('.var-final-float [data-token-id="vff-'+named.name+'"]');
   const scope = statement&&statement.kind==='output'
     ? '[data-statement-id="'+statement.id+'"].program-output-statement'
@@ -267,13 +269,18 @@ function varFinalPanelShouldRender(item){
   return false;
 }
 
+function varFinalPanelVisibleForItem(item){
+  return floatVisible&&varFinalPanelShouldRender(item);
+}
+
 // ----------------------------------------------------------------------------
 // Entry point
 // ----------------------------------------------------------------------------
 function renderVariableFinalFloat(item){
   const stale = document.querySelector('.var-final-float');
   if(stale) stale.remove();
-  const panelVisible=floatVisible&&varFinalPanelShouldRender(item);
+  const panelVisible=varFinalPanelVisibleForItem(item);
+  const dockHost=document.querySelector('.program-memory-dock-host');
   const modalOpen=typeof programStatementTraceOpenForItem==='function'
     &&programStatementTraceOpenForItem(item);
   if(!panelVisible&&!modalOpen){
@@ -295,7 +302,8 @@ function renderVariableFinalFloat(item){
   // the comet or (with travel disabled) immediately starts the value roll.
   const built = buildAnimatedVarFinalSection(item);
   if(!built) return;
-  if(panelVisible) mountVarFinalFloatPanel(built.section,built.flights,isAppearing);
+  if(panelVisible&&dockHost) mountVarFinalDockPanel(dockHost,built.section,built.flights);
+  else if(panelVisible) mountVarFinalFloatPanel(built.section,built.flights,isAppearing);
   else{
     floatWasMounted=false;
     if(built.flights.length) requestAnimationFrame(()=>runVarFinalFlights(built.flights));
@@ -425,23 +433,38 @@ function buildAnimatedVarFinalSection(item){
 // ----------------------------------------------------------------------------
 // Mounting + drag
 // ----------------------------------------------------------------------------
+function varFinalAnimationControl(){
+  const flyState=flyAnimEnabled?`${flightDurationMs/1000}s`:'Off';
+  const nextFlyState=!flyAnimEnabled?'1 second'
+    :(flightDurationMs===1000?'2 seconds':(flightDurationMs===2000?'3 seconds':'off'));
+  const flyTitle=`Memory transfer animation: ${flyState}. Activate for ${nextFlyState}.`;
+  return h('button',{class:'var-final-float-fly-toggle'+(flyAnimEnabled?' active':''),
+    type:'button',title:flyTitle,'aria-label':flyTitle,
+    onclick:e=>{e.stopPropagation();cycleVarFinalFlyAnimation();}},
+    h('i',{class:'fa-solid fa-wand-magic-sparkles','aria-hidden':'true'}),
+    h('span',{class:'var-final-float-fly-state','aria-hidden':'true'},flyState));
+}
+
+function mountVarFinalDockPanel(host,sectionEl,flights){
+  const panel=h('aside',{class:'program-memory-dock','aria-label':'Program memory'},
+    h('div',{class:'program-memory-dock-title'},
+      h('span',{},h('i',{class:'fa-solid fa-memory','aria-hidden':'true'}),' Program Memory'),
+      varFinalAnimationControl()),
+    h('div',{class:'program-memory-dock-body'},sectionEl));
+  host.appendChild(panel);
+  if(flights&&flights.length) requestAnimationFrame(()=>runVarFinalFlights(flights));
+}
+
 function mountVarFinalFloatPanel(sectionEl, flights, playEntrance){
   const panel = h('div',{class:'var-final-float'+(playEntrance?' var-final-float-enter':''), style: floatPositionStyle()});
   const activeItem = typeof currentItem==='function' ? currentItem() : null;
   const title = itemHasInteractiveProgram(activeItem)
     ? 'Program variables and constants' : 'Variable final state';
 
-  const flyState = flyAnimEnabled ? `${flightDurationMs/1000}s` : 'Off';
-  const nextFlyState = !flyAnimEnabled ? '1 second'
-    : (flightDurationMs===1000 ? '2 seconds' : (flightDurationMs===2000 ? '3 seconds' : 'off'));
-  const flyTitle = `Memory transfer animation: ${flyState}. Activate for ${nextFlyState}.`;
   const header = h('div',{class:'var-final-float-header', onmousedown: onVarFinalFloatDragStart, ontouchstart: onVarFinalFloatDragStart},
     h('i',{class:'fa-solid fa-up-down-left-right var-final-float-drag-icon', 'aria-hidden':'true'}),
     h('span',{class:'var-final-float-title-label'}, title),
-    h('button',{class:'var-final-float-fly-toggle'+(flyAnimEnabled?' active':''), title:flyTitle, 'aria-label':flyTitle,
-      onclick: (e)=>{ e.stopPropagation(); cycleVarFinalFlyAnimation(); }
-    }, h('i',{class:'fa-solid fa-wand-magic-sparkles','aria-hidden':'true'}),
-      h('span',{class:'var-final-float-fly-state','aria-hidden':'true'},flyState)),
+    varFinalAnimationControl(),
     h('button',{class:'var-final-float-close', title:'Hide this panel', 'aria-label':'Hide this panel',
       onclick: (e)=>{ e.stopPropagation(); toggleVarFinalFloatVisible(); }
     }, h('i',{class:'fa-solid fa-xmark','aria-hidden':'true'}))
@@ -449,6 +472,7 @@ function mountVarFinalFloatPanel(sectionEl, flights, playEntrance){
   panel.appendChild(header);
 
   const body = h('div',{class:'var-final-float-body'});
+  if(typeof applyActivityZoomToElement==='function') applyActivityZoomToElement(sectionEl);
   body.appendChild(sectionEl);
   panel.appendChild(body);
 
@@ -584,6 +608,7 @@ function clampVarFinalFloatPosition(panel){
 // Flights — the actual "value travels from where it was produced" effect.
 // ----------------------------------------------------------------------------
 function runVarFinalFlights(flights){
+  if(flights.length&&typeof setProgramContextTab==='function') setProgramContextTab('memory');
   flights.forEach(f=>{
     if(f.delayMs){
       const delayed=Object.assign({},f,{delayMs:0});
