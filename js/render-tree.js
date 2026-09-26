@@ -17,12 +17,13 @@ function renderStaticExpr(node, ctxPrec, colorMap, flashId, pendingId, pendingCo
     const isFlash = flashId!=null && node.id===flashId;
     const attrs = {class:'tok tok-lit'+(col?(isFlash?' tok-colored-flash':' tok-colored'):''), 'data-token-id': node.id};
     if(col) attrs.style = `color:${col};`;
-    return h('span',attrs, formatValue(node.value));
+    return h('span',attrs, formatValue(node.value,node.dataType));
   }
   if((node.kind==='variable'||node.kind==='constant') && node.resolved){
     const col = colorMap.get(node.id);
     const isFlash = flashId!=null && node.id===flashId;
-    return renderValueCard({id:node.id, name:node.name, value:node.declaredValue, kind:node.kind, color:col, isFlash});
+    return renderValueCard({id:node.id,name:node.name,value:node.declaredValue,kind:node.kind,
+      dataType:node.dataType,color:col,isFlash});
   }
   if(node.kind==='variable' || node.kind==='constant'){
     const base = node.kind==='variable' ? 'tok tok-var tok-static' : 'tok tok-const tok-static';
@@ -45,7 +46,8 @@ function renderStaticExpr(node, ctxPrec, colorMap, flashId, pendingId, pendingCo
     if(node.substituted){
       const cardColor = colorMap.get(node.id);
       const isFlash = flashId!=null && node.id===flashId;
-      const card = renderValueCard({id:node.id, name:node.inner.name, value:unaryBaseValue(node), kind:node.inner.kind, color:cardColor, isFlash});
+      const card = renderValueCard({id:node.id,name:node.inner.name,value:unaryBaseValue(node),kind:node.inner.kind,
+        dataType:node.inner.dataType,color:cardColor,isFlash});
       const opAttrs = {class:'tok tok-op-muted'+(cardColor?' tok-colored':'')};
       if(cardColor) opAttrs.style = `color:${cardColor};`;
       const opSpan = h('span',opAttrs, node.op);

@@ -69,8 +69,13 @@ function buildBindingsForItem(item){
       .map(statement=>({
         name:statement.binding.name,
         kind:statement.binding.kind==='constant' ? 'program-constant' : 'program-variable',
+        dataType:statement.binding.dataType,
         trigger:'program-assignment',
         statementId:statement.id,
+        // A declaration without an initializer does not occupy memory until
+        // the learner evaluates that declaration line. Initialized bindings
+        // keep the established eager destination card used by write flights.
+        deferredUntilDeclared:statement.initialized===false,
         declaredValue:undefined,
         finalValue:statement.runtime.expectedValue,
         unaryNodeId:null, op:null, form:null, _flashed:false
@@ -95,7 +100,7 @@ function buildBindingsForItem(item){
   for(const op of item.originalFlat.operands){
     if(op.kind==='variable'){
       bindings.push({
-        name: op.name, kind:'declared', trigger:'static',
+        name:op.name,kind:'declared',dataType:op.dataType,trigger:'static',
         declaredValue: op.declaredValue, finalValue: op.declaredValue,
         unaryNodeId:null, op:null, form:null, _flashed:false
       });
@@ -103,14 +108,14 @@ function buildBindingsForItem(item){
       const base = op.inner.declaredValue;
       if(op.op==='!'){
         bindings.push({
-          name: op.inner.name, kind:'declared', trigger:'static',
+          name:op.inner.name,kind:'declared',dataType:op.inner.dataType,trigger:'static',
           declaredValue: base, finalValue: base,
           unaryNodeId:null, op:null, form:null, _flashed:false
         });
       } else {
         const delta = op.op==='++' ? 1 : -1;
         bindings.push({
-          name: op.inner.name, kind:'declared',
+          name:op.inner.name,kind:'declared',dataType:op.inner.dataType,
           trigger: op.form==='prefix' ? 'per-step' : 'statement-complete',
           declaredValue: base, finalValue: base+delta,
           unaryNodeId: op.id, op: op.op, form: op.form, _flashed:false
@@ -177,8 +182,15 @@ function originColorForNode(trace, nodeId){
 function resolveBindingLive(binding, item){
   if(binding.trigger==='program-assignment'){
     const memory = item.program && item.program.memory && item.program.memory[binding.name];
-    if(!memory || !memory.initialized){
-      return {hasValue:false, displayValue:null, committed:false, flashColor:null};
+    if(!memory){
+      return {visible:!binding.deferredUntilDeclared,hasValue:false,displayValue:null,
+        committed:false,flashColor:null};
+    }
+    if(!memory.initialized){
+      const declaredNow=binding.deferredUntilDeclared;
+      return {visible:true,hasValue:false,displayValue:null,committed:declaredNow,
+        insertOnly:declaredNow,originStatementId:memory.lastStatementId||binding.statementId,
+        flashColor:declaredNow?stepColor(0):null};
     }
     const statement = item.program.statements.find(s=>s.id===binding.statementId);
     const originStatementId=memory.lastStatementId||binding.statementId;
@@ -272,6 +284,7 @@ function renderVariableFinalState(item){
   const groups = createVarFinalGroups();
   bindings.forEach(b=>{
     const live = resolveBindingLive(b, item);
+    if(live.visible===false) return;
     if(live.hasValue) b._lastDisplayValue=live.displayValue;
     // A binding's card pulses exactly once, the first render where it's
     // found committed. `_flashed` lives on the cached binding object (not
@@ -287,6 +300,7 @@ function renderVariableFinalState(item){
       name: b.name,
       value: live.hasValue ? live.displayValue : '—',
       kind: b.kind==='program-constant' ? 'constant' : 'variable',
+      dataType:live.hasValue?b.dataType:null,
       color: live.flashColor,
       isFlash
     }));

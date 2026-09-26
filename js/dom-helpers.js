@@ -63,7 +63,7 @@ function bindingIdentityStyle(name,kind,stepColorValue){
   return style;
 }
 
-// opts: {id, name, value, kind, color, isFlash}
+// opts: {id, name, value, kind, dataType, color, isFlash}
 //   id      - the node's own id (same id it carries in the trace/flat model);
 //             stamped as data-token-id so connector-lines.js can locate this
 //             exact card in the DOM. Has no effect on layout/scoring.
@@ -73,9 +73,9 @@ function bindingIdentityStyle(name,kind,stepColorValue){
 //   color   - optional per-step accent used by the arrival pulse, never as identity
 //   isFlash - whether to play the brief "just resolved" highlight animation
 function renderValueCard(opts){
-  const {id, name, value, kind, color, isFlash} = opts;
+  const {id, name, value, kind, dataType, color, isFlash} = opts;
   const cls = 'tok-card binding-identity '+(kind==='constant' ? 'tok-card-const' : 'tok-card-var')+(isFlash?' tok-card-flash':'');
-  const displayValue = formatValue(value);
+  const displayValue = formatValue(value,dataType);
   const attrs = {class:cls, 'data-token-id':id, 'data-binding-name':name,
     style:bindingIdentityStyle(name,kind,color),
     title:`${name} = ${displayValue}`,

@@ -18,13 +18,31 @@ function programOutputResolved(statement){
     statement.runtime.parts[entry.index].resolvedValue!==null);
 }
 
+function programOutputFormatValue(value,format){
+  const spec=String(format||'d');
+  if(spec==='c'){
+    return typeof value==='number'?String.fromCodePoint(value):String(value==null?'':value);
+  }
+  const float=/^(?:\.(\d+))?f$/.exec(spec);
+  if(float){
+    const numeric=Number(value);
+    if(!Number.isFinite(numeric)) return String(value);
+    return numeric.toFixed(float[1]===undefined?6:Number(float[1]));
+  }
+  if(spec==='d'||spec==='i'){
+    const numeric=Number(value);
+    return Number.isFinite(numeric)?String(Math.trunc(numeric)):String(value);
+  }
+  return String(value==null?'':value);
+}
+
 function programOutputStatementText(statement,expected){
   const runtime=statement.runtime;
   const text=statement.parts.map((part,index)=>{
     if(part.kind==='text') return part.value;
     const statePart=runtime.parts[index];
     const value=expected?statePart.expectedValue:statePart.resolvedValue;
-    return value==null?'':String(value);
+    return value==null?'':programOutputFormatValue(value,part.format);
   }).join('');
   return text+(statement.newline?'\n':'');
 }

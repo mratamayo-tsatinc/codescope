@@ -215,14 +215,14 @@ function evaluateFlatAt(flat, leftId, rightId, resultOverride){
   return {applied:false};
 }
 function flatLeafToString(op){
-  if(op.kind==='literal') return formatValue(op.value);
+  if(op.kind==='literal') return formatValue(op.value,op.dataType);
   if(op.kind==='unary'){
     if(op.resolved) return formatValue(op.resultValue);
     const nm = op.substituted ? String(unaryBaseValue(op)) : (op.inner.kind==='literal' ? String(op.inner.value) : op.inner.name);
     if(op.op==='!') return '!'+nm;
     return op.form==='prefix' ? op.op+nm : nm+op.op;
   }
-  return op.resolved ? formatValue(op.declaredValue) : op.name;
+  return op.resolved ? formatValue(op.declaredValue,op.dataType) : op.name;
 }
 // Maximal contiguous runs (length >= 2) of operands sharing the same
 // non-null parenGroup — these are the spans still shown wrapped in "( )".

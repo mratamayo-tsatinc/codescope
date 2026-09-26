@@ -65,7 +65,7 @@ function renderUnaryUpdateStatement(ctx){
       card.appendChild(renderContextHelp(message));
     }
     const canReset=state.mode==='practice'&&(ctx.program.cursor>0||runtime.trace.length>0);
-    const resetControl=renderItemResetControl(canReset);
+    const resetControl=renderItemResetControl(canReset&&!(ctx.services&&ctx.services.statementTraceModal));
     if(resetControl) card.appendChild(resetControl);
   }
   container.appendChild(card);

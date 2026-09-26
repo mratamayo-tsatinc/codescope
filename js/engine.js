@@ -44,13 +44,19 @@ class EngineError extends Error{ constructor(code){ super(code); this.code=code;
 // source/output text. Centralized so every render path (tree-based,
 // flat-based, live-interactive, historical, canonical playback) shows
 // booleans as `true`/`false` and negative numbers parenthesized, consistently.
-function formatValue(v){
+function formatValue(v,dataType){
   if(typeof v === 'boolean') return v ? 'true' : 'false';
+  if(dataType==='char'){
+    const escaped=String(v).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\t/g,'\\t').replace(/\r/g,'\\r');
+    return `'${escaped}'`;
+  }
   return v<0 ? '('+v+')' : String(v);
 }
 
-function makeLiteral(value){ return {id:nextId(), kind:'literal', value}; }
-function makeNamed(kind,name,declaredValue){ return {id:nextId(), kind, name, declaredValue, resolved:false}; }
+function makeLiteral(value,opts){ return Object.assign({id:nextId(),kind:'literal',value},opts||{}); }
+function makeNamed(kind,name,declaredValue,opts){
+  return Object.assign({id:nextId(),kind,name,declaredValue,resolved:false},opts||{});
+}
 function makeBinOp(op,left,right){ return {id:nextId(), kind:'binop', op, left, right}; }
 // A unary node (`++x`, `x--`, `!flag`) wraps exactly one leaf — per this
 // project's scope, always a `variable` leaf: increment/decrement and logical
@@ -187,8 +193,8 @@ function buildCanonicalTrace(originalTree){
 }
 function renderString(node,minPrec){
   minPrec = minPrec || 0;
-  if(node.kind==='literal') return formatValue(node.value);
-  if(node.kind==='variable'||node.kind==='constant') return node.resolved ? formatValue(node.declaredValue) : node.name;
+  if(node.kind==='literal') return formatValue(node.value,node.dataType);
+  if(node.kind==='variable'||node.kind==='constant') return node.resolved ? formatValue(node.declaredValue,node.dataType) : node.name;
   if(node.kind==='unary'){
     if(node.resolved) return formatValue(node.resultValue);
     const nm = node.substituted ? String(unaryBaseValue(node)) : (node.inner.kind==='literal' ? String(node.inner.value) : node.inner.name);

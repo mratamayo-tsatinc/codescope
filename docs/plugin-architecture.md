@@ -35,7 +35,10 @@ dependencies must be declared against public capabilities.
 Checked Practice items place **Try again** outside and directly below the
 activity workspace, aligned to the workspace's left edge. This keeps retry as
 a page-level action instead of making it look like part of the submitted
-answer surface.
+answer surface. Complete-source items place **Reset item** at that same item
+level while work is in progress; statement modals never own whole-item reset.
+For source-backed items, Try again rebuilds only the current manifest item with
+a fresh seed, while Reset item preserves the already materialized source.
 
 Renderers must append the shell-owned retry bar to their outer `container`:
 

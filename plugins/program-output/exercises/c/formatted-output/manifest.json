@@ -5,6 +5,7 @@
     "MultipleValues.c",
     "EmbeddedLines.c",
     "NoTrailingNewline.c",
-    "AssignmentThenOutput.c"
+    "AssignmentThenOutput.c",
+    "TypedValues.c"
   ]
 }

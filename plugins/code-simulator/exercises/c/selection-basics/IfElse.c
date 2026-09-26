@@ -10,8 +10,7 @@ int main() {
 
     if (temperature > 30) {
         printf("It is hot.\n");
-    }
-    else {
+    } else {
         printf("The temperature is moderate.\n");
     }
 

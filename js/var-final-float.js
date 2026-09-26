@@ -68,6 +68,7 @@ const MEMORY_TRANSFER_SETTINGS = MEMORY_PANEL_SETTINGS.transferAnimation;
 const SPEED_LEVELS = MEMORY_TRANSFER_SETTINGS.speedLevelsMs.slice();
 const MEMORY_VALUE_ROLL_DURATION_MS = MEMORY_PANEL_SETTINGS.valueRollDurationMs;
 const MEMORY_VALUE_ROLL_FALLBACK_MS = MEMORY_PANEL_SETTINGS.valueRollFallbackMs;
+const MEMORY_CARD_INSERT_DURATION_MS = MEMORY_PANEL_SETTINGS.cardInsertDurationMs;
 const MEMORY_PANEL_ENTRANCE_DURATION_MS = MEMORY_PANEL_SETTINGS.entranceDurationMs;
 const MEMORY_TRANSFER_SAFETY_BUFFER_MS = MEMORY_TRANSFER_SETTINGS.safetyBufferMs;
 
@@ -236,7 +237,7 @@ function animateVarFinalMemoryToExpression(item, action, applyAction){
     renderedDestination.classList.remove('memory-transfer-waiting');
     renderedDestination.removeAttribute('aria-busy');
     renderedDestination.classList.add('tok-card-flash');
-    rollVarFinalCardValue(renderedDestination,sourceValue,finishTransfer,'');
+    rollVarFinalCardValue(renderedDestination,sourceValue,finishTransfer,'',named.dataType);
   };
   if(flyAnimEnabled){
     const color=bindingIdentityColor(named.name,named.kind==='constant'?'constant':'variable');
@@ -331,6 +332,7 @@ function buildAnimatedVarFinalSection(item){
 
   bindings.forEach(b=>{
     const live = resolveBindingLive(b, item);
+    if(live.visible===false) return;
     // Same one-shot criterion as var-final-state.js's own isFlash — the
     // first render where this binding is found committed. Consuming
     // `b._flashed` here means the OTHER render path (the plain
@@ -353,6 +355,7 @@ function buildAnimatedVarFinalSection(item){
       b._modalTransferPending={statementId:originStatementId,
         hasValue:b._lastDisplayValue!==undefined,value:b._lastDisplayValue};
     }
+    if(justCommitted&&live.insertOnly&&!modalDestination) b._insertPending=true;
     if(justCommitted || staticArrival) b._flashed = true;
 
     let hasValue, displayValue, flashColor;
@@ -375,12 +378,17 @@ function buildAnimatedVarFinalSection(item){
       if(live.hasValue) b._lastDisplayValue=live.displayValue;
     }
 
-    const row = h('div',{class:'var-final-row'+(b.trigger!=='static' && live.committed ? ' var-final-changed':'')});
+    // Source-flow progress rerenders while the comet is travelling. Keep
+    // the new card invisible across those renders until the same flight lands.
+    const inserting=!!b._insertPending;
+    const row = h('div',{class:'var-final-row'+(b.trigger!=='static' && live.committed ? ' var-final-changed':'')
+      +(inserting?' var-final-insert-pending':'')});
     const card = renderValueCard({
       id: 'vff-'+b.name,
       name: b.name,
       value: hasValue ? displayValue : '—',
       kind: b.kind==='program-constant' ? 'constant' : 'variable',
+      dataType:hasValue?b.dataType:null,
       color: flashColor,
       isFlash: staticArrival
     });
@@ -414,9 +422,9 @@ function buildAnimatedVarFinalSection(item){
           ? (item.trace.length ? item.trace[item.trace.length-1].resultNodeId : null)
           : b.unaryNodeId;
       }
-      flights.push({originId,statementId:originStatementId,cardEl:card,binding:b,modalDestination,
-        name:b.name, kind:b.kind==='program-constant'?'constant':'variable',
-        value:live.displayValue, color:live.flashColor,
+      flights.push({originId,statementId:originStatementId,cardEl:card,rowEl:row,binding:b,modalDestination,
+        name:b.name, kind:b.kind==='program-constant'?'constant':'variable',dataType:b.dataType,
+        value:live.displayValue, color:live.flashColor,insertOnly:!!live.insertOnly,
         // Compound calculation timing is deliberately fixed and independent
         // from flightDurationMs. The speed selector controls only the later
         // expression-to-memory travel, never the instructional merge itself.
@@ -615,10 +623,12 @@ function runVarFinalFlights(flights){
       setTimeout(()=>runVarFinalFlights([delayed]),f.delayMs);
       return;
     }
-    const modalCard=f.modalDestination&&typeof document!=='undefined'&&document.querySelector
-      ?document.querySelector('#statementTraceModal .statement-trace-memory [data-token-id="vff-'+f.name+'"]')
-      :null;
-    const activeFlight=modalCard?Object.assign({},f,{cardEl:modalCard}):f;
+    // A source-flow render can replace the dock after this flight was
+    // queued. Measure the current card, never the detached card whose rect
+    // collapses to the viewport origin and sends the comet the wrong way.
+    const liveCard=currentVarFinalFlightCard(f);
+    const activeFlight=liveCard&&liveCard!==f.cardEl
+      ?Object.assign({},f,{cardEl:liveCard,rowEl:liveCard.parentElement}) : f;
     // Disabling global travel removes only the source-to-memory comet. The
     // value-only roll in the stationary destination card remains mandatory.
     if(!flyAnimEnabled){
@@ -647,12 +657,15 @@ function runVarFinalFlights(flights){
 // every later row once resolved), so the LAST match in document order is
 // the current/most-recent on-screen instance of that token.
 function findVarFinalOriginEl(id, statementId){
-  if(id==null) return null;
-  const scope = statementId
-    ? '.program-expression-panel[data-statement-id="'+statementId+'"]'
-    : '.eval-panel';
-  const matches = document.querySelectorAll(scope+' [data-token-id="'+id+'"]');
-  if(matches.length) return matches[matches.length-1];
+  if(id!=null){
+    const scope = statementId
+      ? '.program-expression-panel[data-statement-id="'+statementId+'"]'
+      : '.eval-panel';
+    const matches = document.querySelectorAll(scope+' [data-token-id="'+id+'"]');
+    if(matches.length) return matches[matches.length-1];
+  }
+  // Direct declarations such as `int score;` have no value token. Their
+  // semantic origin is the active authored source line itself.
   return statementId
     ? document.querySelector('.program-source-file-line[data-statement-id="'+statementId+'"]')
     : null;
@@ -785,13 +798,13 @@ function runVarFinalComet(originRect,destRect,color,onArrival){
 // The memory card itself remains fixed. Only its value line rolls downward:
 // the previous value exits below while the replacement enters from above.
 // This transition intentionally does not depend on flyAnimEnabled.
-function rollVarFinalCardValue(cardEl,value,onComplete,oldTextOverride){
+function rollVarFinalCardValue(cardEl,value,onComplete,oldTextOverride,dataType){
   const bodyEl=cardEl&&cardEl.querySelector('.tok-card-body');
   if(!bodyEl){
     if(typeof onComplete==='function') onComplete();
     return;
   }
-  const nextText=formatValue(value);
+  const nextText=formatValue(value,dataType);
   const oldText=oldTextOverride===undefined ? bodyEl.textContent : oldTextOverride;
   bodyEl.textContent='';
   // The rolling children are absolutely positioned and therefore cannot
@@ -820,7 +833,45 @@ function rollVarFinalCardValue(cardEl,value,onComplete,oldTextOverride){
   setTimeout(finish,MEMORY_VALUE_ROLL_FALLBACK_MS);
 }
 
+function currentVarFinalFlightCard(f){
+  if(typeof document==='undefined'||!document.querySelectorAll) return f.cardEl;
+  const selector='[data-token-id="vff-'+f.name+'"]';
+  const scope=f.modalDestination?'#statementTraceModal .statement-trace-memory'
+    :'.program-memory-dock, .var-final-float';
+  const matches=document.querySelectorAll(scope.split(', ').map(part=>part+' '+selector).join(', '));
+  return matches.length?matches[matches.length-1]:f.cardEl;
+}
+
+function settleVarFinalInsertion(f,color){
+  const card=currentVarFinalFlightCard(f);
+  const row=(card&&card.parentElement)||f.rowEl;
+  if(row&&row.classList){
+    row.classList.remove('var-final-insert-pending');
+    row.classList.add('var-final-insert-arriving');
+  }
+  if(color&&card&&card.style&&typeof card.style.setProperty==='function'){
+    card.style.setProperty('--step-color',color);
+  }
+  if(card){
+    card.setAttribute('title',`${f.name} is declared and uninitialized`);
+    card.setAttribute('aria-label',`${f.kind==='constant'?'constant':'variable'} ${f.name}, uninitialized`);
+    card.classList.add('tok-card-flash');
+  }
+  if(f.binding){
+    delete f.binding._insertPending;
+    delete f.binding._modalTransferPending;
+    delete f.binding._lastDisplayValue;
+  }
+  setTimeout(()=>{
+    if(row&&row.classList) row.classList.remove('var-final-insert-arriving');
+  },MEMORY_CARD_INSERT_DURATION_MS);
+}
+
 function settleVarFinalFlight(f, color){
+  if(f.insertOnly){
+    settleVarFinalInsertion(f,color);
+    return;
+  }
   const finish=()=>{
     if(f.binding){
       f.binding._lastDisplayValue=f.value;
@@ -828,11 +879,11 @@ function settleVarFinalFlight(f, color){
     }
     if(f.mergeRuntime) f.mergeRuntime.assignmentMergePending=false;
   };
-  rollVarFinalCardValue(f.cardEl,f.value,finish);
+  rollVarFinalCardValue(f.cardEl,f.value,finish,undefined,f.dataType);
   if(color && f.cardEl.style && typeof f.cardEl.style.setProperty==='function'){
     f.cardEl.style.setProperty('--step-color',color);
   }
-  const valueText=formatValue(f.value);
+  const valueText=formatValue(f.value,f.dataType);
   f.cardEl.setAttribute('title',`${f.name} = ${valueText}`);
   f.cardEl.setAttribute('aria-label',`${f.kind==='constant'?'constant':'variable'} ${f.name}, value ${valueText}`);
   f.cardEl.classList.add('tok-card-flash');
@@ -899,6 +950,15 @@ function ensureVarFinalFloatStyles(){
 }
 .var-final-comet-head{
   filter:drop-shadow(0 0 4px currentColor) drop-shadow(0 0 8px currentColor);
+}
+.var-final-row.var-final-insert-pending .tok-card{visibility:hidden;opacity:0;transform:scale(.74) translateY(-5px);}
+.var-final-row.var-final-insert-arriving .tok-card{
+  visibility:visible;animation:var-final-card-insert ${MEMORY_CARD_INSERT_DURATION_MS}ms cubic-bezier(.2,.82,.25,1) both;
+}
+@keyframes var-final-card-insert{
+  0%{opacity:0;transform:scale(.74) translateY(-5px);}
+  68%{opacity:1;transform:scale(1.06) translateY(0);}
+  100%{opacity:1;transform:scale(1) translateY(0);}
 }
 .vf-value-roll{ position:relative; overflow:hidden; height:1em; width:100%; }
 .vf-value-roll-old,.vf-value-roll-new{

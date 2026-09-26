@@ -107,18 +107,25 @@ int main() {
 
 The parser currently accepts the beginner subset used by Program Core:
 
-- initialized `int` declarations and C `const int` or Java `final int`;
-- integer expressions with identifiers, literals, parentheses, `+`, `-`, `*`,
-  `/`, and `%`;
-- simple and compound assignments;
+- `int`, `float`, `double`, and `char` declarations, including mutable
+  declarations without an initializer; C `const` and Java `final`
+  declarations still require an initializer;
+- numeric and character literals, initialized identifiers, parentheses, and the
+  arithmetic operators `+`, `-`, `*`, `/`, and `%`;
+- simple and compound assignments, including the first assignment to a
+  previously uninitialized variable;
 - prefix and postfix `++` and `--`;
-- C `printf` string literals with `%d`, `%%`, and common escapes;
+- C `printf` string literals with `%d`, `%i`, `%f`, precision such as
+  `%.2f`, `%c`, `%%`, and common escapes;
 - Java `System.out.print` and `System.out.println` with string and identifier
   concatenation.
 
-Each `%d` must have a matching initialized identifier. A Java output expression
-must likewise be an initialized identifier. One output statement may reference
-multiple variables; each produces its own memory read and replacement step.
+Every output placeholder must have a matching initialized identifier. A Java
+output expression must likewise be an initialized identifier. One output
+statement may reference multiple variables; each produces its own memory read
+and replacement step. Character literals retain their single quotes in source,
+timelines, value cards, and memory. Program Output displays the character value
+itself, matching the console produced by `%c` or Java concatenation.
 
 With `presentation:'source-flow'`, the complete metadata-free source becomes
 the interactive program statement flow. Each authored source line occupies its

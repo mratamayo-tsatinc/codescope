@@ -181,7 +181,7 @@ function markManualDestination(node,isDestination){
 function manualResponseOperand(operand){
   if(!operand) return h('span',{class:'tok tok-lit'},'—');
   if(operand.kind==='variable'||operand.kind==='constant'){
-    return manualResponseBindingCard(operand.name,operand.kind,formatValue(operand.declaredValue));
+    return manualResponseBindingCard(operand.name,operand.kind,formatValue(operand.declaredValue,operand.dataType));
   }
   if(operand.kind==='unary'){
     // Mirror the operand's CURRENT statement representation. Once logical
@@ -196,16 +196,17 @@ function manualResponseOperand(operand){
         // in the statement, so preserve that card while using its current
         // expression value rather than the pre-operation memory value.
         return manualResponseBindingCard(operand.inner.name,operand.inner.kind,
-          formatValue(flatOperandValue(operand)));
+          formatValue(flatOperandValue(operand),operand.inner.dataType));
       }
-      return h('span',{class:'tok tok-lit'},formatValue(flatOperandValue(operand)));
+      return h('span',{class:'tok tok-lit'},formatValue(flatOperandValue(operand),operand.dataType));
     }
     if(operand.inner&&(operand.inner.kind==='variable'||operand.inner.kind==='constant')){
-      return manualResponseBindingCard(operand.inner.name,operand.inner.kind,formatValue(unaryBaseValue(operand)));
+      return manualResponseBindingCard(operand.inner.name,operand.inner.kind,
+        formatValue(unaryBaseValue(operand),operand.inner.dataType));
     }
-    return h('span',{class:'tok tok-lit'},formatValue(flatOperandValue(operand)));
+    return h('span',{class:'tok tok-lit'},formatValue(flatOperandValue(operand),operand.dataType));
   }
-  return h('span',{class:'tok tok-lit'},formatValue(flatOperandValue(operand)));
+  return h('span',{class:'tok tok-lit'},formatValue(flatOperandValue(operand),operand.dataType));
 }
 
 function manualResponseResultBox(control,color){

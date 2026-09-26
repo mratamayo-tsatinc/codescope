@@ -37,6 +37,22 @@ function renderDeclarationStatement(ctx){
   }
   card.classList.add('expanded');
 
+  if(!declarationHasInitializer(statement)){
+    const timeline=h('div',{class:'timeline program-summary-timeline'});
+    const row=h('div',{class:`tl-row program-summary-row ${runtime.checked?'done':'current'}`});
+    row.appendChild(h('div',{class:'tl-dot statement-source-dot'},String(programStatementDisplayNumber(statement,statementIndex))));
+    const source=h('code',{},programStatementSource(statement,item));
+    const content=isActive&&!runtime.checked
+      ?h('button',{class:'code-out program-summary-code declaration-direct-action',type:'button',
+          title:`Declare ${statement.binding.name}`,'aria-label':`Declare ${statement.binding.dataType} ${statement.binding.name}`,
+          onclick:()=>handleTokenClick({type:'declare-binding',statementId:statement.id})},source)
+      :h('div',{class:'code-out program-summary-code'},
+          h('i',{class:'fa-solid fa-circle-check program-summary-status','aria-hidden':'true'}),source,
+          renderCollapseStatementAction(statement,statementIndex));
+    row.appendChild(content);timeline.appendChild(row);card.appendChild(timeline);
+    container.appendChild(card);return;
+  }
+
   const labelText = `${declarationKeyword(statement)} ${statement.binding.name}`;
   card.appendChild(renderExpressionEvaluationPanel({
     runtime,
@@ -69,7 +85,7 @@ function renderDeclarationStatement(ctx){
           : 'Evaluate the highlighted operator.')));
     }
     const canReset = state.mode==='practice' && (program.cursor>0 || runtime.trace.length>0);
-    const resetControl=renderItemResetControl(canReset);
+    const resetControl=renderItemResetControl(canReset&&!(ctx.services&&ctx.services.statementTraceModal));
     if(resetControl) card.appendChild(resetControl);
   }
   container.appendChild(card);

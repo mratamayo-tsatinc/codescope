@@ -169,6 +169,7 @@ browser settings do not override them.
 | `memoryPanel.transferAnimation.durationMs` | `1000` | Initial transfer duration. Must match a speed level. |
 | `memoryPanel.transferAnimation.speedLevelsMs` | `[1000, 2000, 3000]` | Durations cycled by the memory header control. |
 | `memoryPanel.entranceDurationMs` | `220` | Memory-panel entrance duration. |
+| `memoryPanel.cardInsertDurationMs` | `360` | Duration of the card insertion after a declaration-without-initializer transfer reaches Memory. |
 | `memoryPanel.valueRollDurationMs` | `420` | Duration of the old/new memory value roll. |
 | `outputPanel.visible` | `true` | Shows the content-aware Program Output screen for programs containing output statements. |
 | `outputPanel.characterAnimation` | `true` | Types each emitted output event into the screen instead of revealing it at once. Reduced-motion preference still disables the animation. |

@@ -18,8 +18,15 @@ unless the user explicitly approves a change.
   feedback policy allow it.
 - Show correct solution is available only after Check and only in the Feedback
   drawer.
+- Reset item returns the current materialized item to its initial state without
+  changing its source values. In complete-source modal presentation, this is an
+  item-level control below the source workspace and never appears inside a
+  statement evaluation modal.
 - Try again resets responses, check results, history, visual classifications,
-  and completion state for the item. It is not a cosmetic unlock.
+  and completion state for the item. For a source-backed item it rebuilds only
+  that manifest entry with a fresh retry seed. Embedded `@seed` directives may
+  therefore produce new values; a file without seed directives reloads its
+  authored code unchanged. It is not a cosmetic unlock.
 
 ### Exam
 
@@ -96,8 +103,16 @@ unless the user explicitly approves a change.
 - A completed statement's actionable elements are disabled before the next
   statement becomes active. Previously used `=` operators must not remain
   clickable.
-- Declarations initialize memory; assignments update mutable memory; constants
-  reject writes; unary `++`/`--` mutate memory.
+- Declarations with initializers write memory immediately. Mutable declarations
+  without initializers create an unset binding that a later plain assignment may
+  initialize. Their memory card does not appear before the declaration line is
+  evaluated; that action transfers from the source line and inserts the unset
+  card in Memory. Constants require initializers, assignments update mutable
+  memory, and unary `++`/`--` mutate initialized numeric memory.
+- Source-backed programs preserve `int`, `float`, `double`, and `char`
+  binding types through expressions, assignments, timelines, and memory cards.
+  Character literals keep their single quotes in every learning view except the
+  Program Output screen, where only the emitted character is shown.
 - Logical `!` derives a Boolean without mutating its source variable. A resolved
   `!` operand therefore renders as the derived literal in later prompts.
 - Resolved `++`/`--` results retain the variable identity and updated value.
@@ -190,6 +205,11 @@ unless the user explicitly approves a change.
 - A selection modal shows only the condition or selector expression. The full
   `if`, `else if`, or `switch` statement remains visible in the stable source
   view and is not duplicated inside the close view.
+- Source flow auto reveal belongs only to the source code viewport. It runs only
+  when the destination line is outside that viewport. Wheel, touch, scrollbar,
+  or keyboard scrolling during a highlight transition transfers scroll control
+  to the learner: the transition still completes, but its final render and focus
+  preserve the learner's viewport instead of snapping to the active line.
 - Profiles that omit `timelinePresentation` retain the established inline
   timeline.
 

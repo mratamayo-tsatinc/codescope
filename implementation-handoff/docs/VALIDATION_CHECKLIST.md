@@ -38,6 +38,13 @@ coverage, then run the full suite.
 
 - [ ] Declaration followed by assignment disables the completed declaration's
       `=` control before the next statement activates.
+- [ ] Uninitialized mutable `int`, `float`, `double`, and `char`
+      declarations have no memory card before evaluation. Their direct action
+      sends a trailing cue from the authored line, inserts one unset card in
+      Memory, and a later plain assignment initializes that same binding.
+- [ ] Float output honors `%f` and precision such as `%.2f`; character output
+      honors `%c`. Character literals retain single quotes in source,
+      timelines, and memory cards but appear unquoted in Program Output.
 - [ ] Compound assignment performs explicit read–modify–write and updates
       memory once.
 - [ ] A valid wrong manual response propagates and receives one score result.
@@ -166,9 +173,18 @@ coverage, then run the full suite.
       dot or second highlighted row appears. The destination stays neutral
       until arrival, then becomes the only active line for a sequential step,
       branch skip, or backward edge. Reduced motion uses a short fade.
+- [ ] Source flow scrolls only its code viewport and only when the destination is
+      outside view. Manual wheel, touch, scrollbar, or keyboard scrolling during
+      a transition cancels its remaining auto reveal; completion focus preserves
+      the learner's chosen viewport, and a later transition may auto reveal again.
 - [ ] A declaration or assignment comet starts at the producing statement and
       reaches the live memory card. Source-flow rerenders do not detach that
       card or redirect the path toward the viewport origin.
+- [ ] Complete-source Practice items show Reset item below the item workspace
+      after work begins, never inside a statement modal. Reset preserves the
+      current materialized source. After completion, Try again replaces Reset
+      item and rebuilds only the current manifest entry with a fresh seed;
+      source without `@seed` metadata remains authored and unchanged.
 - [ ] Source-flow memory renders every declared variable or constant exactly
       once, adds no synthetic result binding, and preserves the identifier's
       authored casing in the docked panel and statement trace modal.

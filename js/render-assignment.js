@@ -23,7 +23,8 @@ function renderCompoundAssignmentPrefix(statement,context,isActive,item){
   let targetNode;
   if(revealedForRow){
     targetNode=renderValueCard({id:tokenId,name:statement.target,value:runtime.targetReadValue,
-      kind:'variable',color:stepVisualColor(runtime.trace[readIndex],readIndex),isFlash:context.flashId===tokenId});
+      kind:'variable',dataType:statement.targetDataType,
+      color:stepVisualColor(runtime.trace[readIndex],readIndex),isFlash:context.flashId===tokenId});
     targetNode.classList.add('compound-target-card');
   } else {
     const interactive=isActive&&!runtime.checked&&!item.checked&&context.isCurrent;
@@ -73,18 +74,19 @@ function appendCompoundAssignmentResult(timeline,statement,options){
   if(!animate&&runtime.assignmentMergePending) runtime.assignmentMergePending=false;
   const source=h('span',{class:'compound-merge-source'},
     h('span',{class:'compound-merge-left'},
-      renderValueCard({id:null,name:statement.target,value:runtime.beforeValue,kind:'variable',color,isFlash:false})),
+      renderValueCard({id:null,name:statement.target,value:runtime.beforeValue,kind:'variable',
+        dataType:statement.targetDataType,color,isFlash:false})),
     ' ',h('span',{class:'tok tok-op-muted compound-merge-operator'},compoundArithmeticOperator(statement.operator)),' ',
     h('span',{class:'tok tok-lit compound-merge-right'},formatValue(runtime.rhsValue)));
   const cue=h('span',{class:'compound-operation-cue'},compoundOperationInstruction(statement));
   const result=renderValueCard({id:runtime.assignmentResultNodeId||assignmentResultTokenId(statement),
-    name:statement.target,value:runtime.assignedValue,kind:'variable',color,isFlash:!animate});
+    name:statement.target,value:runtime.assignedValue,kind:'variable',dataType:statement.targetDataType,color,isFlash:!animate});
   result.classList.add('compound-merge-result');
   const stage=h('span',{class:'compound-merge-stage'+(animate?' is-animating':''),
     style:`--compound-merge-duration:${COMPOUND_MERGE_DURATION_MS}ms;`},source,cue,result);
   const row=h('div',{class:`tl-row ${options.historical?'done':'current'} compound-result-row`});
   row.appendChild(h('div',{class:'tl-dot',style:`background:${color};${options.historical?'':`box-shadow:0 0 0 4px ${hexToRgba(color,0.25)};`}`,
-    title:`${statement.target} now stores ${formatValue(runtime.assignedValue)}`}));
+    title:`${statement.target} now stores ${formatValue(runtime.assignedValue,statement.targetDataType)}`}));
   row.appendChild(h('div',{class:'code-out'+(options.historical?'':' row-enter')},renderBadgeSlot(null),stage));
   timeline.appendChild(row);
 }
@@ -129,7 +131,7 @@ function renderAssignmentStatement(ctx){
       card.appendChild(renderContextHelp(guidance));
     }
     const canReset=state.mode==='practice'&&(program.cursor>0||runtime.trace.length>0||runtime.targetRevealed);
-    const resetControl=renderItemResetControl(canReset);
+    const resetControl=renderItemResetControl(canReset&&!(ctx.services&&ctx.services.statementTraceModal));
     if(resetControl) card.appendChild(resetControl);
   }
   container.appendChild(card);

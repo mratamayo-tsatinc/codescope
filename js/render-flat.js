@@ -20,7 +20,7 @@ function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
     const isFlash = flashId!=null && op.id===flashId;
     const attrs = {class:'tok tok-lit'+(col?(isFlash?' tok-colored-flash':' tok-colored'):''), 'data-token-id': op.id};
     if(col) attrs.style = `color:${col};`;
-    return h('span',attrs, formatValue(op.value));
+    return h('span',attrs, formatValue(op.value,op.dataType));
   }
   if(op.kind==='unary'){
     if(op.resolved){
@@ -45,7 +45,8 @@ function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
       // produced once it eventually fires.
       const cardColor = colorMap.get(op.id);
       const isFlash = flashId!=null && op.id===flashId;
-      const card = renderValueCard({id:op.id, name:op.inner.name, value:unaryBaseValue(op), kind:op.inner.kind, color:cardColor, isFlash});
+      const card = renderValueCard({id:op.id,name:op.inner.name,value:unaryBaseValue(op),kind:op.inner.kind,
+        dataType:op.inner.dataType,color:cardColor,isFlash});
       const opAttrs = {class:'tok tok-op-active'+(cardColor?' tok-colored':'')};
       if(cardColor) opAttrs.style = `color:${cardColor};`;
       const opSpan = h('span',opAttrs, op.op);
@@ -90,7 +91,7 @@ function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
   if(op.resolved){
     const col = colorMap.get(op.id);
     const isFlash = flashId!=null && op.id===flashId;
-    return renderValueCard({id:op.id, name:op.name, value:op.declaredValue, kind:op.kind, color:col, isFlash});
+    return renderValueCard({id:op.id,name:op.name,value:op.declaredValue,kind:op.kind,dataType:op.dataType,color:col,isFlash});
   }
   const cls = (op.kind==='variable' ? 'tok tok-var' : 'tok tok-const') + ' tok-colored binding-identity';
   return h('span',{class:cls, style:bindingIdentityStyle(op.name,op.kind,activeColor),
@@ -145,7 +146,7 @@ function renderStaticFlatOperand(op, colorMap, flashId, pending){
     const isFlash = flashId!=null && op.id===flashId;
     const attrs = {class:'tok tok-lit'+(col?(isFlash?' tok-colored-flash':' tok-colored'):''), 'data-token-id': op.id};
     if(col) attrs.style = `color:${col};`;
-    return h('span',attrs, formatValue(op.value));
+    return h('span',attrs, formatValue(op.value,op.dataType));
   }
   if(op.kind==='unary'){
     if(op.resolved){
@@ -160,7 +161,8 @@ function renderStaticFlatOperand(op, colorMap, flashId, pending){
     if(op.substituted){
       const cardColor = colorMap.get(op.id);
       const isFlash = flashId!=null && op.id===flashId;
-      const card = renderValueCard({id:op.id, name:op.inner.name, value:unaryBaseValue(op), kind:op.inner.kind, color:cardColor, isFlash});
+      const card = renderValueCard({id:op.id,name:op.inner.name,value:unaryBaseValue(op),kind:op.inner.kind,
+        dataType:op.inner.dataType,color:cardColor,isFlash});
       const opAttrs = {class:'tok tok-op-muted'+(cardColor?' tok-colored':'')};
       if(cardColor) opAttrs.style = `color:${cardColor};`;
       const opSpan = h('span',opAttrs, op.op);
@@ -180,7 +182,7 @@ function renderStaticFlatOperand(op, colorMap, flashId, pending){
   if(op.resolved){
     const col = colorMap.get(op.id);
     const isFlash = flashId!=null && op.id===flashId;
-    return renderValueCard({id:op.id, name:op.name, value:op.declaredValue, kind:op.kind, color:col, isFlash});
+    return renderValueCard({id:op.id,name:op.name,value:op.declaredValue,kind:op.kind,dataType:op.dataType,color:col,isFlash});
   }
   const base = (op.kind==='variable' ? 'tok tok-var tok-static' : 'tok tok-const tok-static')+' binding-identity';
   const isPending = pending && pending.type==='substitute' && pending.id===op.id;

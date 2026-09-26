@@ -13,6 +13,8 @@ int main() {
     if (score >= 75 && absences < 5) {
         printf("Requirements met.\n");
     }
+
     printf("Evaluation complete.\n");
+    
     return 0;
 }

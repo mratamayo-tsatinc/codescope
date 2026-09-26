@@ -7,9 +7,9 @@
 // ============================================================================
 
 function engineNodeToProgramIr(node){
-  if(node.kind === 'literal') return literalExpression(node.value, {id:node.id});
+  if(node.kind === 'literal') return literalExpression(node.value, {id:node.id,dataType:node.dataType});
   if(node.kind === 'variable' || node.kind === 'constant'){
-    return identifierExpression(node.name, {id:node.id});
+    return identifierExpression(node.name, {id:node.id,dataType:node.dataType});
   }
   if(node.kind === 'unary'){
     return unaryExpression(node.op, engineNodeToProgramIr(node.inner), {id:node.id, form:node.form});
@@ -47,24 +47,6 @@ function buildDeclarationRuntime(tree, expectedValue){
     totalOpSteps: 0,
     wasCorrectAssignment: null,
     assignedValue: null
-  };
-}
-
-function buildUninitializedDeclarationRuntime(){
-  const empty={operands:[],operators:[]};
-  return {
-    originalTree:null,
-    originalFlat:empty,
-    workingFlat:deepCloneFlat(empty),
-    history:[deepCloneFlat(empty)],
-    trace:[],
-    canonicalTrace:{steps:[],finalValue:null,treeStates:[]},
-    expectedValue:null,
-    checked:false,
-    correctSteps:0,
-    totalOpSteps:0,
-    wasCorrectAssignment:null,
-    assignedValue:null
   };
 }
 
@@ -193,6 +175,24 @@ function buildAdvancedAssignmentUnaryStatements(item,memory){
   return statements;
 }
 
+function buildUninitializedDeclarationRuntime(){
+  const empty={operands:[],operators:[]};
+  return {
+    originalTree:null,
+    originalFlat:empty,
+    workingFlat:deepCloneFlat(empty),
+    history:[deepCloneFlat(empty)],
+    trace:[],
+    canonicalTrace:{steps:[],finalValue:null,treeStates:[]},
+    expectedValue:null,
+    checked:false,
+    correctSteps:0,
+    totalOpSteps:0,
+    wasCorrectAssignment:null,
+    assignedValue:null
+  };
+}
+
 function buildOutputStatementRuntime(spec,index,memory){
   const statement=outputStatement({
     id:`output-${index+1}`,
@@ -236,6 +236,7 @@ function applyProgramMemoryToTree(node,memory){
       const stored=memory[node.name];
       node.declaredValue=stored&&typeof stored==='object'&&Object.prototype.hasOwnProperty.call(stored,'value')
         ?stored.value:stored;
+      if(stored&&typeof stored==='object'&&stored.dataType) node.dataType=stored.dataType;
     }
     return;
   }

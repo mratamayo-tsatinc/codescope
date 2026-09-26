@@ -10,14 +10,11 @@ int main() {
 
     if (grade >= 90) {
         printf("Excellent.\n");
-    }
-    else if (grade >= 80) {
+    } else if (grade >= 80) {
         printf("Very good.\n");
-    }
-    else if (grade >=75) {
+    } else if (grade >=75) {
         printf("Good.\n");
-    }
-    else {
+    } else {
         printf("Keep practicing.\n");
     }
 

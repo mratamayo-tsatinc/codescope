@@ -5,6 +5,7 @@
     "MultipleValues.java",
     "EmbeddedLines.java",
     "NoTrailingNewline.java",
-    "AssignmentThenOutput.java"
+    "AssignmentThenOutput.java",
+    "TypedValues.java"
   ]
 }

@@ -62,43 +62,11 @@ function csMaterializeSource(details,language,filename,mode){
 }
 
 function csExpressionTokens(source,filename,line){
-  const tokens=[];let index=0;
-  while(index<source.length){
-    if(/\s/.test(source[index])){index++;continue;}
-    const pair=/^(\|\||&&|==|!=|<=|>=)/.exec(source.slice(index));
-    if(pair){tokens.push({type:pair[1],value:pair[1]});index+=pair[1].length;continue;}
-    const number=/^\d+/.exec(source.slice(index));
-    if(number){tokens.push({type:'number',value:Number(number[0])});index+=number[0].length;continue;}
-    const name=/^[A-Za-z_][A-Za-z0-9_]*/.exec(source.slice(index));
-    if(name){tokens.push({type:'name',value:name[0]});index+=name[0].length;continue;}
-    if('+-*/%()!<>'.includes(source[index])){tokens.push({type:source[index],value:source[index++]});continue;}
-    throw new Error(`${filename}:${line}: unsupported condition token '${source[index]}'`);
-  }
-  return tokens;
+  return poExpressionTokens(source,filename,line);
 }
 
-function csParseExpression(source,memory,kinds,filename,line){
-  const tokens=csExpressionTokens(source,filename,line),precedence={'||':1,'&&':2,'==':3,'!=':3,'<':4,'>':4,'<=':4,'>=':4,'+':5,'-':5,'*':6,'/':6,'%':6};
-  let cursor=0;
-  const primary=()=>{
-    const token=tokens[cursor++];
-    if(!token) throw new Error(`${filename}:${line}: incomplete condition`);
-    if(token.type==='number') return makeLiteral(token.value);
-    if(token.type==='name'){
-      if(token.value==='true'||token.value==='false') return makeLiteral(token.value==='true');
-      if(!Object.prototype.hasOwnProperty.call(memory,token.value))
-        throw new Error(`${filename}:${line}: '${token.value}' is used before initialization`);
-      return makeNamed(kinds[token.value]||'variable',token.value,memory[token.value]);
-    }
-    if(token.type==='!') return makeUnary('!','prefix',primary());
-    if(token.type==='-'&&tokens[cursor]&&tokens[cursor].type==='number') return makeLiteral(-tokens[cursor++].value);
-    if(token.type==='('){const value=parse(0);if(!tokens[cursor]||tokens[cursor].type!==')')throw new Error(`${filename}:${line}: missing ')'`);cursor++;return value;}
-    throw new Error(`${filename}:${line}: expected condition operand`);
-  };
-  const parse=min=>{let left=primary();while(tokens[cursor]&&precedence[tokens[cursor].type]>=min){
-    const operator=tokens[cursor++].type;const right=parse(precedence[operator]+1);left=makeBinOp(operator,left,right);
-  }return left;};
-  const tree=parse(0);if(cursor!==tokens.length)throw new Error(`${filename}:${line}: unsupported condition '${source.trim()}'`);return tree;
+function csParseExpression(source,memory,kinds,filename,line,dataTypes){
+  return poParseExpression(source,memory,kinds,filename,line,dataTypes);
 }
 
 function csNextCodeLine(lines,start){
@@ -144,8 +112,8 @@ function csFollowingClauseLine(lines,blockEnd){
   return csNextMeaningfulLine(lines,blockEnd+1);
 }
 
-function csBuildSelection(id,kind,condition,lineIndex,lines,memory,kinds,branches){
-  const tree=csParseExpression(condition,memory,kinds,'selection source',lineIndex+1);
+function csBuildSelection(id,kind,condition,lineIndex,lines,memory,kinds,branches,dataTypes){
+  const tree=csParseExpression(condition,memory,kinds,'selection source',lineIndex+1,dataTypes);
   const statement={id,kind:'selection',selectionKind:kind,keyword:kind==='switch'?'switch':(kind==='else-if'?'else if':'if'),
     branches,conditionSource:condition.trim(),sourceLine:lineIndex+1,sourceEndLine:lineIndex+1,sourceText:lines[lineIndex],
     sourceIndent:(lines[lineIndex].match(/^\s*/)||[''])[0],runtime:buildDeclarationRuntime(tree,evalTree(tree))};
@@ -159,17 +127,36 @@ function csParseExercise(exercise,language,sourceValueMode='authored'){
   const rawDetails=poMetadataAndSource(exercise.raw,exercise.filename),materialized=csMaterializeSource(rawDetails,language,exercise.filename,sourceValueMode);
   const details=Object.assign({},rawDetails,{templateSource:rawDetails.source,source:materialized.source,
     sourceValueMode,seedValues:materialized.seedValues}),lines=details.source.split('\n');
-  const memory={},kinds={},declarations=[],statements=[],supported=new Map();
+  const memory={},kinds={},dataTypes={},declarations=[],statements=[],supported=new Map(),declarationsByLine=new Map();
   let declarationIndex=0,assignmentIndex=0,unaryIndex=0,outputIndex=0;
   const mark=statement=>supported.set(statement.sourceLine,{statementId:statement.id,primary:true});
   lines.forEach((raw,index)=>{
-    const pattern=language==='c'?/^\s*(const\s+)?int\s+(\w+)\s*=\s*([^;]+);\s*$/:/^\s*(final\s+)?int\s+(\w+)\s*=\s*([^;]+);\s*$/;
-    const match=pattern.exec(raw);if(!match)return;
-    const tree=csParseExpression(match[3],memory,kinds,exercise.filename,index+1),name=match[2],kind=match[1]?'constant':'variable',value=evalTree(tree);
-    memory[name]=value;kinds[name]=kind;declarations.push({kind,name,value});
-    const statement=declarationStatement({id:`declaration-${++declarationIndex}`,name,dataType:'int',mutable:kind!=='constant',initializer:engineNodeToProgramIr(tree)});
-    statement.binding.kind=kind;statement.runtime=buildDeclarationRuntime(tree,value);statement.dependencies=[...collectExpressionDependencies(statement.initializer)];
-    statement.sourceLine=index+1;statement.sourceEndLine=index+1;statement.sourceText=raw;statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];mark(statement);statements.push(statement);
+    const pattern=language==='c'
+      ?/^\s*(const\s+)?(int|float|double|char)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*=\s*([^;]+))?;\s*$/
+      :/^\s*(final\s+)?(int|float|double|char)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*=\s*([^;]+))?;\s*$/;
+    const match=pattern.exec(raw);
+    if(match){
+      const dataType=match[2],name=match[3],kind=match[1]?'constant':'variable',initialized=match[4]!==undefined;
+      if(Object.prototype.hasOwnProperty.call(kinds,name)) throw new Error(`${exercise.filename}:${index+1}: duplicate declaration '${name}'`);
+      if(kind==='constant'&&!initialized) throw new Error(`${exercise.filename}:${index+1}: constant '${name}' requires an initializer`);
+      const tree=initialized?csParseExpression(match[4],memory,kinds,exercise.filename,index+1,dataTypes):null;
+      const value=initialized?evalTree(tree):undefined;
+      memory[name]=value;kinds[name]=kind;dataTypes[name]=dataType;
+      const declaration={kind,name,value,dataType,initialized};declarations.push(declaration);
+      const statement=declarationStatement({id:`declaration-${++declarationIndex}`,name,dataType,
+        mutable:kind!=='constant',initialized,initializer:tree?engineNodeToProgramIr(tree):null});
+      statement.binding.kind=kind;statement.runtime=initialized
+        ?buildDeclarationRuntime(tree,value):buildUninitializedDeclarationRuntime();
+      statement.dependencies=tree?[...collectExpressionDependencies(statement.initializer)]:[];
+      statement.sourceLine=index+1;statement.sourceEndLine=index+1;statement.sourceText=raw;
+      statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];mark(statement);statements.push(statement);
+      declarationsByLine.set(index+1,{declaration,statement,initializerSource:match[4]});return;
+    }
+    const assignment=/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(=|\+=|-=|\*=|\/=|%=)\s*(.+);\s*$/.exec(raw);
+    if(assignment&&kinds[assignment[1]]==='variable'){
+      const tree=csParseExpression(assignment[3],memory,kinds,exercise.filename,index+1,dataTypes);
+      memory[assignment[1]]=applyAssignmentOperator(assignment[2],memory[assignment[1]],evalTree(tree));
+    }
   });
   const controlStructures=[],attachedElseIf=new Set();let selectionIndex=0;
   lines.forEach((line,index)=>{
@@ -188,7 +175,7 @@ function csParseExercise(exercise,language,sourceValueMode='authored'){
       current=null;
     }
     clauses.forEach(clause=>{
-      const statement=csBuildSelection(`selection-${++selectionIndex}`,clause.kind,clause.condition,clause.index,lines,memory,kinds,[]);
+      const statement=csBuildSelection(`selection-${++selectionIndex}`,clause.kind,clause.condition,clause.index,lines,memory,kinds,[],dataTypes);
       statement.selectionHasAlternative=clauses.length>1||!!elseClause;clause.statement=statement;mark(statement);statements.push(statement);
     });
     controlStructures.push({type:'if-chain',clauses,elseClause,end:chainEnd});
@@ -202,10 +189,23 @@ function csParseExercise(exercise,language,sourceValueMode='authored'){
         label:isDefault?'default':`case ${caseMatch[1]}`});
     }
     cases.forEach((entry,position)=>{entry.end=(cases[position+1]?cases[position+1].index:end)-1;});
-    const statement=csBuildSelection(`selection-${++selectionIndex}`,'switch',header.condition,index,lines,memory,kinds,[]);
+    const statement=csBuildSelection(`selection-${++selectionIndex}`,'switch',header.condition,index,lines,memory,kinds,[],dataTypes);
     mark(statement);statements.push(statement);controlStructures.push({type:'switch',statement,cases,end});
   });
+  const executionMemory={};
   lines.forEach((raw,index)=>{
+    const declarationEntry=declarationsByLine.get(index+1);
+    if(declarationEntry){
+      const {declaration,statement,initializerSource}=declarationEntry;
+      if(declaration.initialized){
+        const tree=csParseExpression(initializerSource,executionMemory,kinds,exercise.filename,index+1,dataTypes),value=evalTree(tree);
+        declaration.value=value;statement.initializer=engineNodeToProgramIr(tree);
+        statement.runtime=buildDeclarationRuntime(tree,value);
+        statement.dependencies=[...collectExpressionDependencies(statement.initializer)];
+        executionMemory[declaration.name]=value;
+      }else executionMemory[declaration.name]=undefined;
+      return;
+    }
     if(supported.has(index+1)) return;
     const trimmed=raw.trim();
     if(!trimmed.endsWith(';')) return;
@@ -216,8 +216,8 @@ function csParseExercise(exercise,language,sourceValueMode='authored'){
       statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];mark(statement);statements.push(statement);return;
     }
     const output=language==='c'
-      ?poParseCOutput(text,memory,exercise.filename,index+1,outputIndex)
-      :poParseJavaOutput(text,memory,exercise.filename,index+1,outputIndex);
+      ?poParseCOutput(text,executionMemory,exercise.filename,index+1,outputIndex,dataTypes)
+      :poParseJavaOutput(text,executionMemory,exercise.filename,index+1,outputIndex,dataTypes);
     if(output){
       outputIndex++;output.sourceLine=index+1;output.sourceEndLine=index+1;output.sourceText=raw;
       output.sourceIndent=(raw.match(/^\s*/)||[''])[0];output.nextStatementId='$end';mark(output);statements.push(output);return;
@@ -226,19 +226,21 @@ function csParseExercise(exercise,language,sourceValueMode='authored'){
     if(unary){
       const prefix=!!unary[1],name=unary[2]||unary[3],operator=unary[1]||unary[4];
       if(kinds[name]!=='variable') throw new Error(`${exercise.filename}:${index+1}: unary update requires a mutable variable`);
-      const statement=buildUnaryUpdateStatementRuntime(name,operator,prefix?'prefix':'postfix',memory,unaryIndex++);
+      const statement=buildUnaryUpdateStatementRuntime(name,operator,prefix?'prefix':'postfix',executionMemory,unaryIndex++);
       statement.sourceLine=index+1;statement.sourceEndLine=index+1;statement.sourceText=raw;
       statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];mark(statement);statements.push(statement);return;
     }
     const assignment=/^([A-Za-z_][A-Za-z0-9_]*)\s*(=|\+=|-=|\*=|\/=|%=)\s*(.+)$/.exec(text);
     if(assignment){
       if(kinds[assignment[1]]!=='variable') throw new Error(`${exercise.filename}:${index+1}: assignment requires a mutable variable`);
-      const tree=csParseExpression(assignment[3],memory,kinds,exercise.filename,index+1);
-      const statement=buildAssignmentStatementRuntime(assignment[1],assignment[2],tree,memory,assignmentIndex++);
+      const tree=csParseExpression(assignment[3],executionMemory,kinds,exercise.filename,index+1,dataTypes);
+      const statement=buildAssignmentStatementRuntime(assignment[1],assignment[2],tree,executionMemory,assignmentIndex++);
+      statement.targetDataType=dataTypes[assignment[1]];
       statement.sourceLine=index+1;statement.sourceEndLine=index+1;statement.sourceText=raw;
       statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];mark(statement);statements.push(statement);
     }
   });
+  Object.keys(memory).forEach(name=>delete memory[name]);Object.assign(memory,executionMemory);
   statements.sort((left,right)=>left.sourceLine-right.sourceLine);
   const firstStatementIn=(start,end)=>statements.find(statement=>statement.sourceLine>=start&&statement.sourceLine<=end)||null;
   const firstStatementAfter=end=>statements.find(statement=>statement.sourceLine>end)||null;
@@ -280,16 +282,20 @@ function csParseExercise(exercise,language,sourceValueMode='authored'){
   });
   if(!statements.length) throw new Error(`${exercise.filename}: no supported executable statements were found`);
   const sourceDisplay={filename:exercise.filename,lines:lines.map((text,index)=>{const support=supported.get(index+1);return {number:index+1,text,supported:!!support,statementId:support&&support.statementId||null,primary:!!support};})};
-  return {details,lines,memory,kinds,declarations,statements,sourceDisplay};
+  return {details,lines,memory,kinds,dataTypes,declarations,statements,sourceDisplay};
 }
 
 function csBuildItem(profile,exercise,language,itemNumber){
   const parsed=csParseExercise(exercise,language,csSourceValueMode(profile)),last=parsed.declarations[parsed.declarations.length-1];
-  const originalTree=last?makeNamed(last.kind,last.name,last.value):makeLiteral(0),originalFlat=flattenInstance(originalTree);
+  const resultName=parsed.details.resultName||(last&&last.name)||'result';
+  if(parsed.details.resultName&&!Object.prototype.hasOwnProperty.call(parsed.memory,resultName))
+    throw new Error(`${exercise.filename}: @result '${resultName}' is not declared`);
+  const resultKind=parsed.kinds[resultName]||'variable',resultValue=parsed.memory[resultName];
+  const originalTree=last?makeNamed(resultKind,resultName,resultValue):makeLiteral(0),originalFlat=flattenInstance(originalTree);
   const item={profileId:profile.id,itemNumber,exerciseId:exercise.id,filename:exercise.filename,exerciseTitle:parsed.details.title,
     source:parsed.details.source,sourceTemplate:parsed.details.templateSource,sourceSeedValues:parsed.details.seedValues,
     sourceValueMode:parsed.details.sourceValueMode,sourceDisplay:parsed.sourceDisplay,sourceFlow:true,language,originalTree,originalFlat,
-    decls:parsed.declarations,resultName:last?last.name:'result',correctFinalValue:last?last.value:0,canonicalTrace:buildCanonicalTrace(originalTree),
+    decls:parsed.declarations,resultName,correctFinalValue:last?resultValue:0,canonicalTrace:buildCanonicalTrace(originalTree),
     workingFlat:deepCloneFlat(originalFlat),history:[deepCloneFlat(originalFlat)],trace:[],checked:false,itemScore:null,points:null,maxPoints:null,
     correctSteps:0,totalOpSteps:0,wasCorrectFinal:null,showSolution:false,playback:null,flagged:false,lockedAt:null,examActionLog:[],
     examSequenceFailure:null,practiceInvalidExecution:null,_bindings:null};
@@ -318,7 +324,11 @@ const codeSimulatorContentProvider={id:CODE_SIMULATOR_PLUGIN_MANIFEST.id,
       throw new Error(`${profile.id}: source-file simulation must use manifest item count`);},
   loadContent:csLoadExerciseContent,
   generateItems({profile,language}){const bank=codeSimulatorExerciseBanks.get(csManifestUrl(profile,language));if(!bank)throw new Error(`${profile.id}: code simulator exercise bank is not loaded`);
-    return bank.exercises.map((exercise,index)=>csBuildItem(profile,exercise,language,index+1));}
+    return bank.exercises.map((exercise,index)=>csBuildItem(profile,exercise,language,index+1));},
+  regenerateItem({profile,item,language}){const bank=codeSimulatorExerciseBanks.get(csManifestUrl(profile,language));if(!bank)throw new Error(`${profile.id}: code simulator exercise bank is not loaded`);
+    const index=bank.exercises.findIndex(exercise=>exercise.filename===item.filename||exercise.id===item.exerciseId);
+    if(index<0)throw new Error(`${profile.id}: current exercise '${item.filename||item.exerciseId}' is not in the active manifest`);
+    return csBuildItem(profile,bank.exercises[index],language,item.itemNumber||index+1);}
 };
 registerProfileContentProvider(codeSimulatorContentProvider);
 

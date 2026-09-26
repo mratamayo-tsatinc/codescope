@@ -33,7 +33,7 @@ function assignmentResultTokenId(statement){
 
 function assignmentDependenciesReady(statement,program){
   const target = program.memory[statement.target];
-  if(!target || !target.initialized || target.mutable===false) return false;
+  if(!target || target.mutable===false || (isCompoundAssignment(statement)&&!target.initialized)) return false;
   return (statement.dependencies||[]).every(name=>{
     const binding = program.memory[name];
     return binding && binding.initialized;
@@ -47,7 +47,7 @@ function syncAssignmentOperandsFromMemory(statement,program){
     applyProgramMemoryToTree(runtime.originalTree,program.memory);
     runtime.expectedRhs=evalTree(runtime.originalTree);
     const target=program.memory[statement.target];
-    if(target&&target.initialized){
+    if(target&&(target.initialized||!isCompoundAssignment(statement))){
       runtime.expectedBefore=target.value;
       runtime.expectedAfter=applyAssignmentOperator(statement.operator,target.value,runtime.expectedRhs);
     }

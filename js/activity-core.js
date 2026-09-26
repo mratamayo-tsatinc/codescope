@@ -57,6 +57,15 @@ function generateProfileContentItems(profile,generateDefault){
   return items;
 }
 
+// Try again may ask a source provider to rebuild just the current manifest
+// item. This keeps every other item and its progress intact while allowing
+// embedded seed directives to materialize new values for this one file.
+function regenerateProfileContentItem(profile,item){
+  const provider=profileContentProviderFor(profile);
+  if(!provider||typeof provider.regenerateItem!=='function') return null;
+  return provider.regenerateItem({profile,item,language:item&&item.language||state.language});
+}
+
 function ensureActivityContentReady(){
   if(activityContentReadyPromise) return activityContentReadyPromise;
   const loaders=[...activityPluginRegistry.values(),...profileContentProviderRegistry.values()];

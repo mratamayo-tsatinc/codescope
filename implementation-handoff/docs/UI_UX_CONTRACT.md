@@ -194,7 +194,9 @@ New activities must look like members of the existing application.
 - Check appears only when all required responses are complete and no known
   wrong-state UI is being misrepresented as merely “ready.”
 - Learners may revise responses until Check.
-- Try again appears after a checked Practice item and performs a full reset.
+- Reset item is scoped to the whole current item and sits outside a
+  statement-evaluation modal. Try again appears after a checked Practice item;
+  source-backed items use it to reseed and rebuild only that current item.
 - Feedback, solution, and celebration state must clear when navigating or
   retrying.
 

@@ -22,6 +22,7 @@ const DEFAULT_SHELL_SETTINGS = Object.freeze({
       safetyBufferMs: 180
     }),
     entranceDurationMs: 220,
+    cardInsertDurationMs: 360,
     valueRollDurationMs: 420,
     valueRollFallbackMs: 560
   }),
@@ -1035,10 +1036,38 @@ function checkExpressionItem(item){
   return true;
 }
 
+function reseedCurrentSourceItem(item){
+  const profile=PROFILES.find(candidate=>candidate.id===item.profileId)||currentProfile();
+  if(!profile) return null;
+  const retrySeed=createSessionSeed();
+  let replacement=null;
+  initializeSeededRandom(retrySeed);
+  try{
+    replacement=typeof regenerateProfileContentItem==='function'
+      ?regenerateProfileContentItem(profile,item):null;
+    if(!replacement){
+      const regenerated=generateItemsForProfile(profile.id);
+      replacement=regenerated[state.itemIndex]||null;
+    }
+  }finally{resetRandomGenerator();}
+  if(!replacement) return null;
+  replacement.retrySeed=retrySeed;
+  state.items[state.itemIndex]=replacement;
+  const profileItems=state.itemsByProfile&&state.itemsByProfile[profile.id];
+  if(Array.isArray(profileItems)) profileItems[state.itemIndex]=replacement;
+  return replacement;
+}
+
 function handleRetrySameItem(){
-  // Re-attempt the SAME generated expression from scratch (multiple Verify attempts, per Practice mode rules).
   const item = currentItem();
   if(state.mode==='exam') return;
+  if(item&&item.sourceFlow){
+    if(typeof closeProgramStatementTrace==='function'&&typeof statementTraceModalState!=='undefined'&&statementTraceModalState)
+      closeProgramStatementTrace(false);
+    if(!reseedCurrentSourceItem(item)) return;
+    render();
+    return;
+  }
   if(item&&item.activityKind){
     const retry=retryActivityItem(item);
     if(!retry.applied)return;

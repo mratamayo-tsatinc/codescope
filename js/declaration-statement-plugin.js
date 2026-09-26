@@ -13,13 +13,15 @@ function declarationDependenciesReady(statement, program){
   });
 }
 
+function declarationHasInitializer(statement){
+  return statement&&statement.initialized!==false;
+}
+
 function declarationInitializerResolved(statement){
   const runtime = statement.runtime;
   return !!(runtime && runtime.workingFlat && runtime.workingFlat.operands.length===1
     && isFlatOperandReady(runtime.workingFlat.operands[0]));
 }
-
-function declarationHasInitializer(statement){return statement&&statement.initialized!==false;}
 
 function syncDeclarationOperandsFromMemory(statement, program){
   const runtime = statement.runtime;
@@ -69,8 +71,6 @@ registerStatementPlugin({
     const {statement, program, action} = ctx;
     const runtime = statement.runtime;
     if(!runtime || runtime.checked || !declarationDependenciesReady(statement, program)) return {applied:false};
-    syncDeclarationOperandsFromMemory(statement, program);
-
     if(action.type==='declare-binding'&&!declarationHasInitializer(statement)){
       runtime.checked=true;
       runtime.wasCorrectAssignment=true;
@@ -88,6 +88,7 @@ registerStatementPlugin({
         target:statement.binding.name,dataType:statement.binding.dataType,wasCorrect:true
       }};
     }
+    syncDeclarationOperandsFromMemory(statement, program);
 
     if(action.type === 'commit-assignment'){
       if(!declarationInitializerResolved(statement)) return {applied:false};

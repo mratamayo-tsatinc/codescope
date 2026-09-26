@@ -81,12 +81,14 @@ function programOutputResolveActionable(interactive,partState){
 
 function renderProgramOutputConsumedIdentifier(statement,entry,partState,showDerived){
   const name=programOutputPartName(entry.part);
+  const dataType=entry.part.expression&&entry.part.expression.dataType;
   const nodes=[renderValueCard({id:programOutputReadTokenId(statement,entry.index),name,
-    value:partState.stagedValue,kind:'variable',color:bindingIdentityColor(name,'variable'),
+    value:partState.stagedValue,kind:'variable',dataType,color:bindingIdentityColor(name,'variable'),
     isFlash:false})];
   if(showDerived) nodes.push(h('span',{class:'program-output-derived-value binding-identity',
     style:bindingIdentityStyle(name,'variable'),
-    'data-token-id':programOutputResultTokenId(statement,entry.index)},`→ ${partState.resolvedValue}`));
+    'data-token-id':programOutputResultTokenId(statement,entry.index)},
+    `→ ${formatValue(partState.resolvedValue,dataType)}`));
   return h('span',{class:'program-output-consumed-source'},...nodes);
 }
 
@@ -119,7 +121,8 @@ function renderProgramOutputState(statement,item,program,options){
           const name=programOutputPartName(part);
           code.appendChild(h('span',{class:'program-output-string program-output-resolved-value binding-identity',
             style:bindingIdentityStyle(name,'variable'),
-            'data-token-id':programOutputResultTokenId(statement,index)},String(partState.resolvedValue)));
+            'data-token-id':programOutputResultTokenId(statement,index)},
+            programOutputFormatValue(partState.resolvedValue,part.format)));
         }else{
           const actionable=programOutputResolveActionable(interactive,partState);
           code.appendChild(outputActionToken(`%${part.format||'d'}`,{
@@ -143,7 +146,8 @@ function renderProgramOutputState(statement,item,program,options){
         code.appendChild(renderProgramOutputConsumedIdentifier(statement,entry,partState,false));
       }else if(partState.stagedValue!==null){
         code.appendChild(renderValueCard({id:programOutputReadTokenId(statement,entry.index),name,
-          value:partState.stagedValue,kind:'variable',color:bindingIdentityColor(name,'variable'),
+          value:partState.stagedValue,kind:'variable',dataType:entry.part.expression&&entry.part.expression.dataType,
+          color:bindingIdentityColor(name,'variable'),
           isFlash:!!options.flashRead&&options.flashPartIndex===entry.index}));
       }else{
         code.appendChild(outputActionToken(name,{
@@ -179,7 +183,8 @@ function renderProgramOutputState(statement,item,program,options){
           code.appendChild(renderProgramOutputConsumedIdentifier(statement,{part,index},partState,true));
         }else if(partState.stagedValue!==null){
           code.appendChild(renderValueCard({id:programOutputReadTokenId(statement,index),name,
-            value:partState.stagedValue,kind:'variable',color:bindingIdentityColor(name,'variable'),
+            value:partState.stagedValue,kind:'variable',dataType:part.expression&&part.expression.dataType,
+            color:bindingIdentityColor(name,'variable'),
             isFlash:!!options.flashRead&&options.flashPartIndex===index}));
         }else{
           code.appendChild(outputActionToken(name,{

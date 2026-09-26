@@ -177,6 +177,13 @@ atomic semantic event and never depend on animation completion. Output events
 form the reproducible runtime output buffer, so Undo and Reset can reconstruct
 the exact screen contents.
 
+Source-backed programs carry each binding's `dataType` through declarations,
+assignments, expression operands, memory cards, and canonical playback. The
+supported source subset includes mutable, uninitialized `int`, `float`,
+`double`, and `char` declarations. C output formats `%d`/`%i`, `%f`
+with optional precision, and `%c`; Java prints the corresponding runtime value.
+Character literals render with single quotes everywhere except Program Output.
+
 Guided mode exposes all unread identifiers and only the combine controls whose
 matching value has been read. Strict mode exposes every unresolved control so
 the normal invalid-execution policy can assess premature actions. Timeline

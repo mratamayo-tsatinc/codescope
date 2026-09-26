@@ -172,6 +172,7 @@ function renderExpressionSourcePanel(title, lines, panelClass){
 function programStatementSource(statement,item){
   if(statement&&typeof statement.sourceText==='string') return statement.sourceText;
   if(statement.kind==='declaration'){
+    if(statement.initialized===false) return `${declarationKeyword(statement)} ${statement.binding.name};`;
     return `${declarationKeyword(statement)} ${statement.binding.name} = ${renderString(statement.runtime.originalTree)};`;
   }
   if(statement.kind==='assignment'){
@@ -215,18 +216,62 @@ function programSourceFragments(line,language){
   return fragments.length?fragments:['\u00a0'];
 }
 
+const sourceFlowViewportStates=new WeakMap();
+const sourceFlowScrollKeys=new Set(['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' ']);
+
+function sourceFlowViewportState(item){
+  let viewport=sourceFlowViewportStates.get(item);
+  if(!viewport){viewport={top:0,left:0,userOverride:false};sourceFlowViewportStates.set(item,viewport);}
+  return viewport;
+}
+
+function rememberSourceFlowViewport(item,source){
+  if(!item||!source)return;
+  const viewport=sourceFlowViewportState(item);
+  viewport.top=Math.max(0,Number(source.scrollTop)||0);
+  viewport.left=Math.max(0,Number(source.scrollLeft)||0);
+}
+
+function markSourceFlowUserScroll(item,source){
+  rememberSourceFlowViewport(item,source);
+  const transition=item&&item._sourceFlowTransition;
+  if(!transition)return;
+  transition.userScrolled=true;
+  sourceFlowViewportState(item).userOverride=true;
+}
+
+function sourceFlowLineFullyVisible(source,row){
+  if(!source||!row||!(source.clientHeight>0))return false;
+  const top=Number(row.offsetTop)||0,bottom=top+(Number(row.offsetHeight)||0);
+  return top>=source.scrollTop&&bottom<=source.scrollTop+source.clientHeight;
+}
+
+function revealSourceFlowLine(source,row,behavior='auto'){
+  if(sourceFlowLineFullyVisible(source,row))return false;
+  const top=Number(row.offsetTop)||0,bottom=top+(Number(row.offsetHeight)||0);
+  const previous=source.scrollTop;
+  const target=top<source.scrollTop?top:Math.max(0,bottom-(Number(source.clientHeight)||0));
+  if(typeof source.scrollTo==='function')source.scrollTo({top:target,left:source.scrollLeft,behavior});
+  else source.scrollTop=target;
+  return target!==previous;
+}
+
 function renderProgramSourceFilePanel(item,program){
   const display=item.sourceDisplay,statements=new Map(program.statements.map((statement,index)=>[statement.id,{statement,index}]));
   const active=program.statements[program.cursor],transition=item._sourceFlowTransition||null;
-  const flowTiming=sourceFlowTimings();
+  const flowTiming=sourceFlowTimings(),viewport=sourceFlowViewportState(item);
+  const markUserScroll=()=>markSourceFlowUserScroll(item,source);
+  const flowKeydown=event=>{if(sourceFlowScrollKeys.has(event.key))markUserScroll();};
   const panel=h('section',{class:'program-source-file-panel',
     'aria-label':`${programSourceLanguageLabel(item.language)} source file ${display.filename||item.filename||''}`});
   panel.appendChild(h('header',{class:'program-source-file-heading'},
     h('i',{class:'fa-solid fa-code','aria-hidden':'true'}),
     h('span',{class:'program-source-file-name'},display.filename||item.filename||'Source'),
     h('span',{class:'program-source-file-language'},programSourceLanguageLabel(item.language))));
-  const source=h('div',{class:'program-source-file-code',
-    style:`--program-flow-duration:${flowTiming.movementDurationMs}ms;`});
+  const source=h('div',{class:'program-source-file-code',tabindex:'0','aria-label':'Source code',
+    style:`--program-flow-duration:${flowTiming.movementDurationMs}ms;`,
+    onscroll:()=>rememberSourceFlowViewport(item,source),onwheel:markUserScroll,
+    ontouchstart:markUserScroll,onpointerdown:markUserScroll,onkeydown:flowKeydown});
   display.lines.forEach(line=>{
     const entry=line.primary&&line.statementId?statements.get(line.statementId):null;
     const statement=entry&&entry.statement;
@@ -267,6 +312,8 @@ function renderProgramSourceFilePanel(item,program){
   }
   panel.appendChild(source);
   if(typeof requestAnimationFrame==='function') requestAnimationFrame(()=>{
+    source.scrollTop=viewport.top;source.scrollLeft=viewport.left;
+    const preserveViewport=!!viewport.userOverride;
     const highlight=panel.querySelector&&panel.querySelector('.program-source-flow-highlight');
     const origin=panel.querySelector&&panel.querySelector('.program-source-file-line.is-flow-origin');
     const destination=panel.querySelector&&panel.querySelector('.program-source-file-line.is-flow-destination');
@@ -277,10 +324,12 @@ function renderProgramSourceFilePanel(item,program){
       highlight.style.setProperty('--program-flow-distance',`${destination.offsetTop-origin.offsetTop}px`);
       highlight.style.setProperty('--program-flow-target-height',`${destination.offsetHeight}px`);
       requestAnimationFrame(()=>highlight.classList.add('is-moving'));
-      destination.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});
+      if(!preserveViewport)revealSourceFlowLine(source,destination,'smooth');
     }
     const current=panel.querySelector&&panel.querySelector('.program-source-file-line.is-active');
-    if(current&&typeof current.scrollIntoView==='function') current.scrollIntoView({block:'nearest',inline:'nearest'});
+    if(current&&!preserveViewport)revealSourceFlowLine(source,current,'auto');
+    rememberSourceFlowViewport(item,source);
+    if(!transition&&preserveViewport)viewport.userOverride=false;
   });
   return panel;
 }
@@ -328,7 +377,8 @@ function stageSourceFlowTransition(item,originStatement,phase='waiting'){
   if(!item||!item.sourceFlow||!item.program||!originStatement||originStatement.status!=='complete') return null;
   const destination=item.program.status==='running'?item.program.statements[item.program.cursor]:null;
   if(!destination||destination.id===originStatement.id) return null;
-  const transition={originId:originStatement.id,destinationId:destination.id,phase};
+  const transition={originId:originStatement.id,destinationId:destination.id,phase,userScrolled:false};
+  sourceFlowViewportState(item).userOverride=false;
   item._sourceFlowTransition=transition;return transition;
 }
 
@@ -349,12 +399,14 @@ function beginSourceFlowTransition(item,settleMs=0){
     if(item._sourceFlowTransition!==transition){sourceFlowTransitionTimer=null;return;}
     transition.phase='moving';render();
     sourceFlowTransitionTimer=setTimeout(()=>{
+      const preserveViewport=!!(transition.userScrolled||sourceFlowViewportState(item).userOverride);
       if(item._sourceFlowTransition===transition)delete item._sourceFlowTransition;
       sourceFlowTransitionTimer=null;render();
       if(typeof document!=='undefined'&&document.querySelector){
         const next=document.querySelector('.program-source-file-line.is-active');
-        if(next&&typeof next.focus==='function')next.focus();
+        if(next&&typeof next.focus==='function')next.focus({preventScroll:true});
       }
+      if(!preserveViewport)sourceFlowViewportState(item).userOverride=false;
     },movementMs);
   },holdMs);
   return true;
@@ -428,9 +480,11 @@ function renderStatementTraceMemory(item){
     const name=statement.binding.name,memory=item.program.memory&&item.program.memory[name];
     const binding=bindings.find(candidate=>candidate.name===name);
     const pending=binding&&binding._modalTransferPending;
+    if(statement.initialized===false&&!memory&&!pending) return;
     const value=pending?(pending.hasValue?pending.value:'—'):(memory&&memory.initialized?memory.value:'—');
     const card=renderValueCard({id:`vff-${name}`,name,value,
-      kind:statement.binding.kind==='constant'?'constant':'variable',color:null,isFlash:false});
+      kind:statement.binding.kind==='constant'?'constant':'variable',
+      dataType:value==='—'?null:statement.binding.dataType,color:null,isFlash:false});
     list.appendChild(card);
   });
   section.appendChild(list);return section;
@@ -637,6 +691,13 @@ function renderProgramWorkspaceShell(container,item,program){
   if(context) workspace.appendChild(h('div',{class:'program-workspace-layout'},flow,context));
   else workspace.appendChild(flow);
   container.appendChild(workspace);
+  if(item.sourceFlow&&state.mode==='practice'){
+    if(item.checked) appendPracticeRetryBar(container);
+    else{
+      const resetControl=renderItemResetControl(itemHasAttempt(item));
+      if(resetControl){resetControl.classList.add('source-program-item-reset');container.appendChild(resetControl);}
+    }
+  }
   return flow;
 }
 
@@ -1218,13 +1279,14 @@ function appendCanonicalAssignmentResult(timeline,statement,runtime,isCurrent){
   }
   const target=statement.kind==='declaration'?statement.binding.name:statement.target;
   const kind=statement.kind==='declaration'?statement.binding.kind:'variable';
+  const dataType=statement.kind==='declaration'?statement.binding.dataType:statement.targetDataType;
   const value=statement.kind==='declaration'?runtime.expectedValue:runtime.expectedAfter;
   const resultId=`canonical-assignment-result-${statement.id}`;
   const color=stepVisualColor({action:'APPLY_ASSIGNMENT'},runtime.canonicalTrace.steps.length);
   const row=h('div',{class:`tl-row ${isCurrent?'current':'done'} canonical-assignment-result-row`});
   row.appendChild(h('div',{class:'tl-dot',style:`background:${color};${isCurrent?`box-shadow:0 0 0 4px ${hexToRgba(color,0.25)};`:''}`,
-    title:`${target} now stores ${formatValue(value)}`}));
-  const result=renderValueCard({id:resultId,name:target,value,kind,color,isFlash:isCurrent});
+    title:`${target} now stores ${formatValue(value,dataType)}`}));
+  const result=renderValueCard({id:resultId,name:target,value,kind,dataType,color,isFlash:isCurrent});
   row.appendChild(h('div',{class:'code-out'+(isCurrent?' row-enter':'')},renderBadgeSlot(null),result));
   timeline.appendChild(row);
 }
