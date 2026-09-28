@@ -610,12 +610,12 @@
 
       const lesson = profile ? LESSONS[profile.id] : null;
       if(!lesson){
-        // No profile, or no authored lesson yet for this one — plain-text
-        // fallback, no worked example/connector lines to draw.
-        if(typeof setConsoleDrawerContent === 'function'){
-          setConsoleDrawerContent(profile ? buildFallbackLesson(profile) : 'No active profile.', {cursor:false});
-        }
-        if(typeof showConsoleDrawerTab === 'function') showConsoleDrawerTab();
+        // The edge trigger is valuable only when this profile owns actual
+        // lesson content. Hiding it also releases scarce mobile viewport
+        // space instead of opening a generic fallback that adds no lesson.
+        if(typeof hideConsoleDrawerTab==='function')hideConsoleDrawerTab();
+        if(typeof closeConsoleDrawer==='function')closeConsoleDrawer();
+        if(typeof clearConsoleDrawerContent==='function')clearConsoleDrawerContent();
         return;
       }
 

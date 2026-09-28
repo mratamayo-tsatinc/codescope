@@ -553,6 +553,7 @@ function renderProgramContextShell(memoryPanel,outputPanel,surface){
     const selected=active===name;
     tabs.appendChild(h('button',{class:`program-context-tab${selected?' active':''}`,type:'button',role:'tab',
       'data-program-context-tab':name,'aria-controls':panelId,'aria-selected':String(selected),
+      'aria-label':label,title:label,
       tabindex:selected?'0':'-1',onclick:()=>activate(name),onkeydown:event=>{
         if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
         event.preventDefault();
@@ -561,7 +562,7 @@ function renderProgramContextShell(memoryPanel,outputPanel,surface){
           :available[(index+(event.key==='ArrowRight'?1:-1)+available.length)%available.length]);
         activate(next,true);
       }},
-      h('i',{class:`fa-solid ${icon}`,'aria-hidden':'true'}),h('span',{},label)));
+      h('i',{class:`fa-solid ${icon}`,'aria-hidden':'true'}),h('span',{class:'program-context-tab-label'},label)));
     context.appendChild(h('div',{id:panelId,class:`program-context-panel${selected?' active':''}`,role:'tabpanel',
       'data-program-context-panel':name},node));
   };
