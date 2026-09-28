@@ -399,6 +399,26 @@
               <i class="fa-solid fa-table-cells" aria-hidden="true"></i>
               <span id="varFloatToggleText" class="control-label">Vars on</span>
             </button>
+            <div id="activityZoomControl" class="activity-zoom-control" hidden>
+              <button class="activity-zoom-trigger" type="button" aria-expanded="false" aria-haspopup="true"
+                onclick="toggleActivityZoomPopover(event)">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <span class="activity-zoom-status-dot" aria-hidden="true"></span>
+              </button>
+              <div class="activity-zoom-popover" role="group" aria-label="Activity size controls"
+                onclick="event.stopPropagation()">
+                <button class="activity-zoom-button" type="button" data-activity-zoom-decrease
+                  title="Decrease activity size (Alt+-)" aria-label="Decrease activity size" aria-keyshortcuts="Alt+-"
+                  onclick="changeActivityZoom(-1)"><i class="fa-solid fa-minus" aria-hidden="true"></i></button>
+                <button class="activity-zoom-value" type="button" data-activity-zoom-value
+                  title="Reset activity size (Alt+0)" aria-label="Reset activity size to 100 percent" aria-keyshortcuts="Alt+0"
+                  onclick="resetActivityZoom()">100%</button>
+                <button class="activity-zoom-button" type="button" data-activity-zoom-increase
+                  title="Increase activity size (Alt++)" aria-label="Increase activity size" aria-keyshortcuts="Alt++"
+                  onclick="changeActivityZoom(1)"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
+              </div>
+              <span id="activityZoomStatus" class="visually-hidden" role="status" aria-live="polite"></span>
+            </div>
             <button id="scoreSummaryBtn" class="score-summary-btn" onclick="openScoreSummaryModal()" hidden
               title="View overall scores" aria-label="View overall scores">
               <i class="fa-solid fa-chart-simple" aria-hidden="true"></i>

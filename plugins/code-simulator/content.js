@@ -219,12 +219,14 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
     const trimmed=raw.trim();
     if(!trimmed.endsWith(';')) return;
     const text=trimmed.slice(0,-1).trim();
-    const insideSwitchCase=controlStructures.some(structure=>structure.type==='switch'
-      &&structure.cases.some(entry=>index>entry.index&&index<=entry.end));
-    if(text==='break'&&insideSwitchCase){
+    const switchOwner=controlStructures.filter(structure=>structure.type==='switch'
+      &&structure.cases.some(entry=>index>entry.index&&index<=entry.end))
+      .sort((left,right)=>(left.end-left.statement.sourceLine)-(right.end-right.statement.sourceLine))[0];
+    if(text==='break'&&switchOwner){
       const statement=programBreakStatement({id:`program-break-${++breakIndex}`});
       statement.sourceLine=index+1;statement.sourceEndLine=index+1;statement.sourceText=raw;
-      statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];mark(statement);statements.push(statement);return;
+      statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];statement.switchStatementId=switchOwner.statement.id;
+      mark(statement);statements.push(statement);return;
     }
     if(language==='c'&&/^return\s+0$/.test(text)){
       const statement=programReturnStatement({id:'program-return',value:0});
@@ -298,14 +300,24 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
       }
       return;
     }
-    structure.cases.forEach(entry=>{
-      const body=statementsIn(entry.index+2,entry.end+1),target=targetDetails(body[0]||after);
+    const caseBodies=structure.cases.map(entry=>statementsIn(entry.index+2,entry.end+1));
+    const nextCaseTarget=start=>{
+      for(let position=start;position<caseBodies.length;position++) if(caseBodies[position].length) return caseBodies[position][0];
+      return after;
+    };
+    structure.cases.forEach((entry,position)=>{
+      const body=caseBodies[position],target=targetDetails(body[0]||nextCaseTarget(position+1));
       structure.statement.branches.push({value:entry.value,default:entry.default,label:entry.label,
         targetLine:target.line,targetText:target.text,nextStatementId:target.id,targetStatementId:target.id});
-      const breakStatement=body.find(statement=>statement.kind==='program-break');
-      if(breakStatement)breakStatement.nextStatementId=afterTarget.id;
-      else if(body.length)body[body.length-1].nextStatementId=afterTarget.id;
+      body.filter(statement=>statement.kind==='program-break'&&statement.switchStatementId===structure.statement.id)
+        .forEach(statement=>{statement.nextStatementId=afterTarget.id;});
+      if(body.length&&body[body.length-1].kind!=='program-break')
+        body[body.length-1].nextStatementId=targetDetails(nextCaseTarget(position+1)).id;
     });
+    if(!structure.cases.some(entry=>entry.default)){
+      structure.statement.branches.push({noMatch:true,label:'NO MATCH',targetLine:afterTarget.line,targetText:afterTarget.text,
+        nextStatementId:afterTarget.id,targetStatementId:afterTarget.id});
+    }
   });
   if(!statements.length) throw new Error(`${exercise.filename}: no supported executable statements were found`);
   const sourceDisplay={filename:exercise.filename,lines:lines.map((text,index)=>{const support=supported.get(index+1);return {number:index+1,text,supported:!!support,statementId:support&&support.statementId||null,primary:!!support};})};

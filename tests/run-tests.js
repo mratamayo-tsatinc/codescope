@@ -131,6 +131,7 @@ function testScriptManifestParses(){
   const juiceSource=fs.readFileSync(path.join(ROOT,'js','juice.js'),'utf8');
   const shellSource=fs.readFileSync(path.join(ROOT,'js','shell-ui.js'),'utf8');
   const mainSource=fs.readFileSync(path.join(ROOT,'js','main.js'),'utf8');
+  const loginSource=fs.readFileSync(path.join(ROOT,'js','login.js'),'utf8');
   const settingsPersistenceSource=fs.readFileSync(path.join(ROOT,'js','settings-persistence.js'),'utf8');
   const sharedStylesSource=fs.readFileSync(path.join(ROOT,'css','styles.css'),'utf8');
   assert(stateSource.includes("event&&event.type==='RETURN'&&typeof celebrateProgramCompletion==='function'"));
@@ -144,8 +145,14 @@ function testScriptManifestParses(){
   assert(!shellSource.includes('element.style.width=`${100/factor}%`'));
   assert(shellSource.includes("event.altKey")&&shellSource.includes("event.key==='0'"));
   assert(mainSource.includes("mountActivityZoom(container)"));
+  assert(mainSource.includes("renderProfileSelectionPrompt(container)"));
+  assert(!loginSource.includes("if(openCategoryIds.size===0 && currentProfile())"));
   assert(settingsPersistenceSource.includes("key.indexOf('precedifyActivityZoom:')===0"));
-  assert(sharedStylesSource.includes('.activity-zoom-toolbar{'));
+  assert(html.includes('id="activityZoomControl" class="activity-zoom-control"'));
+  assert(shellSource.includes('function toggleActivityZoomPopover(event)'));
+  assert(!shellSource.includes("toolbar.className='activity-zoom-toolbar'"));
+  assert(sharedStylesSource.includes('.activity-zoom-control{position:relative;'));
+  assert(sharedStylesSource.includes('.activity-zoom-control.open .activity-zoom-popover'));
   assert(sharedStylesSource.includes('.activity-zoom-surface{'));
   assert(sharedStylesSource.includes('@media (max-width:768px)'));
   assert(html.includes('id="statementTraceModal"'));
@@ -2055,6 +2062,17 @@ function testModeScopedPersistence(){
     return ctx;
   }
 
+  const fresh=sessionContext(false,false);
+  const unselectedStart=JSON.parse(evaluate(fresh,`(()=>{
+    enabledProfiles=()=>[{id:'alpha'},{id:'beta'}];
+    generateItemsForProfile=id=>[{profileId:id}];
+    state.profileId='stale-profile';
+    startSession();
+    return JSON.stringify({profileId:state.profileId,itemCount:state.items.length,
+      profileBanks:Object.keys(state.itemsByProfile),screen:state.screen});
+  })()`));
+  assert.deepStrictEqual(unselectedStart,{profileId:null,itemCount:0,profileBanks:['alpha','beta'],screen:'session'});
+
   const disabledPractice=sessionContext(false,true);
   const defaults=JSON.parse(evaluate(disabledPractice,`(()=>{
     state.userEmail='student@example.edu';state.mode='practice';state.screen='session';
@@ -2498,6 +2516,24 @@ int main() {
 int main() {
     mystery();
 }`;
+  ctx.csSwitchFallthroughFixture=`#include <stdio.h>
+int main() {
+    int day = 2;
+    switch (day) {
+        case 1:
+            printf("One\\n");
+            break;
+        case 2:
+            printf("Two\\n");
+        case 3:
+            printf("Three\\n");
+            break;
+        default:
+            printf("Other\\n");
+    }
+    printf("After\\n");
+    return 0;
+}`;
   ctx.csTypedFixture=fs.readFileSync(path.join(ROOT,'exercise-libraries','source-programs','c','formatted-output','TypedValues.c'),'utf8');
   ctx.csUndeclaredSeedFixture=ctx.csSeedFixture.replace('@seed score min=10 max=999','@seed missing min=1 max=2');
   ctx.csDerivedSeedFixture=ctx.csSeedFixture.replace('@seed score min=10 max=999','@seed bonus min=1 max=2');
@@ -2527,6 +2563,26 @@ int main() {
     const liveControl=csParseExercise({filename:'LiveControl.c',raw:csLiveControlFixture},'c','authored');
     const mixedStatements=csParseExercise({filename:'MixedStatements.c',raw:csMixedStatementFixture},'c','authored');
     const outputOnly=csParseExercise({filename:'OutputOnly.c',raw:csOutputOnlyFixture},'c','authored');
+    const switchFallthrough=csParseExercise({filename:'SwitchFallthrough.c',raw:csSwitchFallthroughFixture},'c','authored');
+    const switchFallthroughItem=csBuildItem(profile,{id:'SwitchFallthrough',filename:'SwitchFallthrough.c',raw:csSwitchFallthroughFixture},'c',98);
+    const switchIndex=switchFallthroughItem.program.statements.findIndex(candidate=>candidate.kind==='selection');
+    switchFallthroughItem.program.statements.slice(0,switchIndex).forEach(candidate=>candidate.status='complete');
+    switchFallthroughItem.program.cursor=switchIndex;
+    const fallthroughSwitch=switchFallthroughItem.program.statements[switchIndex];
+    fallthroughSwitch.status='active';
+    switchFallthroughItem.program.memory.day={name:'day',kind:'variable',initialized:true,value:2};
+    fallthroughSwitch.runtime.workingFlat={operands:[{id:'switch-result',kind:'literal',value:2}],operators:[]};
+    dispatchProgramAction(switchFallthroughItem,{type:'commit-branch',statementId:fallthroughSwitch.id},{applyExpressionAction});
+    const fallthroughPath=[];
+    for(let step=0;step<5&&switchFallthroughItem.program.status==='running';step++){
+      const active=switchFallthroughItem.program.statements[switchFallthroughItem.program.cursor];
+      fallthroughPath.push({kind:active.kind,source:active.sourceText.trim()});
+      if(active.sourceText.includes('After'))break;
+      const action=active.kind==='output'?{type:'emit-output',statementId:active.id}
+        :active.kind==='program-break'?{type:'break-control',statementId:active.id}:null;
+      if(!action)break;
+      dispatchProgramAction(switchFallthroughItem,action);
+    }
     const outputOnlyItem=csBuildItem(profile,{id:'OutputOnly',filename:'OutputOnly.c',raw:csOutputOnlyFixture},'c',99);
     const dynamicSelectionItem=csBuildItem(profile,{id:'DynamicSelection',filename:'SeedFixture.c',raw:csSeedFixture},'c',100);
     const dynamicSelection=dynamicSelectionItem.program.statements.find(candidate=>candidate.kind==='selection');
@@ -2723,6 +2779,9 @@ int main() {
       mixedKinds:mixedStatements.statements.map(candidate=>candidate.kind),
       mixedFinalValue:mixedStatements.memory.total,
       outputOnlyKinds:outputOnly.statements.map(candidate=>candidate.kind),
+      switchFallthroughKinds:switchFallthrough.statements.map(candidate=>candidate.kind),
+      switchBreakLines:switchFallthrough.sourceDisplay.lines.filter(line=>line.text.trim()==='break;'&&line.supported).length,
+      switchFallthroughPath:fallthroughPath,
       outputOnlyDeclarations:outputOnly.declarations.length,
       outputOnlyContextMuted:outputOnly.sourceDisplay.lines.some(line=>line.text.includes('puts(')&&!line.supported),
       outputOnlyItemStatements:outputOnlyItem.program.statements.map(candidate=>candidate.kind),
@@ -2848,7 +2907,7 @@ int main() {
     &&result.sourceFlowTiming.modalCloseSettleMs>=250);
   assert(result.sourceProgramText.includes('#include <stdio.h>')&&result.sourceProgramText.includes('int main() {')
     &&result.sourceProgramText.includes('return 0;')&&result.sourceProgramText.includes('IfStatement.c'));
-  assert.strictEqual(result.manifestVersion,'2.0.0');
+  assert.strictEqual(result.manifestVersion,'2.1.0');
   assert.deepStrictEqual(result.seededSources,result.repeatSources);
   assert.notDeepStrictEqual(result.seededSources,result.changedSources);
   assert.strictEqual(result.retrySeededFilename,result.filenames[0]);
@@ -2942,12 +3001,17 @@ int main() {
   assert.strictEqual(result.elseIfAdvanced,'else-if');
   assert(result.branchUndo&&result.branchUndoId==='selection-1');
   assert.strictEqual(result.switchCases,4);
-  assert.strictEqual(result.switchBreakCount,3);
-  assert(result.switchBreakSources.length===3&&result.switchBreakSources.every(line=>line.supported));
-  assert.deepStrictEqual(result.switchBreakTargets,['program-return','program-return','program-return']);
+  assert(result.switchBreakCount>0&&result.switchBreakSources.length===result.switchBreakCount
+    &&result.switchBreakSources.every(line=>line.supported));
+  assert(result.switchBreakTargets.every(target=>target==='program-return'));
   assert.strictEqual(result.breakPlanMode,'direct');
   assert.strictEqual(result.breakPlanAction,'break-control');
   assert(result.breakApplied&&result.breakEvent.type==='BREAK'&&result.breakCursor===1);
+  assert.strictEqual(result.switchBreakLines,2);
+  assert.deepStrictEqual(result.switchFallthroughPath.map(step=>step.kind),['output','output','program-break','output']);
+  assert(result.switchFallthroughPath[0].source.includes('Two')&&result.switchFallthroughPath[1].source.includes('Three')
+    &&result.switchFallthroughPath[2].source==='break;'&&result.switchFallthroughPath[3].source.includes('After'));
+  assert(result.switchFallthroughKinds.includes('program-break'));
   assert(result.allBranchTargets);
   assert(result.javaCount===4&&result.javaLanguage==='java'&&result.javaSeeded&&result.serializable);
   assert.strictEqual(result.javaSwitchBreakCount,3);

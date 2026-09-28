@@ -108,7 +108,7 @@ function tryResumeSession(mode,email){
   const sessionProfiles=enabledProfiles();
   if(!sessionProfiles.length) return false;
   state.profileId = sessionProfiles.some(profile=>profile.id===record.profileId)
-    ?record.profileId:sessionProfiles[0].id;
+    ?record.profileId:null;
   state.itemIndex = record.itemIndex || 0;
   state.itemIndexByProfile = record.itemIndexByProfile || {};
   state.sessionSeed = record.sessionSeed;
@@ -139,7 +139,7 @@ function tryResumeSession(mode,email){
     });
     resetRandomGenerator();
   }
-  state.items = state.itemsByProfile[state.profileId] || [];
+  state.items = state.profileId ? (state.itemsByProfile[state.profileId] || []) : [];
   state.showConnectors = record.showConnectors !== undefined ? record.showConnectors : state.showConnectors;
   state.screen = 'session';
 

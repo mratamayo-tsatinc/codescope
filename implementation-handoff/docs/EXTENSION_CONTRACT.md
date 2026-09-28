@@ -178,7 +178,10 @@ for Java or for source that does not author it.
 The shared `program-break` statement plugin represents an authored `break;`
 inside a supported switch case. It supplies one direct `break-control` action,
 emits `BREAK`, and follows the enclosing switch adapter's `nextStatementId` to
-the first executable statement after that switch.
+the first executable statement after that switch. The Code Simulator adapter
+owns fall-through edges: when a case has no authored `break;`, its final
+executable statement advances to the first executable statement in the next
+case body.
 
 External profile content is registered through the generic content-provider
 API in `js/activity-core.js`. A provider owns configuration validation, content

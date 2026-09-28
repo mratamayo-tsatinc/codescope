@@ -96,7 +96,8 @@ Last consolidated: 2026-09-28
   and punctuation stay outside. Its result appears centered below as unboxed
   text, and literal multi-character operators do not become ligature glyphs.
   Branch connectors are intentionally hidden, while untaken code remains muted.
-- Random selection-program generation and switch fall-through are deferred.
+- Random selection-program generation is deferred. Authored switch programs
+  support explicit `break;` and realistic fall-through when it is omitted.
 - The Code Simulator profile opts into
   `program.timelinePresentation:'statement-modal'`. Its complete source remains
   stable in one filename-labelled, syntax-highlighted file panel with a

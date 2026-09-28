@@ -194,8 +194,10 @@ unless the user explicitly approves a change.
 - `switch` evaluates its selector and traces to the matching explicit case or
   `default`. An authored `break;` is a direct executable statement: the learner
   clicks it after the selected case body, it emits `BREAK`, and control moves
-  to the first executable statement after the switch. The initial lesson does
-  not model fall-through.
+  to the first executable statement after the switch. When a case omits
+  `break;`, execution continues into the next authored case body until a later
+  `break;` or the end of the switch. A switch without a matching case or
+  `default` continues after the switch.
 - A complete-source profile may opt into
   `program.timelinePresentation:'statement-modal'`. The authored source then
   remains one stable file view with its exercise filename, language, continuous
@@ -305,6 +307,15 @@ Canonical classification is contextual, not merely lexical.
 - Activity feedback must be readable on desktop and mobile and must wrap rather
   than create horizontal overflow.
 
+## Session profile selection
+
+- A fresh session has no current profile. All enabled profile items may be
+  prepared in advance, but `state.items` remains empty until the student
+  selects a profile. Categories also remain collapsed until explicitly opened.
+- A valid persisted session may restore its previously selected profile; an
+  absent or no-longer-enabled saved profile does not fall back to the first
+  configured profile.
+
 ## Activity size preference
 
 - Activity zoom is presentation state. Changing it must not regenerate an
@@ -313,6 +324,9 @@ Canonical classification is contextual, not merely lexical.
 - The shell clamps the configured percentage to the declared minimum, maximum,
   and step. The preference is keyed by normalized student email and is restored
   when that student starts or resumes a session on the same browser.
+- Its trigger lives in the existing app-header controls on desktop and mobile.
+  The temporary popover consumes no activity row and never overlays learning
+  content.
 - Clearing all local application data removes activity-size preferences and
   restores the configured default. Resetting only application settings does not
   impersonate or merge one student's preference with another student's.

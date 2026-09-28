@@ -33,6 +33,10 @@ coverage, then run the full suite.
 - [ ] Correct solution remains unavailable in Exam.
 - [ ] Desktop and mobile layouts have no page-level horizontal overflow.
 - [ ] Mouse, keyboard, focus, and disabled states agree.
+- [ ] A fresh session has no active profile and no expanded category. The
+      neutral activity prompt remains until the student chooses a profile.
+- [ ] Selecting a profile activates its saved item without regenerating other
+      profile items or restarting the session timer.
 
 ## Legacy/program activity scenarios
 
@@ -152,9 +156,10 @@ coverage, then run the full suite.
       executable statement. The target uses its registered renderer; untaken
       branch lines remain visible, muted, and inert.
 - [ ] A false first condition advances to the next `else if`; a true condition
-      exits the chain. Switch selects the matching case or `default` and honors
-      explicit `break` without fall-through. Each authored `break;` is an active
-      direct-action line, emits `BREAK`, and then advances past the switch.
+      exits the chain. Switch selects the matching case or `default`. Each
+      authored `break;` is an active direct-action line that emits `BREAK` and
+      exits the switch. A case without `break;` continues through the next case
+      body, while a switch with no match and no default continues afterward.
 - [ ] The Code Simulator profile renders one stable, complete source program and
       exposes an action only on the current executable line; no expression
       timeline is inserted into the main source flow.
@@ -288,16 +293,17 @@ coverage, then run the full suite.
       percentage action and `Alt+0` restore 100%.
 - [ ] `Alt+-` and `Alt++` work during a session but do not intercept typing in
       an input, textarea, select, or editable element.
-- [ ] The app header, sidebar, pagination, drawers, modal frame/actions,
-      legacy floating-memory frame, and Activity size toolbar do not change
+- [ ] The app header, sidebar, pagination, drawers, modal frame/actions, legacy
+      floating-memory frame, and compact Activity size trigger do not change
       size.
 - [ ] The main activity, statement modal trace, docked memory, and legacy
       floating-memory contents use the selected size. Expression, assignment,
       output, and falling-token connectors remain attached after each change.
 - [ ] The preference survives reload for the same student, does not carry to a
       different student, and is removed by Clear all local application data.
-- [ ] Around 390 px, the label is hidden, every control remains reachable, and
-      enlarging the activity creates no page-level horizontal overflow.
+- [ ] On desktop and around 390 px, the trigger occupies an existing header
+      control slot, adds no row, and does not cover activity content. Its
+      popover remains reachable and creates no page-level horizontal overflow.
 
 ## Handoff report
 

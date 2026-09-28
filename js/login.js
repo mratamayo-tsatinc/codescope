@@ -99,9 +99,8 @@ async function handleLogin(event) {
   state.userEmail = email;
   state.userStudentId = studentNumber;
   state.mode = appSettings.mode;
-  // state.profileId already defaults to PROFILES[0].id — startSession()
-  // generates every profile's items and drops the student straight into
-  // the first profile's actual questions, skipping the legacy setup screen.
+  // startSession() prepares every enabled profile while leaving selection to
+  // the student. No profile or category is chosen implicitly.
   
   // Animate transition
   const loginOverlay = document.getElementById('loginOverlay');
@@ -552,7 +551,6 @@ const openCategoryIds = new Set();
 function populateProfileSidebar() {
   const profileList = document.getElementById('profileList');
   profileList.innerHTML = '';
-  if(openCategoryIds.size===0 && currentProfile()) openCategoryIds.add(currentProfile().categoryId);
 
   enabledCategories().forEach(category=>{
     const profiles=profilesForCategory(category.id);

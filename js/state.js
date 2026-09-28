@@ -81,7 +81,7 @@ const state = {
   userStudentId: null,
   language: 'c',
   mode: 'practice',
-  profileId: PROFILES[0].id,
+  profileId: null,
   itemIndex: 0,
   itemIndexByProfile: {}, // Remembers which item each profile was last viewing, so switching profiles via the sidebar returns to that exact item instead of resetting to Item 1
   showConnectors: DEFAULT_SHELL_SETTINGS.connectors.visible, // runtime value toggled by connector-lines.js
@@ -330,9 +330,10 @@ function startSession(){
   if(!sessionProfiles.length){
     throw new Error('CodeScope requires at least one enabled profile in an enabled category.');
   }
-  if(!sessionProfiles.some(profile=>profile.id===state.profileId)){
-    state.profileId=sessionProfiles[0].id;
-  }
+  // A fresh session begins at the activity catalog. Profile selection is an
+  // explicit student action rather than an array-order default.
+  state.profileId=null;
+  if(typeof openCategoryIds!=='undefined')openCategoryIds.clear();
   // A fresh login is a fresh attempt. Resumed exams bypass this function and
   // restore their saved seed, so reload/logout-login still reproduces exactly
   // the same items while a different student never inherits an in-memory seed.
@@ -357,8 +358,9 @@ function startSession(){
     state.itemsByProfile[profile.id] = generateItemsForProfile(profile.id);
   });
   
-  // Set current profile's items
-  state.items = state.itemsByProfile[state.profileId];
+  // Items are ready, but none becomes active until the student selects its
+  // profile from the sidebar.
+  state.items = [];
   state.itemIndex = 0;
   
   // Reset to non-seeded random for other operations

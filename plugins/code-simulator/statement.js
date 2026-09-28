@@ -24,7 +24,8 @@ function syncSelectionOperands(statement,program){
 function selectionDecision(statement,value){
   if(statement.selectionKind==='switch'){
     const matched=statement.branches.find(branch=>branch.value===value)
-      ||statement.branches.find(branch=>branch.default);
+      ||statement.branches.find(branch=>branch.default)
+      ||statement.branches.find(branch=>branch.noMatch);
     return matched||null;
   }
   return value?statement.branches.find(branch=>branch.when===true)

@@ -2110,21 +2110,32 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;
   overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;
 }
-.activity-zoom-toolbar{
-  position:sticky;top:0;z-index:25;display:flex;align-items:center;justify-content:flex-start;gap:8px;
-  min-height:38px;margin:-6px 0 10px;padding:4px 0;
-  background:linear-gradient(180deg,var(--bg) 72%,transparent);
+.activity-zoom-control{position:relative;z-index:80;flex:0 0 40px;width:40px;height:40px;}
+.activity-zoom-control[hidden]{display:none!important;}
+.activity-zoom-trigger{
+  position:relative;display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;padding:0;
+  border:1px solid transparent;border-radius:8px;background:transparent;color:var(--text-mute);cursor:pointer;
 }
-.activity-zoom-label{color:var(--text-mute);font:650 11px/1 var(--ui);letter-spacing:.03em;}
-.activity-zoom-controls{
-  display:inline-flex;align-items:center;padding:2px;border:1px solid var(--line);border-radius:8px;
-  background:var(--panel);box-shadow:0 3px 12px rgba(0,0,0,.12);
+.activity-zoom-trigger:hover,.activity-zoom-trigger:focus-visible,.activity-zoom-control.open .activity-zoom-trigger{
+  border-color:var(--line);background:var(--panel-alt);color:var(--op-glow);outline:0;
 }
+.activity-zoom-status-dot{
+  position:absolute;right:5px;bottom:5px;width:5px;height:5px;border-radius:50%;
+  background:var(--op);opacity:0;box-shadow:0 0 0 2px var(--bg);
+}
+.activity-zoom-control.is-adjusted .activity-zoom-status-dot{opacity:1;}
+.activity-zoom-popover{
+  position:absolute;top:46px;right:0;display:flex;align-items:center;gap:3px;width:max-content;padding:4px;
+  border:1px solid var(--line);border-radius:9px;background:var(--panel);box-shadow:0 12px 30px rgba(0,0,0,.4);
+  opacity:0;visibility:hidden;transform:translateY(-4px);pointer-events:none;
+  transition:opacity .14s ease,transform .14s ease,visibility .14s;
+}
+.activity-zoom-control.open .activity-zoom-popover{opacity:1;visibility:visible;transform:none;pointer-events:auto;}
 .activity-zoom-button,.activity-zoom-value{
-  appearance:none;display:inline-flex;align-items:center;justify-content:center;height:30px;margin:0;border:0;border-radius:6px;
+  appearance:none;display:inline-flex;align-items:center;justify-content:center;height:32px;margin:0;border:0;border-radius:6px;
   background:transparent;color:var(--text-dim);font:700 11px/1 var(--ui);cursor:pointer;
 }
-.activity-zoom-button{width:30px;}
+.activity-zoom-button{width:32px;}
 .activity-zoom-value{min-width:50px;padding:0 7px;color:var(--text);font-family:var(--mono);}
 .activity-zoom-button:hover,.activity-zoom-value:hover,
 .activity-zoom-button:focus-visible,.activity-zoom-value:focus-visible{
@@ -2133,6 +2144,21 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
 .activity-zoom-button:disabled{opacity:.35;cursor:not-allowed;background:transparent;color:var(--text-mute);box-shadow:none;}
 .activity-zoom-viewport{min-width:0;overflow:visible;}
 .activity-zoom-surface{box-sizing:border-box;min-width:0;transform-origin:top left;}
+.session-profile-empty{
+  display:flex;min-height:min(420px,55vh);flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:32px;text-align:center;color:var(--text-dim);
+}
+.session-profile-empty-icon{
+  display:inline-flex;width:48px;height:48px;align-items:center;justify-content:center;border:1px solid var(--line);
+  border-radius:12px;background:var(--panel);color:var(--op);font-size:19px;
+}
+.session-profile-empty h2{margin:4px 0 0;color:var(--text);font:750 18px/1.25 var(--ui);}
+.session-profile-empty p{max-width:360px;margin:0;font:500 12.5px/1.55 var(--ui);}
+.session-profile-empty-action{
+  display:inline-flex;align-items:center;gap:8px;min-height:40px;margin-top:6px;padding:0 14px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel);color:var(--text);font:700 12px/1 var(--ui);cursor:pointer;
+}
+.session-profile-empty-action:hover,.session-profile-empty-action:focus-visible{border-color:var(--op);color:var(--op-glow);}
 
 .item-pagination-container{
   padding:8px 12px max(8px,env(safe-area-inset-bottom));
@@ -2180,15 +2206,6 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   .timer-display{min-width:44px;font-size:14px;}
   .mode-tag{min-height:28px;padding:3px 7px;font-size:10px;}
   #app{padding-top:1rem;}
-  .activity-zoom-toolbar{
-    position:fixed;top:auto;right:auto;bottom:calc(72px + env(safe-area-inset-bottom));left:12px;z-index:930;
-    width:max-content;min-height:44px;margin:0;padding:3px;border-radius:9px;background:var(--bg);
-    box-shadow:0 4px 18px rgba(0,0,0,.32);
-  }
-  .activity-zoom-label{display:none;}
-  .activity-zoom-button,.activity-zoom-value{height:40px;}
-  .activity-zoom-button{width:40px;}
-  .activity-zoom-value{min-width:58px;}
   .item-pagination-container{padding:7px 10px max(7px,env(safe-area-inset-bottom));}
   .item-pagination{max-width:420px;padding:6px 8px;gap:6px;flex-wrap:nowrap;}
   .item-page-first,.item-page-last{display:none;}

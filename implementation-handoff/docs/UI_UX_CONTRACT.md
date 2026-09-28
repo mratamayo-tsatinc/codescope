@@ -204,6 +204,9 @@ New activities must look like members of the existing application.
 
 - The profile sidebar groups profiles under expandable categories. Each
   profile belongs to exactly one category configured in `js/profiles.js`.
+- A fresh session selects no profile and expands no category. The activity area
+  presents a neutral selection prompt until the student explicitly expands a
+  category and selects a profile.
 - Category headers keep their names and score badges readable without breaking
   words. Their compact QR action has an accessible label and tooltip.
 - Expanded profiles use an indented navigation rail. The current profile uses
@@ -227,9 +230,11 @@ drawer scrolling, and absence of page-level horizontal overflow.
 
 ## Activity size controls
 
-- A compact Activity size control appears above the learning surface during a
-  session. It provides decrease, percentage/reset, and increase actions from
-  80% through 140% in 10% steps.
+- One compact Activity size icon appears in the existing app-header controls
+  during a desktop or mobile session. It adds no toolbar row and does not
+  overlay learning content. Activating it opens a temporary popover with
+  decrease, percentage/reset, and increase actions from 80% through 140% in
+  10% steps.
 - Activity sizing applies only to the learning content, statement trace modal
   contents, and memory card contents. The app header, sidebar, pagination,
   drawers, modal frame and actions, legacy floating-memory frame, and the size
@@ -239,7 +244,6 @@ drawer scrolling, and absence of page-level horizontal overflow.
 - Connector geometry and fitted activity layouts must refresh after every size
   change. Enlarging content must reflow within its available area without
   creating page-level horizontal overflow.
-- Mobile presents the control as a compact floating group above the pagination.
-  It hides the text label but
-  retains accessible 40 px icon controls and a visible percentage. The chosen
+- Outside click, Escape, or inactivity closes the popover. A small status dot
+  remains visible when the selected size differs from the default. The chosen
   size is stored per signed-in student on the current browser.

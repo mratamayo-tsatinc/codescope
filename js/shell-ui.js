@@ -10,6 +10,7 @@ const ACTIVITY_ZOOM_STORAGE_PREFIX='precedifyActivityZoom:';
 let activityZoomPreferenceOwner=null;
 let activityZoomResizeObserver=null;
 let activityZoomGeometryFrame=null;
+let activityZoomCloseTimer=null;
 
 function activityZoomSettings(){
   return DEFAULT_APP_SETTINGS.shell.activityZoom;
@@ -102,6 +103,41 @@ function syncActivityZoomControls(){
   document.querySelectorAll('[data-activity-zoom-value]').forEach(element=>element.textContent=`${percent}%`);
   document.querySelectorAll('[data-activity-zoom-decrease]').forEach(button=>button.disabled=percent<=settings.minPercent);
   document.querySelectorAll('[data-activity-zoom-increase]').forEach(button=>button.disabled=percent>=settings.maxPercent);
+  const control=document.getElementById('activityZoomControl'),adjusted=percent!==settings.defaultPercent;
+  if(control){
+    control.classList.toggle('is-adjusted',adjusted);
+    const trigger=control.querySelector('.activity-zoom-trigger');
+    if(trigger){
+      trigger.title=`Activity size: ${percent}%`;
+      trigger.setAttribute('aria-label',`Activity size ${percent} percent. Open size controls`);
+    }
+  }
+}
+
+function closeActivityZoomPopover(){
+  if(activityZoomCloseTimer){clearTimeout(activityZoomCloseTimer);activityZoomCloseTimer=null;}
+  const control=document.getElementById('activityZoomControl');
+  if(!control)return;
+  control.classList.remove('open');
+  const trigger=control.querySelector('.activity-zoom-trigger');
+  if(trigger)trigger.setAttribute('aria-expanded','false');
+}
+
+function scheduleActivityZoomClose(){
+  if(activityZoomCloseTimer)clearTimeout(activityZoomCloseTimer);
+  activityZoomCloseTimer=setTimeout(closeActivityZoomPopover,3200);
+}
+
+function toggleActivityZoomPopover(event){
+  if(event)event.stopPropagation();
+  const control=document.getElementById('activityZoomControl');
+  if(!control)return;
+  const open=!control.classList.contains('open');
+  control.classList.toggle('open',open);
+  const trigger=control.querySelector('.activity-zoom-trigger');
+  if(trigger)trigger.setAttribute('aria-expanded',String(open));
+  if(open)scheduleActivityZoomClose();
+  else closeActivityZoomPopover();
 }
 
 function setActivityZoomPercent(value,options){
@@ -142,36 +178,9 @@ function resetActivityZoom(){
   setActivityZoomPercent(activityZoomSettings().defaultPercent,{focusValue:true});
 }
 
-function activityZoomButton(className,label,title,icon,handler,shortcut){
-  const button=document.createElement('button');
-  button.type='button';button.className=className;button.setAttribute('aria-label',label);button.title=title;
-  if(shortcut) button.setAttribute('aria-keyshortcuts',shortcut);
-  button.innerHTML=`<i class="fa-solid ${icon}" aria-hidden="true"></i>`;
-  button.addEventListener('click',handler);return button;
-}
-
 function mountActivityZoom(container){
   syncActivityZoomPreferenceForUser();
   resetActivityZoomObservers();
-  const settings=activityZoomSettings();
-  if(settings.enabled&&settings.userControlVisible){
-    const toolbar=document.createElement('div');toolbar.className='activity-zoom-toolbar';
-    toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','Activity size');
-    const label=document.createElement('span');label.className='activity-zoom-label';label.textContent='Activity size';
-    const controls=document.createElement('div');controls.className='activity-zoom-controls';
-    const decrease=activityZoomButton('activity-zoom-button','Decrease activity size',
-      'Decrease activity size (Alt+-)','fa-minus',()=>changeActivityZoom(-1),'Alt+-');
-    decrease.setAttribute('data-activity-zoom-decrease','');
-    const reset=document.createElement('button');reset.type='button';reset.className='activity-zoom-value';
-    reset.setAttribute('data-activity-zoom-value','');reset.setAttribute('aria-label','Reset activity size to 100 percent');
-    reset.setAttribute('aria-keyshortcuts','Alt+0');reset.title='Reset activity size (Alt+0)';reset.addEventListener('click',resetActivityZoom);
-    const increase=activityZoomButton('activity-zoom-button','Increase activity size',
-      'Increase activity size (Alt++)','fa-plus',()=>changeActivityZoom(1),'Alt++');
-    increase.setAttribute('data-activity-zoom-increase','');
-    controls.append(decrease,reset,increase);toolbar.append(label,controls);container.appendChild(toolbar);
-    const status=document.createElement('span');status.id='activityZoomStatus';status.className='visually-hidden';
-    status.setAttribute('role','status');status.setAttribute('aria-live','polite');container.appendChild(status);
-  }
   const viewport=document.createElement('div');viewport.className='activity-zoom-viewport';
   const surface=document.createElement('div');applyActivityZoomToElement(surface);
   viewport.appendChild(surface);container.appendChild(viewport);syncActivityZoomControls();return surface;
@@ -207,6 +216,11 @@ function syncShellSessionContext(){
   if(context) context.hidden=!inSession;
   if(profileName) profileName.textContent=inSession?profile.name:'';
   if(itemPosition) itemPosition.textContent=inSession?`Item ${state.itemIndex+1} of ${state.items.length}`:'';
+  const zoomControl=document.getElementById('activityZoomControl'),zoomSettings=activityZoomSettings();
+  if(zoomControl){
+    zoomControl.hidden=!(inSession&&zoomSettings.enabled&&zoomSettings.userControlVisible);
+    if(zoomControl.hidden)closeActivityZoomPopover();
+  }
 }
 
 function positionAccountMenu(trigger){
@@ -278,6 +292,8 @@ function syncSidebarShellState(){
 }
 
 document.addEventListener('pointerdown',event=>{
+  const zoomControl=document.getElementById('activityZoomControl');
+  if(zoomControl&&zoomControl.classList.contains('open')&&!zoomControl.contains(event.target))closeActivityZoomPopover();
   const menu=document.getElementById('accountMenu');
   if(!menu||menu.hidden) return;
   if(menu.contains(event.target)||(activeAccountTrigger&&activeAccountTrigger.contains(event.target))) return;
@@ -299,12 +315,23 @@ document.addEventListener('keydown',event=>{
     }
   }
   if(event.key!=='Escape') return;
+  closeActivityZoomPopover();
   const menu=document.getElementById('accountMenu');
   if(menu&&!menu.hidden){
     event.preventDefault();
     closeAccountMenu({restoreFocus:true});
   }
 });
+
+const activityZoomControl=document.getElementById('activityZoomControl');
+if(activityZoomControl){
+  activityZoomControl.addEventListener('pointerenter',()=>{
+    if(activityZoomControl.classList.contains('open')&&activityZoomCloseTimer){clearTimeout(activityZoomCloseTimer);activityZoomCloseTimer=null;}
+  });
+  activityZoomControl.addEventListener('pointerleave',()=>{
+    if(activityZoomControl.classList.contains('open'))scheduleActivityZoomClose();
+  });
+}
 
 window.addEventListener('resize',()=>{
   closeAccountMenu();

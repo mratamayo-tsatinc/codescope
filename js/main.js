@@ -16,6 +16,22 @@ function restoreExpressionScrollPositions(container,positions){
   });
 }
 
+function focusProfileNavigation(){
+  if(window.innerWidth<=768&&typeof openSidebar==='function')openSidebar();
+  else if(typeof expandDesktopSidebar==='function')expandDesktopSidebar();
+  const firstCategory=document.querySelector('.category-expand-btn');
+  if(firstCategory&&typeof firstCategory.focus==='function')firstCategory.focus();
+}
+
+function renderProfileSelectionPrompt(container){
+  container.appendChild(h('section',{class:'session-profile-empty','aria-labelledby':'sessionProfileEmptyTitle'},
+    h('span',{class:'session-profile-empty-icon','aria-hidden':'true'},h('i',{class:'fa-solid fa-layer-group'})),
+    h('h2',{id:'sessionProfileEmptyTitle'},'Choose an activity'),
+    h('p',{},'Expand a category, then select a profile to begin.'),
+    h('button',{class:'session-profile-empty-action',type:'button',onclick:focusProfileNavigation},
+      h('i',{class:'fa-solid fa-list','aria-hidden':'true'}),h('span',{},'Browse activities'))));
+}
+
 function render(){
   if(activePlaybackTimer){ clearTimeout(activePlaybackTimer); activePlaybackTimer = null; }
 
@@ -58,6 +74,16 @@ function render(){
     return;
   }
   const activeItem=currentItem();
+  if(state.screen==='session'&&!activeItem){
+    renderProfileSelectionPrompt(container);
+    const pagination=document.getElementById('itemPaginationContainer');
+    if(pagination)pagination.style.display='none';
+    if(typeof syncFeedbackDrawerForItem==='function')syncFeedbackDrawerForItem(null);
+    if(typeof renderVariableFinalFloat==='function')renderVariableFinalFloat(null);
+    if(typeof syncStatementTraceModal==='function')syncStatementTraceModal(null);
+    if(typeof saveSessionProgress==='function')saveSessionProgress();
+    return;
+  }
   const activitySurface=typeof mountActivityZoom==='function'?mountActivityZoom(container):container;
   if(activeItem&&activeItem.activityKind) renderActivityItem(activitySurface,activeItem);
   else renderProgramItem(activitySurface, activeItem);
