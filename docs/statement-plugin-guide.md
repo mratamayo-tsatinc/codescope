@@ -192,7 +192,7 @@ muted state while the derived value stays associated with its placeholder or
 concatenation step.
 
 The dedicated `program-output-source-flow` profile uses the Code Simulator
-provider with `sourceLibrary:'program-output'`. It reads the existing
+provider with `library:'source-programs'`. The independently registered library resolves the
 formatted-output bank and renders one stable, metadata-free source file with
 statement-modal detail views. Supported lines retain their semantic renderers
 and authored line numbers. Headers/imports, wrappers, braces, blank lines, and
@@ -200,6 +200,35 @@ unsupported statements stay in place as muted read-only source lines. In C
 source flow, an authored `return 0;` is a direct terminal action: the learner
 clicks it to finish the program. Java source flow finishes after its final
 authored executable statement. Neither path appends a synthetic assignment.
+
+## Input statements
+
+`plugins/program-input/` registers the `input` statement kind and exposes its
+source parser to Code Simulator. The initial subset supports C `scanf` with
+`%d` or `%i` and Java `Scanner.nextInt()` assignments to declared mutable
+integers. Each source destination has an `@input` metadata directive with an
+authored value and inclusive seeded range.
+
+The interaction mirrors output in reverse:
+
+1. Activate the input command.
+2. Watch the configured characters and spaces appear through the numeric
+   keyboard.
+3. Press Enter to emit one `INPUT` event. Conversion and memory writes remain
+   unavailable before Enter.
+4. Watch every submitted value travel from its exact Program Console token to
+   the matching `%d`/`%i` or `nextInt()` result position. Receivers show a
+   spinner until their value arrives.
+5. Activate the complete C address expression such as `&x`, or the Java
+   assignment target, to emit `INPUT_WRITE` and update Program Memory.
+
+Multiple C values transfer together after Enter; their address operators write
+to memory in source order. Program Input and
+Program Output render into the shared Program Console, while only output events
+count as printed program output. Keyboard playback and key highlighting are
+presentation, as are the colored console-to-placeholder trails. The Enter
+gate, batch conversion, writes, history, scoring, and canonical trace are
+plugin semantics.
 
 ## Code Simulator source programs
 
@@ -324,6 +353,11 @@ The shared `program-return` statement kind handles an authored C `return 0;`.
 Its source-line interaction emits the semantic `RETURN` event, finalizes the
 item, and runs the configured completion celebration. It is not synthesized
 for Java or for a C file that does not contain that exact terminal statement.
+
+The shared `program-break` statement kind handles an authored `break;` inside
+a supported switch case. Its source-line interaction emits `BREAK` and advances
+to the destination assigned by the source adapter, normally the first
+executable statement after the switch.
 
 ## Future statements
 

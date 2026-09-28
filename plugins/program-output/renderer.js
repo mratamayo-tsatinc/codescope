@@ -270,26 +270,53 @@ function programOutputAnimationSurface(item,pending){
     &&programStatementTraceOpenFor(item,pending.event&&pending.event.statementId)?'modal':'main';
 }
 
+function appendProgramConsoleEvents(pre,events,program){
+  events.forEach(event=>{
+    if(event.type!=='INPUT'||!Array.isArray(event.tokens)||!event.tokens.length){
+      pre.appendChild(h('span',{},event.text||''));return;
+    }
+    const statement=program.statements.find(entry=>entry.id===event.statementId);
+    const raw=String(event.rawText==null?'':event.rawText);
+    let offset=0;
+    event.tokens.forEach((token,index)=>{
+      const value=String(token),position=raw.indexOf(value,offset);
+      if(position<0) return;
+      if(position>offset) pre.appendChild(h('span',{},raw.slice(offset,position)));
+      const target=statement&&statement.reads[index]&&statement.reads[index].target;
+      pre.appendChild(h('span',{class:'program-input-console-token binding-identity',
+        style:target?bindingIdentityStyle(target,'variable'):'',
+        'data-input-console-token':`${event.statementId}-${index}`},value));
+      offset=position+value.length;
+    });
+    pre.appendChild(h('span',{},raw.slice(offset)+'\n'));
+  });
+}
+
 function renderProgramOutputPanel(item,program,options){
   options=options||{};
   const surface=options.surface==='modal'?'modal':'main';
-  const events=(program.events||[]).filter(event=>event&&event.type==='OUTPUT');
+  const events=(program.events||[]).filter(event=>event&&(event.type==='OUTPUT'||event.type==='INPUT'));
   const pending=pendingProgramOutputAnimation&&pendingProgramOutputAnimation.item===item
     ? pendingProgramOutputAnimation:null;
   const ownsPending=!!(pending&&programOutputAnimationSurface(item,pending)===surface);
-  let visibleText=events.map(event=>event.text).join('');
+  let visibleEvents=events;
   if(ownsPending){
     const index=events.lastIndexOf(pending.event);
-    if(index>=0) visibleText=events.slice(0,index).map(event=>event.text).join('');
+    if(index>=0) visibleEvents=events.slice(0,index);
   }
-  const pre=h('pre',{class:'program-output-screen-text'},visibleText);
+  const pre=h('pre',{class:'program-output-screen-text'});
+  appendProgramConsoleEvents(pre,visibleEvents,program);
   const escape=h('span',{class:'program-output-escape-cue','aria-hidden':'true',
     title:'newline (\\n)'},'↵');
-  const panel=h('aside',{class:'program-output-screen','aria-label':'Program output','data-output-surface':surface},
+  const hasInput=program.statements.some(statement=>statement.kind==='input');
+  const title=hasInput?'Program Console':'Program Output';
+  const panel=h('aside',{class:'program-output-screen','aria-label':title,'data-output-surface':surface},
     h('div',{class:'program-output-screen-title'},
-      h('i',{class:'fa-solid fa-display','aria-hidden':'true'}),h('span',{},'Program Output')),
+      h('i',{class:'fa-solid fa-display','aria-hidden':'true'}),h('span',{},title)),
     h('div',{class:'program-output-screen-body','aria-live':'polite'},pre,escape,
       h('span',{class:'program-output-cursor','aria-hidden':'true'},'▌')));
+  if(hasInput&&typeof renderProgramInputConsoleControls==='function')
+    renderProgramInputConsoleControls(item,program,panel,pre,surface);
   if(ownsPending) requestAnimationFrame(()=>startProgramOutputAnimation(panel,pre,escape,pending));
   return panel;
 }

@@ -44,14 +44,15 @@ snapshots are stored in the browser.
 | Layer | Primary files | Responsibility |
 |---|---|---|
 | Static shell | `index.html`, `css/`, shared `js/` | Application framing and reusable services. |
-| Profile catalog | `js/profiles.js` | All 36 profile configurations. No plugin-local profiles. |
+| Profile catalog | `js/profiles.js` | All 41 profile configurations. No plugin-local profiles. |
 | Expression engine | `js/engine.js`, `flat-model.js`, `template-engine.js`, `generator.js` | Seeded expression construction and evaluation. |
 | Program runtime | `js/program-ir.js`, `program-core.js`, `program-item-builder.js` | Ordered statement programs and dispatch. |
-| Statement semantics | Existing statement files in `js/`; Program Output in `plugins/program-output/` | Expression, declaration, assignment, unary update, and language-neutral output behavior. |
+| Statement semantics | Existing statement files in `js/`; Program Output and Program Input in their plugin directories | Expression, declaration, assignment, unary update, and language-neutral input/output behavior. |
 | Activity orchestration | `js/activity-core.js` | Activity-plugin registry, profile content-provider registry, and shell lifecycle dispatch. |
 | Token Classification | `plugins/token-classification/` | Language rules, identifier generation/analysis, syntax-position classification, modal, renderer, and feedback. |
 | Falling Token Sort | `plugins/falling-token-sort/` | Configurable bucket sorting using Token Classification's public identifier capabilities. |
 | Code Simulator | `plugins/code-simulator/` | Manifest-backed complete C/Java programs that dispatch every supported statement kind through Program Core. |
+| Program Input | `plugins/program-input/` | Source input parsing, Enter-gated console submission, conversion, memory writes, virtual keyboard presentation, and canonical input traces. |
 | Persistence | `js/settings-persistence.js`, `exam-persistence.js` | Device settings and independently configurable per-student Practice/Exam snapshots. |
 | Verification | `tests/run-tests.js` | Full compatibility and extension suite. |
 
@@ -71,6 +72,8 @@ The global catalog currently contains:
 - 2 Program Output lesson profiles:
   - `program-output-basics`
   - `program-output-source-flow`
+- 1 Program Input lesson profile:
+  - `program-input-source-flow`
 - Code Simulator backs these 2 complete-source profiles, overlapping the
   lesson families above:
   - `program-output-source-flow`
@@ -88,10 +91,10 @@ change.
 
 Program Output registers a profile content provider for statement-oriented and
 generated lessons. Code Simulator owns complete-source parsing. The Source
-Program Output profile uses Code Simulator with `sourceLibrary:'program-output'`
-so it reads the existing
-`plugins/program-output/exercises/<language>/<exerciseSet>/manifest.json`
-bank without duplicating the authored files. Program Output still owns output
+Program Output profile uses Code Simulator with `library:'source-programs'`.
+The independent exercise library resolves to
+`exercise-libraries/source-programs/<language>/<exerciseSet>/manifest.json`.
+Neither plugin owns or hardcodes that content path. Program Output still owns output
 statement behavior and rendering. Source-backed items persist the resulting
 IR, so an active Exam restores its snapshot rather than rebuilding its
 statements from changed source files.

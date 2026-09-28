@@ -555,7 +555,7 @@
       if(!steps || steps.length===0) return;
 
       const rows = timelineEl.querySelectorAll('.tl-row');
-      const panelRect = timelineEl.getBoundingClientRect();
+      const panelRect = connectorContentRect(timelineEl);
       const {paths, dots} = buildConnectorVisuals(panelRect, rows, steps, steps.length);
 
       // buildConnectorVisuals() colors each line/dot via connector-lines.js's

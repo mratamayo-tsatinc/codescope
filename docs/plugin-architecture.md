@@ -63,7 +63,8 @@ contract; it does not maintain a second answer list.
 ## Reference implementation
 
 `plugins/falling-token-sort/`, `plugins/token-classification/`,
-`plugins/simulate-output/`, and `plugins/program-output/` are reference
+`plugins/simulate-output/`, `plugins/program-output/`, and
+`plugins/program-input/` are reference
 directory boundaries for activity plugins. Their profiles are declared
 globally in `js/profiles.js`; their plugin directories contain only the
 behavior and presentation needed to execute those configurations.
@@ -75,11 +76,28 @@ engine through Program Core. Its profile content provider can parse a
 manifest-selected C or Java source bank at runtime or delegate to the seeded
 generator. Both inputs converge on the same serializable Program IR.
 
+Program Input follows the same composition boundary. Its plugin owns parsing
+and execution for `scanf` and `Scanner.nextInt()`, the submitted-input event,
+numeric keyboard playback, conversion steps, destination writes, and rendering.
+Code Simulator discovers those statements while parsing a complete source file
+and routes their Program IR through Program Core. Input and Output share a
+Program Console, while their semantic event types remain separate. See
+`docs/how-to-create-a-program-input-profile.md`.
+
 `js/activity-core.js` owns the generic profile content-provider registry. The
 shell asks registered providers to validate profiles, load external content,
 and construct items. It does not know source formats or exercise-set layouts.
 See `docs/how-to-create-a-program-output-profile.md` for the Program Output
 provider contract.
+
+`js/source-library-registry.js` owns logical exercise-library registration,
+compatibility aliases, and manifest URL resolution. The independent
+`exercise-libraries/source-programs/library.js` registration owns its relative
+root and supported languages. Source-backed providers consume
+`content.library` and `content.exerciseSet`; they must not hardcode another
+plugin's directory. Current profiles use the canonical `source-programs` ID.
+The former `program-output` and `code-simulator` IDs and the older
+`content.sourceLibrary` field remain temporary read aliases.
 
 Simulate Output owns runtime-loaded exercise manifests, source files with
 embedded answer metadata, answer comparison, and its response UI. Exercise

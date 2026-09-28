@@ -13,7 +13,7 @@ Only manifest-listed files become activities. Source is fetched with
 ## Directory layout
 
 ```text
-plugins/code-simulator/exercises/
+exercise-libraries/source-programs/
   c/<exercise-set>/
     manifest.json
     Example.c
@@ -29,9 +29,10 @@ language is active:
 content:{
   provider:'code-simulator',
   mode:'source-files',
-  sourceLibrary:'code-simulator',
+  library:'source-programs',
   exerciseSet:'selection-basics',
   sourceValueMode:'seeded', // or 'authored'
+  inputValueMode:'seeded',  // or 'authored'
   presentation:'source-flow',
   selection:{count:'all',shuffle:false},
 },
@@ -44,11 +45,12 @@ program:{
 
 Use `scoring.itemCount:'manifest'` when the manifest owns the complete set.
 
-`sourceLibrary` defaults to `code-simulator`. Set it to `program-output` when
-the complete-source profile should consume an exercise set maintained under
-`plugins/program-output/exercises/`. This shares the live source files and
-manifest without copying them. The Source Program Output profile uses this
-configuration with `exerciseSet:'formatted-output'` and authored values.
+All complete-source profiles use the independently registered
+`source-programs` library. The exercise set selects `selection-basics`,
+`formatted-output`, `output-basics`, or another authored set without coupling
+the content to its consumer plugin. The former `code-simulator` and
+`program-output` library IDs, and the `sourceLibrary` field name, remain
+temporary compatibility aliases for saved configuration.
 
 ## Supported source behavior
 
@@ -58,7 +60,10 @@ A file may contain any combination of currently registered simulator behavior:
 - `=`, `+=`, `-=`, `*=`, `/=`, and `%=` assignments;
 - standalone prefix or postfix `++` and `--`;
 - C `printf` or Java `System.out.print`/`System.out.println`;
+- C `scanf` with `%d`/`%i` or Java `Scanner.nextInt()` when matching
+  source-owned `@input` metadata is present;
 - `if`, `if/else`, ordered `else if`, and `switch` conditions;
+- explicit `break;` inside switch cases;
 - C `return 0;`.
 
 No statement kind is mandatory. For example, a literal-only output program can
@@ -84,6 +89,11 @@ With `sourceValueMode:'seeded'`, each listed binding uses its inclusive range.
 Bindings absent from `@seed` remain authored. With `'authored'`, every source
 initializer remains unchanged. Malformed, duplicate, unknown, and nonliteral
 seed targets are load errors.
+
+Input values use separate `@input target=<name> value=<integer> min=<integer>
+max=<integer>` directives. `inputValueMode` selects the authored value or its
+inclusive source-local range. See
+`docs/how-to-create-a-program-input-profile.md` for the interaction contract.
 
 ## Compatibility
 

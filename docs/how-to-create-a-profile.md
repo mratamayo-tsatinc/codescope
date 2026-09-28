@@ -531,6 +531,7 @@ recreating JavaScript data:
   content:{
     provider:'program-output',
     mode:'source-files',
+    library:'source-programs',
     recipe:'formatted-values',
     exerciseSet:'formatted-output',
     selection:{count:'all',shuffle:false},
@@ -544,7 +545,7 @@ recreating JavaScript data:
 ```
 
 The plugin loads the matching
-`plugins/program-output/exercises/<language>/<exerciseSet>/manifest.json` and
+`exercise-libraries/source-programs/<language>/<exerciseSet>/manifest.json` and
 parses only the source files listed there. Set `content.mode:'generated'` to use
 the seeded `shape`/`template` path instead. Both modes produce the same Program
 IR and use the established Check, feedback, scoring, persistence, and
@@ -556,7 +557,7 @@ Use Code Simulator for a stable complete-source view:
 content:{
   provider:'code-simulator',
   mode:'source-files',
-  sourceLibrary:'program-output',
+  library:'source-programs',
   exerciseSet:'formatted-output',
   sourceValueMode:'authored',
   presentation:'source-flow',
@@ -591,9 +592,10 @@ file/manifest workflow, supported statements, and metadata rules.
 content:{
   provider:'code-simulator',
   mode:'source-files',
-  sourceLibrary:'code-simulator',
+  library:'source-programs',
   exerciseSet:'selection-basics',
   sourceValueMode:'seeded', // or 'authored'
+  inputValueMode:'seeded',  // or 'authored'
   presentation:'source-flow',
   selection:{count:'all',shuffle:false},
 }
@@ -601,7 +603,7 @@ content:{
 
 Each manifest-listed source file is parsed independently. It may contain any
 combination of supported declarations, assignments, standalone `++`/`--`,
-output statements, selections, and C `return 0;`. No individual statement kind
+input/output statements, selections, switch `break;`, and C `return 0;`. No individual statement kind
 is mandatory. Unsupported lines remain visible as muted context. A file is
 rejected only when it contains no supported executable statement or has invalid
 manifest/seed metadata or invalid references inside recognized statements.

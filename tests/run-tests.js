@@ -93,9 +93,11 @@ function testScriptManifestParses(){
   assert(names.includes('render-assignment.js'));
   assert(names.includes('render-unary-update.js'));
   assert(names.includes('render-done.js'));
-  const localScripts=[...html.matchAll(/<script src="((?:js|plugins)\/[^\"]+)"/g)].map(match=>match[1]);
+  const localScripts=[...html.matchAll(/<script src="((?:js|plugins|exercise-libraries)\/[^\"]+)"/g)].map(match=>match[1]);
   new vm.Script(localScripts.map(name=>fs.readFileSync(path.join(ROOT,name),'utf8')).join('\n'),{filename:'complete-local-script-order.js'});
   assert(localScripts.includes('js/activity-core.js'));
+  assert(localScripts.includes('js/source-library-registry.js'));
+  assert(localScripts.includes('exercise-libraries/source-programs/library.js'));
   assert(localScripts.includes('plugins/token-classification/plugin.js'));
   assert(html.includes('plugins/simulate-output/styles.css'));
   assert(!localScripts.includes('plugins/simulate-output/catalog.js'));
@@ -108,6 +110,11 @@ function testScriptManifestParses(){
   assert(localScripts.includes('plugins/program-output/content.js'));
   assert(localScripts.includes('plugins/code-simulator/manifest.js'));
   assert(localScripts.includes('plugins/code-simulator/content.js'));
+  assert(localScripts.includes('plugins/program-input/manifest.js'));
+  assert(localScripts.includes('plugins/program-input/parser.js'));
+  assert(localScripts.includes('plugins/program-input/statement.js'));
+  assert(localScripts.includes('plugins/program-input/renderer.js'));
+  assert(html.includes('plugins/program-input/styles.css'));
   assert(html.includes('plugins/code-simulator/styles.css'));
   assert(!html.includes('plugins/program-selection/'));
   assert(localScripts.indexOf('js/program-item-builder.js')
@@ -116,6 +123,10 @@ function testScriptManifestParses(){
     <localScripts.indexOf('js/state.js'));
   assert(localScripts.includes('js/program-return.js'));
   assert(localScripts.indexOf('js/program-return.js')<localScripts.indexOf('plugins/program-output/content.js'));
+  assert(localScripts.includes('js/program-break.js'));
+  assert(localScripts.indexOf('js/program-break.js')<localScripts.indexOf('plugins/code-simulator/content.js'));
+  assert(localScripts.indexOf('js/source-library-registry.js')<localScripts.indexOf('plugins/program-output/manifest.js'));
+  assert(localScripts.indexOf('exercise-libraries/source-programs/library.js')<localScripts.indexOf('plugins/program-output/manifest.js'));
   const stateSource=fs.readFileSync(path.join(ROOT,'js','state.js'),'utf8');
   const juiceSource=fs.readFileSync(path.join(ROOT,'js','juice.js'),'utf8');
   const shellSource=fs.readFileSync(path.join(ROOT,'js','shell-ui.js'),'utf8');
@@ -174,6 +185,7 @@ function testScriptManifestParses(){
   const assignmentRenderer = fs.readFileSync(path.join(ROOT,'js','render-assignment.js'),'utf8');
   const sessionRenderer = fs.readFileSync(path.join(ROOT,'js','render-session.js'),'utf8');
   const connectorRenderer = fs.readFileSync(path.join(ROOT,'js','connector-lines.js'),'utf8');
+  const consoleDrawerContent = fs.readFileSync(path.join(ROOT,'js','console-drawer-content.js'),'utf8');
   const memoryRenderer = fs.readFileSync(path.join(ROOT,'js','var-final-state.js'),'utf8');
   const memoryFloatRenderer = fs.readFileSync(path.join(ROOT,'js','var-final-float.js'),'utf8');
   const styles = fs.readFileSync(path.join(ROOT,'css','styles.css'),'utf8');
@@ -217,6 +229,8 @@ function testScriptManifestParses(){
   assert(connectorRenderer.includes('laneY=Math.max(y1,y2)+22'));
   assert(connectorRenderer.includes("const color = step.outputAction ? 'var(--op)' : semanticColor"));
   assert(!connectorRenderer.includes('selection-flow-connector'));
+  assert(consoleDrawerContent.includes('const panelRect = connectorContentRect(timelineEl);'));
+  assert(!consoleDrawerContent.includes('const panelRect = timelineEl.getBoundingClientRect();'));
   assert(memoryRenderer.includes("class:'var-final-group var-final-group-constants'"));
   assert(memoryRenderer.includes("class:'var-final-group var-final-group-variables'"));
   assert(!memoryRenderer.includes('renderBindingInfoTrigger'));
@@ -320,6 +334,26 @@ function testScriptManifestParses(){
   assert(assignmentRenderer.includes("!(ctx.services&&ctx.services.statementTraceModal)"));
   assert(fs.readFileSync(path.join(ROOT,'js','render-unary-update.js'),'utf8')
     .includes("!(ctx.services&&ctx.services.statementTraceModal)"));
+}
+
+function testExerciseLibraryRegistry(){
+  const ctx=context();
+  load(ctx,['source-library-registry.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    registerExerciseLibrary({id:'sample-library',root:'fixtures/source-programs',languages:['c','java'],aliases:['legacy-sample']});
+    let duplicate=false,unsupported=false,unsafe=false;
+    try{registerExerciseLibrary({id:'sample-library',root:'fixtures/other',languages:['c']});}catch(error){duplicate=true;}
+    try{resolveExerciseManifestUrl({library:'sample-library',language:'python',exerciseSet:'basics'});}catch(error){unsupported=true;}
+    try{registerExerciseLibrary({id:'unsafe',root:'../outside',languages:['c']});}catch(error){unsafe=true;}
+    return JSON.stringify({
+      url:resolveExerciseManifestUrl({library:'sample-library',language:'c',exerciseSet:'formatted-output'}),
+      aliasUrl:resolveExerciseManifestUrl({library:'legacy-sample',language:'java',exerciseSet:'selection-basics'}),
+      duplicate,unsupported,unsafe
+    });
+  })()`));
+  assert.strictEqual(result.url,'fixtures/source-programs/c/formatted-output/manifest.json');
+  assert.strictEqual(result.aliasUrl,'fixtures/source-programs/java/selection-basics/manifest.json');
+  assert(result.duplicate&&result.unsupported&&result.unsafe);
 }
 
 function testPracticeRetryPlacement(){
@@ -916,7 +950,7 @@ function testDeclarationChain(){
     });
   })()`));
   assert.deepStrictEqual(result, {
-    profileCount:34,
+    profileCount:35,
     declarationCount:4,
     statementCount:5,
     dependencyCounts:[0,1,1,1],
@@ -1258,7 +1292,7 @@ function testOldExamSaveGainsNewProfile(){
     });
   })()`));
   assert.deepStrictEqual(result, {
-    resumed:true, profileCount:34, preservedScore:0.75,policyMigrated:true,
+    resumed:true, profileCount:35, preservedScore:0.75,policyMigrated:true,
     addedKind:'interactive-declarations',addedAssignmentKind:'interactive-program'
   });
 }
@@ -2094,20 +2128,21 @@ function testProgramOutputStatementPlugin(){
   installFakeDom(ctx);
   load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
     'program-ir.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
-    'assignment-statement-plugin.js','program-return.js','activity-core.js']);
-  loadRelative(ctx,['plugins/program-output/manifest.js','plugins/program-output/statement.js']);
+    'assignment-statement-plugin.js','program-return.js','program-break.js','activity-core.js','source-library-registry.js']);
+  loadRelative(ctx,['exercise-libraries/source-programs/library.js','plugins/program-output/manifest.js','plugins/program-output/statement.js',
+    'plugins/program-input/manifest.js','plugins/program-input/parser.js','plugins/program-input/statement.js']);
   load(ctx,['program-item-builder.js']);
   loadRelative(ctx,['plugins/program-output/content.js']);
   load(ctx,['state.js','dom-helpers.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
     'render-assignment.js','render-unary-update.js','render-session.js']);
   loadRelative(ctx,['plugins/program-output/renderer.js']);
   const installBank=(language)=>{
-    const directory=path.join(ROOT,'plugins','program-output','exercises',language,'formatted-output');
+    const directory=path.join(ROOT,'exercise-libraries','source-programs',language,'formatted-output');
     const manifest=JSON.parse(fs.readFileSync(path.join(directory,'manifest.json'),'utf8'));
     const rows=manifest.exercises.map(filename=>({filename,raw:fs.readFileSync(path.join(directory,filename),'utf8')}));
     ctx[`test${language.toUpperCase()}Manifest`]=manifest;
     ctx[`test${language.toUpperCase()}Rows`]=rows;
-    evaluate(ctx,`poInstallExerciseBank('plugins/program-output/exercises/${language}/formatted-output/manifest.json',
+    evaluate(ctx,`poInstallExerciseBank('exercise-libraries/source-programs/${language}/formatted-output/manifest.json',
       '${language}','formatted-output',test${language.toUpperCase()}Manifest,test${language.toUpperCase()}Rows)`);
     return manifest;
   };
@@ -2247,7 +2282,7 @@ function testProgramOutputStatementPlugin(){
       sourceFlowItemCount:sourceFlowProfile.scoring.itemCount,
       sourceFlowSelectionCount:sourceFlowProfile.content.selection.count,
       migratedSourceFlowProvider:sourceFlowCatalogProfile.content.provider,
-      migratedSourceFlowLibrary:sourceFlowCatalogProfile.content.sourceLibrary,
+      migratedSourceFlowLibrary:sourceFlowCatalogProfile.content.library,
       migratedSourceFlowTimeline:sourceFlowCatalogProfile.program.timelinePresentation,
       recoveredProgramItems,
       statementCount:kinds.length,
@@ -2305,7 +2340,7 @@ function testProgramOutputStatementPlugin(){
   assert.strictEqual(result.sourceFlowItemCount,'manifest');
   assert.strictEqual(result.sourceFlowSelectionCount,'all');
   assert.strictEqual(result.migratedSourceFlowProvider,'code-simulator');
-  assert.strictEqual(result.migratedSourceFlowLibrary,'program-output');
+  assert.strictEqual(result.migratedSourceFlowLibrary,'source-programs');
   assert.strictEqual(result.migratedSourceFlowTimeline,'statement-modal');
   assert.strictEqual(result.recoveredProgramItems,2);
   assert.strictEqual(result.statementCount,8);
@@ -2397,14 +2432,15 @@ function testCodeSimulatorPlugin(){
   const ctx=context();installFakeDom(ctx);
   load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
     'program-ir.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
-    'assignment-statement-plugin.js','program-return.js','activity-core.js']);
-  loadRelative(ctx,['plugins/program-output/manifest.js','plugins/program-output/statement.js']);
+    'assignment-statement-plugin.js','program-return.js','program-break.js','activity-core.js','source-library-registry.js']);
+  loadRelative(ctx,['exercise-libraries/source-programs/library.js','plugins/program-output/manifest.js','plugins/program-output/statement.js',
+    'plugins/program-input/manifest.js','plugins/program-input/parser.js','plugins/program-input/statement.js']);
   load(ctx,['program-item-builder.js']);
   loadRelative(ctx,['plugins/program-output/content.js','plugins/code-simulator/manifest.js',
     'plugins/code-simulator/statement.js','plugins/code-simulator/content.js']);
   load(ctx,['state.js','dom-helpers.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
     'render-assignment.js','render-unary-update.js','render-session.js']);
-  loadRelative(ctx,['plugins/program-output/renderer.js','plugins/code-simulator/renderer.js']);
+  loadRelative(ctx,['plugins/program-output/renderer.js','plugins/program-input/renderer.js','plugins/code-simulator/renderer.js']);
   const selectionStatementSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','statement.js'),'utf8');
   const selectionRendererSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','renderer.js'),'utf8');
   const selectionStyles=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','styles.css'),'utf8');
@@ -2462,23 +2498,23 @@ int main() {
 int main() {
     mystery();
 }`;
-  ctx.csTypedFixture=fs.readFileSync(path.join(ROOT,'plugins','program-output','exercises','c','formatted-output','TypedValues.c'),'utf8');
+  ctx.csTypedFixture=fs.readFileSync(path.join(ROOT,'exercise-libraries','source-programs','c','formatted-output','TypedValues.c'),'utf8');
   ctx.csUndeclaredSeedFixture=ctx.csSeedFixture.replace('@seed score min=10 max=999','@seed missing min=1 max=2');
   ctx.csDerivedSeedFixture=ctx.csSeedFixture.replace('@seed score min=10 max=999','@seed bonus min=1 max=2');
   ['c','java'].forEach(language=>{
-    const directory=path.join(ROOT,'plugins','code-simulator','exercises',language,'selection-basics');
+    const directory=path.join(ROOT,'exercise-libraries','source-programs',language,'selection-basics');
     const manifest=JSON.parse(fs.readFileSync(path.join(directory,'manifest.json'),'utf8'));
     const rows=manifest.exercises.map(filename=>({filename,raw:fs.readFileSync(path.join(directory,filename),'utf8')}));
     ctx.csTestManifest=manifest;ctx.csTestRows=rows;
-    evaluate(ctx,`csInstallExerciseBank('plugins/code-simulator/exercises/${language}/selection-basics/manifest.json',
+    evaluate(ctx,`csInstallExerciseBank('exercise-libraries/source-programs/${language}/selection-basics/manifest.json',
       '${language}','selection-basics',csTestManifest,csTestRows)`);
   });
   ['c','java'].forEach(language=>{
-    const directory=path.join(ROOT,'plugins','program-output','exercises',language,'formatted-output');
+    const directory=path.join(ROOT,'exercise-libraries','source-programs',language,'formatted-output');
     const manifest=JSON.parse(fs.readFileSync(path.join(directory,'manifest.json'),'utf8'));
     const rows=manifest.exercises.map(filename=>({filename,raw:fs.readFileSync(path.join(directory,filename),'utf8')}));
     ctx.csOutputManifest=manifest;ctx.csOutputRows=rows;
-    evaluate(ctx,`csInstallExerciseBank('plugins/program-output/exercises/${language}/formatted-output/manifest.json',
+    evaluate(ctx,`csInstallExerciseBank('exercise-libraries/source-programs/${language}/formatted-output/manifest.json',
       '${language}','formatted-output',csOutputManifest,csOutputRows)`);
   });
   const result=JSON.parse(evaluate(ctx,`(()=>{
@@ -2515,6 +2551,13 @@ int main() {
     initializeSeededRandom(2);const retrySeededA=regenerateProfileContentItem(profile,items[0]);
     initializeSeededRandom(3);const retrySeededB=regenerateProfileContentItem(profile,items[0]);
     const kinds=items.map(item=>item.program.statements.filter(statement=>statement.kind==='selection').map(statement=>statement.selectionKind));
+    const switchItem=items[3],switchBreaks=switchItem.program.statements.filter(statement=>statement.kind==='program-break');
+    const switchReturn=switchItem.program.statements.find(statement=>statement.kind==='program-return');
+    const breakProbeStatement=JSON.parse(JSON.stringify(switchBreaks[0]));breakProbeStatement.status='active';
+    const breakProbeReturn=programReturnStatement({id:switchReturn.id,value:0});breakProbeReturn.status='locked';
+    const breakProbe={checked:false,program:createProgram([breakProbeStatement,breakProbeReturn],{language:'c'})};
+    const breakPlan=statementInteractionPlan(breakProbe,breakProbeStatement);
+    const breakResult=dispatchProgramAction(breakProbe,breakPlan.action);
     const first=items[0],selectionIndex=first.program.statements.findIndex(statement=>statement.kind==='selection');
     const firstMemoryNames=ensureBindings(first).map(binding=>binding.name);
     state.profileId=profile.id;state.items=items;state.itemIndex=0;state.mode='practice';
@@ -2703,13 +2746,23 @@ int main() {
       selectedBranchTarget:statement.branches.find(row=>row.when===Boolean(statement.runtime.expectedValue)).targetStatementId,
       elseIfAdvanced,branchUndo:branchUndo.applied,branchUndoId:branchUndoStatement.id,
       switchCases:items[3].program.statements.find(candidate=>candidate.kind==='selection').branches.length,
+      switchBreakCount:switchBreaks.length,
+      switchBreakSources:switchItem.sourceDisplay.lines.filter(line=>line.text.trim()==='break;'),
+      switchBreakTargets:switchBreaks.map(statement=>statement.nextStatementId),
+      breakPlanMode:breakPlan.mode,breakPlanAction:breakPlan.action&&breakPlan.action.type,
+      breakApplied:breakResult.applied,breakEvent:breakProbe.program.events[0],breakCursor:breakProbe.program.cursor,
       allBranchTargets:items.every(item=>item.program.statements.filter(candidate=>candidate.kind==='selection')
         .every(candidate=>candidate.branches.every(row=>row.targetStatementId))),
       javaCount:javaItems.length,javaLanguage:javaItems[0].language,
       javaSeeded:javaItems.every(item=>Object.keys(item.sourceSeedValues).length>0),
+      javaSwitchBreakCount:javaItems[3].program.statements.filter(candidate=>candidate.kind==='program-break').length,
+      javaSwitchBreakTargets:javaItems[3].program.statements.filter(candidate=>candidate.kind==='program-break')
+        .map(candidate=>candidate.nextStatementId),
       javaReturnCounts:javaItems.map(item=>item.program.statements.filter(candidate=>candidate.kind==='program-return').length),
-      sourceOutputProvider:sourceOutputProfile.content.provider,sourceOutputLibrary:sourceOutputProfile.content.sourceLibrary,
+      sourceOutputProvider:sourceOutputProfile.content.provider,sourceOutputLibrary:sourceOutputProfile.content.library,
       sourceOutputValueMode:sourceOutputProfile.content.sourceValueMode,
+      legacySourceLibraryUrl:csManifestUrl({id:'legacy-source-library',content:{
+        sourceLibrary:'program-output',exerciseSet:'formatted-output'}},'c'),
       modalOutputSurface,directOutputSurface,
       mainOutputIncludesPending:mainOutputMirror.textContent.includes('Modal output sentinel'),
       modalOutputWithholdsPending:!modalOutputMirror.textContent.includes('Modal output sentinel'),
@@ -2819,7 +2872,8 @@ int main() {
   assert.strictEqual(result.dynamicSelectionExpected,false);
   assert.strictEqual(result.dynamicOutputExpected,42);
   assert.strictEqual(result.sourceOutputProvider,'code-simulator');
-  assert.strictEqual(result.sourceOutputLibrary,'program-output');
+  assert.strictEqual(result.sourceOutputLibrary,'source-programs');
+  assert.strictEqual(result.legacySourceLibraryUrl,'exercise-libraries/source-programs/c/formatted-output/manifest.json');
   assert.strictEqual(result.sourceOutputValueMode,'authored');
   assert.strictEqual(result.modalOutputSurface,'modal');
   assert.strictEqual(result.directOutputSurface,'main');
@@ -2888,8 +2942,16 @@ int main() {
   assert.strictEqual(result.elseIfAdvanced,'else-if');
   assert(result.branchUndo&&result.branchUndoId==='selection-1');
   assert.strictEqual(result.switchCases,4);
+  assert.strictEqual(result.switchBreakCount,3);
+  assert(result.switchBreakSources.length===3&&result.switchBreakSources.every(line=>line.supported));
+  assert.deepStrictEqual(result.switchBreakTargets,['program-return','program-return','program-return']);
+  assert.strictEqual(result.breakPlanMode,'direct');
+  assert.strictEqual(result.breakPlanAction,'break-control');
+  assert(result.breakApplied&&result.breakEvent.type==='BREAK'&&result.breakCursor===1);
   assert(result.allBranchTargets);
   assert(result.javaCount===4&&result.javaLanguage==='java'&&result.javaSeeded&&result.serializable);
+  assert.strictEqual(result.javaSwitchBreakCount,3);
+  assert.deepStrictEqual(result.javaSwitchBreakTargets,['$end','$end','$end']);
   assert.deepStrictEqual(result.javaReturnCounts,[0,0,0,0]);
   assert(selectionStatementSource.includes('selectionExpressionResolved(statement)\n      ?completeSelection'));
   assert(!selectionRendererSource.includes('Trace branch'));
@@ -2930,8 +2992,119 @@ int main() {
   ],2).get(id)})()`),evaluate(ctx,'stepColor(1)'));
 }
 
+function testProgramInputPlugin(){
+  const inputRendererSource=fs.readFileSync(path.join(ROOT,'plugins','program-input','renderer.js'),'utf8');
+  const inputStyles=fs.readFileSync(path.join(ROOT,'plugins','program-input','styles.css'),'utf8');
+  const ctx=context();installFakeDom(ctx);
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
+    'program-ir.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
+    'assignment-statement-plugin.js','program-return.js','program-break.js','activity-core.js','source-library-registry.js']);
+  loadRelative(ctx,['exercise-libraries/source-programs/library.js','plugins/program-output/manifest.js','plugins/program-output/statement.js',
+    'plugins/program-input/manifest.js','plugins/program-input/parser.js','plugins/program-input/statement.js']);
+  load(ctx,['program-item-builder.js']);
+  loadRelative(ctx,['plugins/program-output/content.js','plugins/code-simulator/manifest.js',
+    'plugins/code-simulator/statement.js','plugins/code-simulator/content.js']);
+  load(ctx,['state.js','dom-helpers.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
+    'render-assignment.js','render-unary-update.js','render-session.js']);
+  loadRelative(ctx,['plugins/program-output/renderer.js','plugins/program-input/renderer.js','plugins/code-simulator/renderer.js']);
+  for(const language of ['c','java']){
+    const directory=path.join(ROOT,'exercise-libraries','source-programs',language,'input-basics');
+    const manifest=JSON.parse(fs.readFileSync(path.join(directory,'manifest.json'),'utf8'));
+    const rows=manifest.exercises.map(filename=>({filename,raw:fs.readFileSync(path.join(directory,filename),'utf8')}));
+    ctx.inputManifest=manifest;ctx.inputRows=rows;
+    evaluate(ctx,`csInstallExerciseBank('exercise-libraries/source-programs/${language}/input-basics/manifest.json',
+      '${language}','input-basics',inputManifest,inputRows)`);
+  }
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const profile=PROFILES.find(candidate=>candidate.id==='program-input-source-flow');
+    const category=PROFILE_CATEGORIES.find(candidate=>candidate.id==='input-statements');
+    state.language='c';initializeSeededRandom(41);const seeded=generateItemsForProfile(profile.id)[0];
+    initializeSeededRandom(41);const repeated=generateItemsForProfile(profile.id)[0];
+    initializeSeededRandom(82);const changed=generateItemsForProfile(profile.id)[0];
+    const cInput=seeded.program.statements.find(statement=>statement.kind==='input');
+    const isolated=programInputStatement({id:'input-test',inputSyntax:'c',readerName:'scanf',format:'%d %d %d',
+      rawInput:'4 7 2',reads:[
+        {target:'x',dataType:'int',conversion:'d',expectedRaw:'4',expectedValue:4},
+        {target:'y',dataType:'int',conversion:'d',expectedRaw:'7',expectedValue:7},
+        {target:'z',dataType:'int',conversion:'d',expectedRaw:'2',expectedValue:2}
+      ]});
+    const program=createProgram([isolated],{language:'c'}),item={checked:false,program};
+    const plugin=statementPluginFor(isolated);
+    const apply=action=>{const result=plugin.applyAction({statement:isolated,program,item,action});
+      if(result.event)program.events.push(result.event);return result;};
+    const start=apply({type:'start-input'});
+    const earlyEnter=apply({type:'submit-input'});
+    const consoleBefore=renderProgramOutputPanel(item,program,{surface:'main'});
+    isolated.runtime.playbackComplete=true;
+    const submit=apply({type:'submit-input'});
+    const postSubmitReads=isolated.runtime.reads.map(read=>({tokenRead:read.tokenRead,converted:read.converted,written:read.written}));
+    const postSubmitTrace=isolated.runtime.trace.map(step=>step.action);
+    const beforeWrites=Object.keys(program.memory);
+    const prematureWrite=apply({type:'write-input',readIndex:0});
+    isolated.runtime.transferComplete=true;
+    isolated.runtime.history[isolated.runtime.history.length-1].transferComplete=true;
+    for(let index=0;index<3;index++){
+      apply({type:'write-input',readIndex:index});
+    }
+    const consoleAfter=renderProgramOutputPanel(item,program,{surface:'main'});isolated.status='complete';
+    const timelineHost=h('div',{});renderInputStatement({container:timelineHost,item,program,statement:isolated,
+      statementIndex:0,isActive:false});
+    state.language='java';initializeSeededRandom(41);const javaItem=generateItemsForProfile(profile.id)[0];
+    return JSON.stringify({profileId:profile.id,categoryProfiles:category.profileIds,inputMode:profile.content.inputValueMode,
+      cKinds:seeded.program.statements.map(statement=>statement.kind),cReads:cInput.reads.length,cRaw:cInput.rawInput,
+      sourceInputValues:seeded.sourceInputValues,repeatInputValues:repeated.sourceInputValues,changedInputValues:changed.sourceInputValues,
+      start:start.applied,earlyEnter:earlyEnter.applied,keyboardKeys:countNodesWithClass(consoleBefore,'program-input-key'),
+      enterKeys:countNodesWithClass(consoleBefore,'enter-key'),beforeWrites,submit:submit.applied,
+      postSubmitReads,postSubmitTrace,
+      prematureWrite:prematureWrite.applied,consoleTokens:countNodesWithClass(consoleAfter,'program-input-console-token'),
+      eventTypes:program.events.map(event=>event.type),memory:Object.fromEntries(Object.entries(program.memory).map(([name,row])=>[name,row.value])),
+      consoleText:consoleAfter.textContent,checked:isolated.runtime.checked,
+      wasCorrectAssignment:isolated.runtime.wasCorrectAssignment,
+      timelineRows:countNodesWithClass(timelineHost,'tl-row'),
+      javaKinds:javaItem.program.statements.map(statement=>statement.kind),
+      javaInputs:javaItem.program.statements.filter(statement=>statement.kind==='input').map(statement=>statement.reads[0].target),
+      manifestCapabilities:PROGRAM_INPUT_PLUGIN_MANIFEST.capabilities,codeDependencies:CODE_SIMULATOR_PLUGIN_MANIFEST.dependencies});
+  })()`));
+  assert.strictEqual(result.profileId,'program-input-source-flow');
+  assert.deepStrictEqual(result.categoryProfiles,['program-input-source-flow']);
+  assert.strictEqual(result.inputMode,'seeded');
+  assert(result.cKinds.includes('input')&&result.cReads===3&&/^\d+ \d+ \d+$/.test(result.cRaw));
+  assert.deepStrictEqual(result.sourceInputValues,result.repeatInputValues);
+  assert.notDeepStrictEqual(result.sourceInputValues,result.changedInputValues);
+  assert(result.start&&!result.earlyEnter&&result.keyboardKeys===14&&result.enterKeys===1);
+  assert.deepStrictEqual(result.beforeWrites,[]);
+  assert.strictEqual(result.prematureWrite,false);
+  assert.deepStrictEqual(result.postSubmitReads,[
+    {tokenRead:true,converted:true,written:false},
+    {tokenRead:true,converted:true,written:false},
+    {tokenRead:true,converted:true,written:false}
+  ]);
+  assert.deepStrictEqual(result.postSubmitTrace,['CALL_INPUT','CONVERT_INPUT_BATCH']);
+  assert(result.submit&&result.checked&&result.wasCorrectAssignment);
+  assert.strictEqual(result.consoleTokens,3);
+  assert.deepStrictEqual(result.eventTypes,['INPUT','INPUT_WRITE','INPUT_WRITE','INPUT_WRITE']);
+  assert.deepStrictEqual(result.memory,{x:4,y:7,z:2});
+  assert(result.consoleText.includes('4 7 2')&&result.consoleText.includes('Program Console'));
+  assert(result.timelineRows>=5);
+  assert.deepStrictEqual(result.javaInputs,['x','y','z']);
+  assert(result.javaKinds.filter(kind=>kind==='input').length===3);
+  assert(result.manifestCapabilities.includes('numeric-keyboard'));
+  assert(result.codeDependencies.includes('program-input:source-input-parsing'));
+  assert(inputRendererSource.includes('runVarFinalComet(sources[index].getBoundingClientRect()'));
+  assert(inputRendererSource.includes('function programInputWriteToMemory(statement,index,button,attempt=0)'));
+  assert(inputRendererSource.includes('runVarFinalComet(source.getBoundingClientRect(),destination.getBoundingClientRect()'));
+  assert(inputRendererSource.indexOf("const commit=()=>handleTokenClick({type:'write-input'")
+    <inputRendererSource.indexOf('runVarFinalComet(source.getBoundingClientRect(),destination.getBoundingClientRect()'));
+  assert(inputRendererSource.includes('programInputPlaybackTimer=setTimeout(step,180)'));
+  assert(inputRendererSource.includes('},240)'));
+  assert(inputStyles.includes('.program-input-placeholder-spinner'));
+  assert(inputStyles.includes('.program-input-console-token'));
+}
+
+testExerciseLibraryRegistry();
 testProfileCategoriesAndScopedScores();
 testModeScopedPersistence();
 testProgramOutputStatementPlugin();
 testCodeSimulatorPlugin();
+testProgramInputPlugin();
 run();

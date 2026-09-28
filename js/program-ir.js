@@ -117,6 +117,16 @@ function programReturnStatement(spec){
   };
 }
 
+function programBreakStatement(spec){
+  spec=spec||{};
+  return {
+    id:spec.id||null,
+    kind:'program-break',
+    sourceSpan:spec.sourceSpan||null,
+    runtime:{checked:false}
+  };
+}
+
 function collectExpressionDependencies(expression, out){
   out = out || new Set();
   if(!expression || typeof expression !== 'object') return out;

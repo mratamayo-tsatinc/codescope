@@ -4,5 +4,5 @@ const PROGRAM_OUTPUT_PLUGIN_MANIFEST=Object.freeze({
   statementKind:'output',
   languages:Object.freeze(['c','java']),
   capabilities:Object.freeze(['formatted-output','string-concatenation','console-playback',
-    'source-exercise-banks','generated-content','order-independent-output-values','source-flow'])
+    'source-output-parsing','generated-content','order-independent-output-values','source-flow'])
 });

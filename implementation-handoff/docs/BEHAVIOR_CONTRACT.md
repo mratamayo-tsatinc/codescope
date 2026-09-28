@@ -135,6 +135,21 @@ unless the user explicitly approves a change.
 - Resolving one output value does not remove its source identifier from later
   timeline rows. The exposed variable card retains its name and value while the
   derived value stays associated with its output position.
+- Input statements use source-owned `@input` metadata. Each directive names a
+  mutable integer destination, an authored value, and an inclusive seeded
+  range. Destinations absent from metadata are invalid; the app does not invent
+  exercise input.
+- Activating `scanf` or `Scanner.nextInt()` starts simulated keyboard entry in
+  Program Console. Digits and C separator spaces are shown through the virtual
+  keyboard. The learner presses Enter; conversion and memory writes remain
+  unavailable before that explicit submission.
+- After Enter, all submitted tokens are converted as one semantic step. Each
+  visible console token trails to its matching `%d`, `%i`, or `nextInt()`
+  result position while that receiver shows a spinner. Memory writes unlock
+  only after all transfers arrive. The learner then clicks each C `&` address
+  operator or Java assignment target in source order. Input emits `INPUT` and
+  `INPUT_WRITE` events and shares the console display with Output without
+  becoming a printed output event.
 - Source-backed items display the complete metadata-free source. Structures
   and statements without registered behavior remain present, muted, and
   read-only rather than disappearing or gaining inferred semantics.
@@ -177,8 +192,10 @@ unless the user explicitly approves a change.
 - Else-if conditions are visited in source order until a true condition is
   reached or the final else path is selected.
 - `switch` evaluates its selector and traces to the matching explicit case or
-  `default`. The initial lesson supports explicit `break` and does not model
-  fall-through.
+  `default`. An authored `break;` is a direct executable statement: the learner
+  clicks it after the selected case body, it emits `BREAK`, and control moves
+  to the first executable statement after the switch. The initial lesson does
+  not model fall-through.
 - A complete-source profile may opt into
   `program.timelinePresentation:'statement-modal'`. The authored source then
   remains one stable file view with its exercise filename, language, continuous

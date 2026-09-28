@@ -279,7 +279,7 @@ const PROFILES_RAW = [
 
     template:'operand op operand op operand',
     scoring:{itemCount:'manifest',pointsPerItem:2},
-    content:{provider:'program-output',mode:'source-files',recipe:'formatted-values',
+    content:{provider:'program-output',mode:'source-files',library:'source-programs',recipe:'formatted-values',
       exerciseSet:'formatted-output',selection:{count:'all',shuffle:false}},
     program:{declarations:'interactive',outputLesson:'formatted-values',scoreAssignments:true},
   },
@@ -291,10 +291,23 @@ const PROFILES_RAW = [
     operators:{allowed:OPS.ADD_SUB},
     template:'operand op operand op operand',
     scoring:{itemCount:'manifest',pointsPerItem:2},
-    content:{provider:'code-simulator',mode:'source-files',sourceLibrary:'program-output',
+    content:{provider:'code-simulator',mode:'source-files',library:'source-programs',
       exerciseSet:'formatted-output',sourceValueMode:'authored',presentation:'source-flow',
       selection:{count:'all',shuffle:false}},
     program:{declarations:'interactive',outputLesson:'formatted-values',scoreAssignments:true,
+      timelinePresentation:'statement-modal'},
+  },
+  {
+    enabled:true,
+    meta:{id:'program-input-source-flow',name:'Program Input Flow',
+      description:'Trace simulated console input, press Enter to submit it, convert each token, and write its value to memory.'},
+    shape:{operandSources:{variable:3},operandRange:{min:1,max:20},allowNegativeOperands:false},
+    operators:{allowed:OPS.ADD_SUB},template:'operand op operand op operand',
+    scoring:{itemCount:'manifest',pointsPerItem:2},
+    content:{provider:'code-simulator',mode:'source-files',library:'source-programs',exerciseSet:'input-basics',
+      sourceValueMode:'authored',inputValueMode:'seeded',presentation:'source-flow',
+      selection:{count:'all',shuffle:false}},
+    program:{declarations:'interactive',inputLesson:'numeric-console',scoreAssignments:true,
       timelinePresentation:'statement-modal'},
   },
   {
@@ -304,7 +317,7 @@ const PROFILES_RAW = [
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:1,max:100},allowNegativeOperands:false},
     operators:{allowed:[...OPS.COMPARISON,...OPS.LOGICAL]},template:'operand cmp operand',
     scoring:{itemCount:'manifest',pointsPerItem:2},
-    content:{provider:'code-simulator',mode:'source-files',exerciseSet:'selection-basics',sourceValueMode:'seeded',
+    content:{provider:'code-simulator',mode:'source-files',library:'source-programs',exerciseSet:'selection-basics',sourceValueMode:'seeded',
       presentation:'source-flow',selection:{count:'all',shuffle:false}},
     program:{declarations:'interactive',scoreAssignments:true,timelinePresentation:'statement-modal'},
   },
@@ -315,7 +328,7 @@ const PROFILES_RAW = [
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:1,max:100},allowNegativeOperands:false},
     operators:{allowed:[...OPS.COMPARISON,...OPS.LOGICAL]},template:'operand cmp operand',
     scoring:{itemCount:'manifest',pointsPerItem:2},
-    content:{provider:'code-simulator',mode:'source-files',exerciseSet:'output-basics',sourceValueMode:'seeded',
+    content:{provider:'code-simulator',mode:'source-files',library:'source-programs',exerciseSet:'output-basics',sourceValueMode:'seeded',
       presentation:'source-flow',selection:{count:'all',shuffle:false}},
     program:{declarations:'interactive',scoreAssignments:true,timelinePresentation:'statement-modal'},
   },
@@ -636,6 +649,7 @@ const PROFILES_RAW = [
 // Categories are authored here alongside the profiles. A profile belongs to
 // exactly one category; removing a category or profile ID is validated at load.
 const PROFILE_CATEGORIES = [
+  {id:'input-statements',name:'Input Statements',enabled:true,profileIds:['program-input-source-flow']},
   {
     id:'output-statements',name:'Output Statements',enabled:true,
     profileIds:[

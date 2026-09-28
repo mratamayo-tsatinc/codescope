@@ -61,6 +61,25 @@ coverage, then run the full suite.
 - [ ] Character playback applies `\\n` as one newline and respects reduced
       motion; it never changes scoring.
 - [ ] Program Output is beside the flow on desktop and above it near 390 px.
+- [ ] The Input Statements category contains one source-backed Program Input
+      profile and loads only the active language's `input-basics` manifest.
+- [ ] `inputValueMode:'authored'` preserves each `@input value`; `'seeded'`
+      remains inside its source-local inclusive range, repeats with the same
+      seed, and can change with a different seed.
+- [ ] Activating an input command highlights simulated numeric keys and Space
+      while the submitted characters appear in Program Console. Conversion and
+      memory writes remain disabled until the learner presses Enter.
+- [ ] Pressing Enter emits one `INPUT` event and one batch conversion timeline
+      row. Every exact console token trails to its matching placeholder, which
+      shows a spinner until arrival; memory writes remain blocked until all
+      trails finish.
+- [ ] Each C destination then requires clicking its complete address expression
+      such as `&x`; Java requires clicking the corresponding assignment target. The resolved
+      placeholder value trails to the matching modal Memory card before the
+      semantic write and value-roll complete.
+- [ ] Input writes update the existing authored-casing memory binding, emit one
+      `INPUT_WRITE` per destination, support Undo/Reset reconstruction, and do
+      not count as Program Output text.
 - [ ] Source-file mode loads only manifest-listed exercises from the active
       C/Java language folder and preserves manifest order unless seeded shuffle
       is configured.
@@ -83,9 +102,15 @@ coverage, then run the full suite.
 - [ ] Source Program Output adds no synthetic final assignment and finalizes
       scoring after the last authored executable statement.
 - [ ] Source Program Output uses the Code Simulator provider with the
-      `program-output` source library, preserves the formatted-output manifest
+      registered `source-programs` exercise library, preserves the formatted-output manifest
       order in C and Java, uses authored values, and opens multistep statements
       through statement-modal presentation.
+- [ ] Program Output and Code Simulator resolve `content.library` through the
+      shared registry; neither provider contains the other plugin's directory
+      path. Unknown libraries and unsupported languages fail validation.
+- [ ] Complete source exercise sets live under
+      `exercise-libraries/source-programs/<language>/<exercise-set>/`; the
+      plugin exercise directories contain no authored source bank.
 - [ ] Generated Program Output mode still delegates to seeded profile
       generation and produces the same statement interaction contract.
 - [ ] A serialized source-backed item contains complete Program IR and restores
@@ -128,7 +153,8 @@ coverage, then run the full suite.
       branch lines remain visible, muted, and inert.
 - [ ] A false first condition advances to the next `else if`; a true condition
       exits the chain. Switch selects the matching case or `default` and honors
-      explicit `break` without fall-through.
+      explicit `break` without fall-through. Each authored `break;` is an active
+      direct-action line, emits `BREAK`, and then advances past the switch.
 - [ ] The Code Simulator profile renders one stable, complete source program and
       exposes an action only on the current executable line; no expression
       timeline is inserted into the main source flow.

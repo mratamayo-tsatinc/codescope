@@ -1,7 +1,6 @@
 // Runtime exercise-bank loading and constrained C/Java source parsing for
 // Program Output profiles. Source files are the authored truth; they are
 // parsed into the same Program IR used by seeded generation.
-const PROGRAM_OUTPUT_EXERCISE_ROOT='plugins/program-output/exercises';
 const programOutputExerciseBanks=new Map();
 
 function poContentSlug(value,label){
@@ -16,8 +15,14 @@ function poExerciseSet(profile){
   return poContentSlug(poContentConfig(profile).exerciseSet,`${profile&&profile.id||'program-output'}: exerciseSet`);
 }
 
+function poExerciseLibrary(profile){
+  const content=poContentConfig(profile);
+  return poContentSlug(content.library||content.sourceLibrary||PROGRAM_OUTPUT_PLUGIN_MANIFEST.id,
+    `${profile&&profile.id||'program-output'}: exercise library`);
+}
+
 function poManifestUrl(profile,language){
-  return `${PROGRAM_OUTPUT_EXERCISE_ROOT}/${poContentSlug(language,'CodeScope language')}/${poExerciseSet(profile)}/manifest.json`;
+  return resolveExerciseManifestUrl({library:poExerciseLibrary(profile),language,exerciseSet:poExerciseSet(profile)});
 }
 
 function poValidateManifest(manifest,url){

@@ -16,7 +16,7 @@ Configure the profile with a language independent exercise set name:
   content:{
     provider:'code-simulator',
     mode:'source-files',
-    sourceLibrary:'program-output',
+    library:'source-programs',
     exerciseSet:'formatted-output',
     sourceValueMode:'authored',
     presentation:'source-flow',
@@ -33,18 +33,24 @@ Configure the profile with a language independent exercise set name:
 }
 ```
 
-The global app language selects the language folder. `sourceLibrary` keeps the
-existing Program Output exercise bank as the single authored copy, while Code
-Simulator parses and executes its complete programs. The profile's
+The global app language selects the language folder. `library` selects the
+independent source-program exercise bank, while Code Simulator parses and
+executes its complete programs. The profile's
 `exerciseSet` selects the folder beneath that library:
 
 ```text
-plugins/program-output/exercises/
+exercise-libraries/source-programs/
   c/formatted-output/manifest.json
   c/formatted-output/BasicValues.c
   java/formatted-output/manifest.json
   java/formatted-output/BasicValues.java
 ```
+
+The library registers its own physical root under the logical
+`source-programs` ID. Neither Program Output nor Code Simulator owns or
+hardcodes the exercise path. The former `program-output` and `code-simulator`
+library IDs and the legacy `sourceLibrary` field remain accepted for saved
+configuration.
 
 Changing the activity requires two deliberate edits:
 

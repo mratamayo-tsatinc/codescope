@@ -1,6 +1,6 @@
 # Implementation Handoff
 
-Last consolidated: 2026-09-21
+Last consolidated: 2026-09-28
 
 ## Current baseline
 
@@ -8,14 +8,27 @@ Last consolidated: 2026-09-21
 - Temporary icon/logo: original **Precedify** artwork pending an approved
   CodeScope replacement.
 - Runtime: static vanilla HTML/CSS/classic JavaScript.
-- Profile count: 36, all in `js/profiles.js`.
+- Profile count: 41, all in `js/profiles.js`.
 - Activity plugins: `token-classification` 1.1.0 and `falling-token-sort` 1.7.0.
 - Statement plugins: legacy expression, declaration, assignment, unary update,
-  and Program Output.
+  Program Output, and Program Input.
 - Persistence: browser localStorage; no backend database.
 - Full test command: `node tests/run-tests.js`.
 
 ## Recently completed foundations
+
+### Program Input
+
+- Added the `program-input` statement plugin for C `scanf` integer conversions
+  and Java `Scanner.nextInt()` assignments.
+- Added source-local `@input` metadata with authored values and inclusive seeded
+  ranges. The profile selects authored or seeded materialization.
+- Added an Enter-gated numeric keyboard flow. Simulated characters and spaces
+  appear in Program Console, while the learner intentionally presses Enter
+  before conversion or memory writes become available.
+- Added the `Input Statements` category and its single
+  `program-input-source-flow` profile, backed by C and Java `input-basics`
+  source manifests.
 
 ### Activity plugin boundary
 
@@ -34,7 +47,7 @@ Last consolidated: 2026-09-21
 - Program Output can use profile-selected `source-files` or `generated` content
   without changing its statement interaction contract.
 - C and Java source banks live under
-  `plugins/program-output/exercises/<language>/<exerciseSet>/`; each
+  `exercise-libraries/source-programs/<language>/<exerciseSet>/`; each
   `manifest.json` alone controls membership and order.
 - Runtime parsing supports the current beginner declaration, expression,
   assignment, unary update, `printf`, and `System.out.print/println` subset,
@@ -54,9 +67,10 @@ Last consolidated: 2026-09-21
   `selection-statements-source` ID is retained for saved progress, while its
   user-facing name and provider are Code Simulator.
 - `program-output-source-flow` now also uses the Code Simulator provider and
-  statement-modal presentation. Its `sourceLibrary:'program-output'` setting
-  keeps the existing formatted-output C/Java manifests and source files as the
-  single authored bank; Program Output continues to own output semantics.
+  statement-modal presentation. Its `library:'source-programs'` setting uses
+  the independent formatted-output C/Java manifests and source files as the
+  single authored bank. The shared exercise-library registry resolves that ID;
+  Program Output continues to own output semantics.
 - Source-backed Program Output and Code Simulator profiles use
   `selection.count:'all'` with `scoring.itemCount:'manifest'`. The manifest now
   owns membership, item total, order, and category maximum score.

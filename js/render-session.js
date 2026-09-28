@@ -496,9 +496,11 @@ function renderStatementTraceOutput(item){
     if(panel&&panel.classList) panel.classList.add('statement-trace-output');
     return panel;
   }
-  const text=(item.program.events||[]).filter(event=>event&&event.type==='OUTPUT').map(event=>event.text).join('');
-  return h('aside',{class:'program-output-screen statement-trace-output','aria-label':'Program output'},
-    h('div',{class:'program-output-screen-title'},h('i',{class:'fa-solid fa-display','aria-hidden':'true'}),h('span',{},'Program Output')),
+  const hasInput=item.program.statements.some(statement=>statement.kind==='input');
+  const title=hasInput?'Program Console':'Program Output';
+  const text=(item.program.events||[]).filter(event=>event&&(event.type==='OUTPUT'||event.type==='INPUT')).map(event=>event.text).join('');
+  return h('aside',{class:'program-output-screen statement-trace-output','aria-label':title},
+    h('div',{class:'program-output-screen-title'},h('i',{class:'fa-solid fa-display','aria-hidden':'true'}),h('span',{},title)),
     h('div',{class:'program-output-screen-body'},h('pre',{class:'program-output-screen-text'},text),
       h('span',{class:'program-output-cursor','aria-hidden':'true'},'▌')));
 }
@@ -565,7 +567,7 @@ function renderProgramContextShell(memoryPanel,outputPanel,surface){
   };
   context.appendChild(tabs);
   addPanel('memory','Memory','fa-memory',memoryPanel);
-  addPanel('output','Output','fa-display',outputPanel);
+  addPanel('output','Console','fa-display',outputPanel);
   return context;
 }
 
@@ -599,7 +601,7 @@ function syncStatementTraceModal(item,moveFocus=false){
   if(completed) trace.appendChild(h('div',{class:'statement-trace-complete-note',role:'status'},
     h('i',{class:'fa-solid fa-circle-check','aria-hidden':'true'}),
     h('span',{},'Evaluation complete. Review the result, then continue to the next statement.')));
-  const modalOutput=item.program.statements.some(candidate=>candidate.kind==='output')
+  const modalOutput=item.program.statements.some(candidate=>candidate.kind==='output'||candidate.kind==='input')
     ?renderStatementTraceOutput(item):null;
   const context=renderProgramContextShell(renderStatementTraceMemory(item),modalOutput,'modal');
   if(context&&context.classList) context.classList.add('statement-trace-context');
@@ -607,7 +609,7 @@ function syncStatementTraceModal(item,moveFocus=false){
   if(typeof applyActivityZoomToElement==='function') applyActivityZoomToElement(layout);
   body.appendChild(layout);
   const line=programStatementDisplayNumber(statement,statementIndex);
-  const kindLabel={declaration:'Declaration',assignment:'Assignment','unary-update':'Update',output:'Output',selection:'Condition'}[statement.kind]||'Statement';
+  const kindLabel={declaration:'Declaration',assignment:'Assignment','unary-update':'Update',output:'Output',input:'Input',selection:'Condition'}[statement.kind]||'Statement';
   title.textContent=`${kindLabel} trace · Line ${line}${completed?' · Complete':''}`;
   modal.classList.toggle('is-complete',completed);
   if(back){back.disabled=false;back.querySelector('span').textContent=completed?'Back to source':'Close evaluation';}
@@ -679,7 +681,7 @@ function renderProgramWorkspaceShell(container,item,program){
   workspace.appendChild(progress);
   const flow=h('div',{class:'program-statement-flow'});
   if(programContextItemRef!==item){programContextItemRef=item;programContextActiveTab='memory';}
-  const hasOutput=program.statements.some(statement=>statement.kind==='output')
+  const hasOutput=program.statements.some(statement=>statement.kind==='output'||statement.kind==='input')
     &&DEFAULT_APP_SETTINGS.shell.outputPanel.visible;
   const hasMemory=typeof varFinalPanelVisibleForItem==='function'
     ?varFinalPanelVisibleForItem(item)

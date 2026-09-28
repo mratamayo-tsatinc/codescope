@@ -99,8 +99,8 @@ See `docs/identifier-generation.md` for the precise configuration contract.
 ## Statement plugins
 
 Program Core dispatches each statement by `statement.kind`. Current statement
-plugins are legacy expression, declaration, assignment, unary update, output,
-selection, and program return. One profile can generate a sequence that uses
+plugins are legacy expression, declaration, assignment, unary update, input,
+output, selection, program break, and program return. One profile can generate a sequence that uses
 several statement kinds.
 
 Program Output lives in `plugins/program-output/` and renders the same
@@ -108,6 +108,14 @@ language-neutral output IR as C `printf` or Java
 `System.out.print`/`System.out.println`. Profiles select a source-file exercise
 set or a generated recipe; they do not embed source text, canonical answers, or
 language-specific interaction logic.
+
+Program Input lives in `plugins/program-input/`. It owns the language adapter,
+input runtime, semantic actions, canonical trace, and keyboard/timeline
+renderer. Code Simulator consumes its public source parser and must not
+reimplement `scanf` or `Scanner.nextInt()` behavior. Exercise files define each
+input with `@input target=<name> value=<integer> min=<integer> max=<integer>`;
+profiles choose authored or seeded materialization with
+`content.inputValueMode`.
 
 Code Simulator source files own exercise-specific value seeding. Their leading
 `@codescope` block may explicitly allowlist literal integer declarations with
@@ -123,18 +131,22 @@ Program Core plugins. The provider must accept any manifest-listed program that
 contains at least one supported executable statement; it must not require a
 declaration, selection, output, or return statement merely because an exercise
 set previously focused on that lesson. It currently recognizes declarations,
-assignments, standalone unary updates, output, selections, and C `return 0;`.
+assignments, standalone unary updates, input, output, selections, switch
+`break;`, and C `return 0;`.
 Unsupported source remains visible, muted context. Condition evaluation
 delegates to the shared expression runtime, and output delegates to Program
 Output.
 
 A complete-source profile may select an approved exercise library through
-`content.sourceLibrary`. The default `code-simulator` library resolves beneath
-`plugins/code-simulator/exercises/`; `program-output` resolves beneath
-`plugins/program-output/exercises/`. This permits Source Program Output to use
-Code Simulator flow while retaining one live formatted-output manifest and
-source bank. Providers must reject unknown library names and must not copy the
-exercise files into a second plugin directory.
+`content.library`. Library owners register their logical ID, physical root, and
+supported languages with the shared exercise-library registry. The canonical
+`source-programs` library resolves beneath
+`exercise-libraries/source-programs/` and contains the formatted-output,
+selection-basics, and output-basics sets. It is independent of the plugins that
+parse or present it. Providers must reject unknown library names and must not
+copy exercise files into a plugin directory. The former `program-output` and
+`code-simulator` IDs and `content.sourceLibrary` field are temporary
+compatibility aliases and must not be used by new profiles.
 
 The provider must derive supported statement order and control-flow edges from
 the current fetched source. This includes sequential successors, branch entry
@@ -162,6 +174,11 @@ The shared `program-return` statement plugin represents an authored exact C
 `return 0;`. It supplies one direct `return-program` action and emits `RETURN`
 with `nextStatementId:'$end'`. Content providers must not invent this statement
 for Java or for source that does not author it.
+
+The shared `program-break` statement plugin represents an authored `break;`
+inside a supported switch case. It supplies one direct `break-control` action,
+emits `BREAK`, and follows the enclosing switch adapter's `nextStatementId` to
+the first executable statement after that switch.
 
 External profile content is registered through the generic content-provider
 API in `js/activity-core.js`. A provider owns configuration validation, content

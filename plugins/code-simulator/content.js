@@ -1,19 +1,14 @@
-const CODE_SIMULATOR_SOURCE_LIBRARIES=Object.freeze({
-  'code-simulator':'plugins/code-simulator/exercises',
-  'program-output':'plugins/program-output/exercises'
-});
 const codeSimulatorExerciseBanks=new Map();
 
 function csSourceLibrary(profile){
-  const library=profile&&profile.content&&profile.content.sourceLibrary||'code-simulator';
-  if(!Object.prototype.hasOwnProperty.call(CODE_SIMULATOR_SOURCE_LIBRARIES,library))
-    throw new Error(`${profile&&profile.id||'code-simulator'}: unsupported sourceLibrary '${library}'`);
-  return library;
+  const content=profile&&profile.content||{};
+  return exerciseLibrarySlug(content.library||content.sourceLibrary||CODE_SIMULATOR_PLUGIN_MANIFEST.id,
+    `${profile&&profile.id||'code-simulator'}: exercise library`);
 }
 
 function csManifestUrl(profile,language){
-  const root=CODE_SIMULATOR_SOURCE_LIBRARIES[csSourceLibrary(profile)];
-  return `${root}/${poContentSlug(language,'CodeScope language')}/${poContentSlug(profile.content.exerciseSet,'exerciseSet')}/manifest.json`;
+  return resolveExerciseManifestUrl({library:csSourceLibrary(profile),language,
+    exerciseSet:poContentSlug(profile.content.exerciseSet,'exerciseSet')});
 }
 
 function csSourceValueMode(profile){
@@ -21,6 +16,8 @@ function csSourceValueMode(profile){
   if(mode!=='authored'&&mode!=='seeded') throw new Error(`${profile&&profile.id||'code-simulator'}: sourceValueMode must be 'authored' or 'seeded'`);
   return mode;
 }
+
+function csInputValueMode(profile){return programInputValueMode(profile);}
 
 function csSeedDirectives(metadata,filename){
   const directives=new Map();
@@ -121,14 +118,18 @@ function csBuildSelection(id,kind,condition,lineIndex,lines,memory,kinds,branche
   return statement;
 }
 
-function csParseExercise(exercise,language,sourceValueMode='authored'){
+function csParseExercise(exercise,language,sourceValueMode='authored',inputValueMode='authored'){
   if(sourceValueMode!=='authored'&&sourceValueMode!=='seeded')
     throw new Error(`${exercise.filename}: sourceValueMode must be 'authored' or 'seeded'`);
+  if(inputValueMode!=='authored'&&inputValueMode!=='seeded')
+    throw new Error(`${exercise.filename}: inputValueMode must be 'authored' or 'seeded'`);
   const rawDetails=poMetadataAndSource(exercise.raw,exercise.filename),materialized=csMaterializeSource(rawDetails,language,exercise.filename,sourceValueMode);
+  const inputDefinitions=programInputDirectives(rawDetails.metadata,exercise.filename,inputValueMode);
   const details=Object.assign({},rawDetails,{templateSource:rawDetails.source,source:materialized.source,
-    sourceValueMode,seedValues:materialized.seedValues}),lines=details.source.split('\n');
+    sourceValueMode,seedValues:materialized.seedValues,inputValueMode,
+    inputValues:Object.fromEntries(inputDefinitions.map(definition=>[definition.target,definition.materializedValue]))}),lines=details.source.split('\n');
   const memory={},kinds={},dataTypes={},declarations=[],statements=[],supported=new Map(),declarationsByLine=new Map();
-  let declarationIndex=0,assignmentIndex=0,unaryIndex=0,outputIndex=0;
+  let declarationIndex=0,assignmentIndex=0,unaryIndex=0,outputIndex=0,inputIndex=0,breakIndex=0;
   const mark=statement=>supported.set(statement.sourceLine,{statementId:statement.id,primary:true});
   lines.forEach((raw,index)=>{
     const pattern=language==='c'
@@ -151,6 +152,14 @@ function csParseExercise(exercise,language,sourceValueMode='authored'){
       statement.sourceLine=index+1;statement.sourceEndLine=index+1;statement.sourceText=raw;
       statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];mark(statement);statements.push(statement);
       declarationsByLine.set(index+1,{declaration,statement,initializerSource:match[4]});return;
+    }
+    const inputText=raw.trim().replace(/;\s*$/,'');
+    if(programInputLooksLikeSourceLine(inputText,language)){
+      const targets=language==='c'?[...inputText.matchAll(/&([A-Za-z_][A-Za-z0-9_]*)/g)].map(match=>match[1])
+        :[inputText.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=/)[1]];
+      targets.forEach(target=>{const definition=inputDefinitions.find(candidate=>candidate.target===target);
+        if(definition)memory[target]=definition.materializedValue;});
+      return;
     }
     const assignment=/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(=|\+=|-=|\*=|\/=|%=)\s*(.+);\s*$/.exec(raw);
     if(assignment&&kinds[assignment[1]]==='variable'){
@@ -210,11 +219,26 @@ function csParseExercise(exercise,language,sourceValueMode='authored'){
     const trimmed=raw.trim();
     if(!trimmed.endsWith(';')) return;
     const text=trimmed.slice(0,-1).trim();
+    const insideSwitchCase=controlStructures.some(structure=>structure.type==='switch'
+      &&structure.cases.some(entry=>index>entry.index&&index<=entry.end));
+    if(text==='break'&&insideSwitchCase){
+      const statement=programBreakStatement({id:`program-break-${++breakIndex}`});
+      statement.sourceLine=index+1;statement.sourceEndLine=index+1;statement.sourceText=raw;
+      statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];mark(statement);statements.push(statement);return;
+    }
     if(language==='c'&&/^return\s+0$/.test(text)){
       const statement=programReturnStatement({id:'program-return',value:0});
       statement.sourceLine=index+1;statement.sourceEndLine=index+1;statement.sourceText=raw;
       statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];mark(statement);statements.push(statement);return;
     }
+    const input=programInputParseSourceLine(text,{language,filename:exercise.filename,line:index+1,
+      statementIndex:++inputIndex,kinds,dataTypes,definitions:inputDefinitions});
+    if(input){
+      input.sourceLine=index+1;input.sourceEndLine=index+1;input.sourceText=raw;
+      input.reads.forEach(read=>{executionMemory[read.target]=read.expectedValue;});
+      input.sourceIndent=(raw.match(/^\s*/)||[''])[0];input.nextStatementId='$end';mark(input);statements.push(input);return;
+    }
+    inputIndex--;
     const output=language==='c'
       ?poParseCOutput(text,executionMemory,exercise.filename,index+1,outputIndex,dataTypes)
       :poParseJavaOutput(text,executionMemory,exercise.filename,index+1,outputIndex,dataTypes);
@@ -240,6 +264,7 @@ function csParseExercise(exercise,language,sourceValueMode='authored'){
       statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];mark(statement);statements.push(statement);
     }
   });
+  programInputValidateDefinitions(inputDefinitions,exercise.filename);
   Object.keys(memory).forEach(name=>delete memory[name]);Object.assign(memory,executionMemory);
   statements.sort((left,right)=>left.sourceLine-right.sourceLine);
   const firstStatementIn=(start,end)=>statements.find(statement=>statement.sourceLine>=start&&statement.sourceLine<=end)||null;
@@ -277,7 +302,9 @@ function csParseExercise(exercise,language,sourceValueMode='authored'){
       const body=statementsIn(entry.index+2,entry.end+1),target=targetDetails(body[0]||after);
       structure.statement.branches.push({value:entry.value,default:entry.default,label:entry.label,
         targetLine:target.line,targetText:target.text,nextStatementId:target.id,targetStatementId:target.id});
-      if(body.length)body[body.length-1].nextStatementId=afterTarget.id;
+      const breakStatement=body.find(statement=>statement.kind==='program-break');
+      if(breakStatement)breakStatement.nextStatementId=afterTarget.id;
+      else if(body.length)body[body.length-1].nextStatementId=afterTarget.id;
     });
   });
   if(!statements.length) throw new Error(`${exercise.filename}: no supported executable statements were found`);
@@ -286,7 +313,7 @@ function csParseExercise(exercise,language,sourceValueMode='authored'){
 }
 
 function csBuildItem(profile,exercise,language,itemNumber){
-  const parsed=csParseExercise(exercise,language,csSourceValueMode(profile)),last=parsed.declarations[parsed.declarations.length-1];
+  const parsed=csParseExercise(exercise,language,csSourceValueMode(profile),csInputValueMode(profile)),last=parsed.declarations[parsed.declarations.length-1];
   const resultName=parsed.details.resultName||(last&&last.name)||'result';
   if(parsed.details.resultName&&!Object.prototype.hasOwnProperty.call(parsed.memory,resultName))
     throw new Error(`${exercise.filename}: @result '${resultName}' is not declared`);
@@ -294,7 +321,8 @@ function csBuildItem(profile,exercise,language,itemNumber){
   const originalTree=last?makeNamed(resultKind,resultName,resultValue):makeLiteral(0),originalFlat=flattenInstance(originalTree);
   const item={profileId:profile.id,itemNumber,exerciseId:exercise.id,filename:exercise.filename,exerciseTitle:parsed.details.title,
     source:parsed.details.source,sourceTemplate:parsed.details.templateSource,sourceSeedValues:parsed.details.seedValues,
-    sourceValueMode:parsed.details.sourceValueMode,sourceDisplay:parsed.sourceDisplay,sourceFlow:true,language,originalTree,originalFlat,
+    sourceValueMode:parsed.details.sourceValueMode,sourceInputValues:parsed.details.inputValues,
+    inputValueMode:parsed.details.inputValueMode,sourceDisplay:parsed.sourceDisplay,sourceFlow:true,language,originalTree,originalFlat,
     decls:parsed.declarations,resultName,correctFinalValue:last?resultValue:0,canonicalTrace:buildCanonicalTrace(originalTree),
     workingFlat:deepCloneFlat(originalFlat),history:[deepCloneFlat(originalFlat)],trace:[],checked:false,itemScore:null,points:null,maxPoints:null,
     correctSteps:0,totalOpSteps:0,wasCorrectFinal:null,showSolution:false,playback:null,flagged:false,lockedAt:null,examActionLog:[],
@@ -320,7 +348,7 @@ async function csLoadExerciseContent(){
 
 const codeSimulatorContentProvider={id:CODE_SIMULATOR_PLUGIN_MANIFEST.id,
   validateProfile(profile){if(profile.content.mode!=='source-files')throw new Error(`${profile.id}: code simulator content must use source-files`);
-    csSourceLibrary(profile);csSourceValueMode(profile);if(!profile.content.selection||profile.content.selection.count!=='all'||profile.itemCount!=='manifest')
+    csSourceLibrary(profile);csSourceValueMode(profile);csInputValueMode(profile);if(!profile.content.selection||profile.content.selection.count!=='all'||profile.itemCount!=='manifest')
       throw new Error(`${profile.id}: source-file simulation must use manifest item count`);},
   loadContent:csLoadExerciseContent,
   generateItems({profile,language}){const bank=codeSimulatorExerciseBanks.get(csManifestUrl(profile,language));if(!bank)throw new Error(`${profile.id}: code simulator exercise bank is not loaded`);
