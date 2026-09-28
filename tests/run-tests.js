@@ -3095,6 +3095,8 @@ function testProgramInputPlugin(){
   assert(inputRendererSource.includes('runVarFinalComet(source.getBoundingClientRect(),destination.getBoundingClientRect()'));
   assert(inputRendererSource.indexOf("const commit=()=>handleTokenClick({type:'write-input'")
     <inputRendererSource.indexOf('runVarFinalComet(source.getBoundingClientRect(),destination.getBoundingClientRect()'));
+  assert(inputRendererSource.includes("programInputAction(`&${entry.target}`,'input-address"));
+  assert(!inputRendererSource.includes('program-input-target-name'));
   assert(inputRendererSource.includes('programInputPlaybackTimer=setTimeout(step,180)'));
   assert(inputRendererSource.includes('},240)'));
   assert(inputStyles.includes('.program-input-placeholder-spinner'));
