@@ -670,7 +670,13 @@ const PROFILES_RAW = [
       kind:'simulate-output',
       instructions:'Read each source program, predict its terminal output, and give its final variable values. Check when ready.',
       generator:{library:'source-programs',exerciseSet:'simulate-basic-selection',shuffle:false}
-    }
+    },
+    feedback: {
+      showCorrectSolution: {
+        practice: false,
+        exam: false
+      }
+    },
   },
   {
     enabled:true,
@@ -682,7 +688,13 @@ const PROFILES_RAW = [
       kind:'simulate-output',
       instructions:'Read each source program, predict its terminal output, and give its final variable values. Check when ready.',
       generator:{library:'source-programs',exerciseSet:'simulate-compound-selection',shuffle:false}
-    }
+    },
+    feedback: {
+      showCorrectSolution: {
+        practice: false,
+        exam: false
+      }
+    },
   },
 ];
 
