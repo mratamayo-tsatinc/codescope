@@ -1469,6 +1469,28 @@ int main(void) {
   printf("%d %d %d\\n", itemCost, quantity, discount);
   return 0;
 }`;
+  ctx.selectionAnswerFixture=`/* @codescope
+ * @seed a min=6 max=10
+ * @seed b min=3 max=7
+ */
+#include <stdio.h>
+int main(void) {
+  int a = 8;
+  int b = 5;
+  int c;
+  int total;
+  c = a + b * 2;
+  total = c - a;
+  if (total > 10) {
+    total = total + 3;
+    c = c - 2;
+  }
+  printf("a = %d\\n", a);
+  printf("b = %d\\n", b);
+  printf("c = %d\\n", c);
+  printf("total = %d\\n", total);
+  return 0;
+}`;
   const result=JSON.parse(evaluate(ctx,`(()=>{
     const authored=sourceProgramParseExercise({raw:pipelineFixture,filename:'Seed.c',language:'c',
       sourceValueMode:'authored',randomInteger:()=>4});
@@ -1478,6 +1500,10 @@ int main(void) {
       filename:'Stepped.c',language:'c',sourceValueMode:'seeded',randomInteger:()=>slot}));
     const multi=sourceProgramParseExercise({raw:multiSeedFixture,filename:'Store.c',language:'c',
       sourceValueMode:'seeded',randomInteger:min=>min});
+    let selectionSeedIndex=0;
+    const selection=sourceProgramParseExercise({raw:selectionAnswerFixture,filename:'Selection.c',language:'c',
+      sourceValueMode:'seeded',randomInteger:()=>selectionSeedIndex++===0?6:4});
+    const selectionAnswer=sourceProgramGenerateAnswer(selection,'Selection.c');
     const invalidSteps=[];
     for(const metadata of ['@seed x min=1 max=5 step=0','@seed x min=1 max=5 step=-1']){
       try{sourceProgramSeedDirectives(metadata,'Invalid.c');}catch(error){invalidSteps.push(error.message);}
@@ -1499,7 +1525,8 @@ int main(void) {
       steppedSources:stepped.map(entry=>entry.source),invalidSteps,
       multi:{source:multi.source,seedValues:multi.seedValues,
         declarations:multi.coreProgramResult.ir.statements.filter(statement=>statement.kind==='declaration')
-          .map(statement=>statement.binding.name),memory:multi.coreProgramResult.ir.metadata.expectedMemory}});
+          .map(statement=>statement.binding.name),memory:multi.coreProgramResult.ir.metadata.expectedMemory},
+      selectionAnswer});
   })()`));
   assert.deepStrictEqual(result.manifest,{title:'Demo',exercises:['One.c','Two.c']});
   assert.strictEqual(result.errors.length,3);
@@ -1525,6 +1552,9 @@ int main(void) {
   assert.strictEqual(result.multi.memory.itemCost.value,430);
   assert.strictEqual(result.multi.memory.quantity.value,2);
   assert.strictEqual(result.multi.memory.discount.value,50);
+  assert.deepStrictEqual(result.selectionAnswer.expectedLines,['a = 6','b = 4','c = 14','total = 8']);
+  assert.deepStrictEqual(result.selectionAnswer.variables.map(entry=>[entry.name,entry.expected]),
+    [['a','6'],['b','4'],['c','14'],['total','8']]);
 
   for(const language of ['c','java']){
     const directory=path.join(ROOT,'exercise-libraries','source-programs',language,'output-basics');
