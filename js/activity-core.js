@@ -24,10 +24,14 @@ function registerActivityPlugin(plugin){
   return plugin;
 }
 
-// Profiles may obtain item content from generated data or from runtime-loaded
-// source files without teaching the shell either domain. The provider owns
-// validation, loading, parsing and item construction; the shell supplies the
-// existing seeded generator as an explicit fallback for generated mode.
+// Profiles describe their content, lesson, interaction, and presentation.
+// Adapters declare which descriptions they support; profiles never name a
+// parser or provider.
+function profileContentProviderMatches(provider,profile){
+  if(!profile||!profile.content)return false;
+  return typeof provider.matches==='function'&&!!provider.matches(profile);
+}
+
 function registerProfileContentProvider(provider){
   if(!provider||typeof provider!=='object'||!provider.id)
     throw new Error('Profile content provider requires an id');
@@ -35,7 +39,7 @@ function registerProfileContentProvider(provider){
     throw new Error(`Profile content provider '${provider.id}' is already registered`);
   if(typeof provider.generateItems!=='function')
     throw new Error(`Profile content provider '${provider.id}' requires generateItems()`);
-  const matchingProfiles=PROFILES.filter(profile=>profile.content&&profile.content.provider===provider.id);
+  const matchingProfiles=PROFILES.filter(profile=>profileContentProviderMatches(provider,profile));
   matchingProfiles.forEach(profile=>{
     if(typeof provider.validateProfile==='function') provider.validateProfile(profile);
   });
@@ -44,13 +48,21 @@ function registerProfileContentProvider(provider){
 }
 
 function profileContentProviderFor(profile){
-  return profile&&profile.content
-    ?profileContentProviderRegistry.get(profile.content.provider)||null:null;
+  if(!profile||!profile.content)return null;
+  const matches=[...profileContentProviderRegistry.values()].filter(provider=>
+    profileContentProviderMatches(provider,profile));
+  if(matches.length>1)throw new Error(`${profile.id}: content description matches multiple adapters: ${matches.map(row=>row.id).join(', ')}`);
+  return matches[0]||null;
+}
+
+function profileUsesContentProvider(profile,providerId){
+  const provider=profileContentProviderFor(profile);
+  return !!provider&&provider.id===providerId;
 }
 
 function generateProfileContentItems(profile,generateDefault){
   const provider=profileContentProviderFor(profile);
-  if(!provider) throw new Error(`${profile.id}: unknown content provider '${profile.content&&profile.content.provider}'`);
+  if(!provider) throw new Error(`${profile.id}: no content adapter supports this profile description`);
   const items=provider.generateItems({profile,language:state.language,generateDefault});
   if(!Array.isArray(items)||!items.length)
     throw new Error(`${profile.id}: content provider '${provider.id}' returned no items`);

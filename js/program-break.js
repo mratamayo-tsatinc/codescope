@@ -8,12 +8,14 @@ registerStatementPlugin({
   },
 
   applyAction(ctx){
-    const {statement,action}=ctx;
+    const {statement,action,program}=ctx;
     if(action.type!=='break-control'||statement.runtime.checked) return {applied:false};
+    const semantic=programSemanticsForContext(ctx).execute(statement,program.memory);
+    const flow=semantic.effects.find(effect=>effect.kind==='flow');
     statement.runtime.checked=true;
-    return {applied:true,completed:true,nextStatementId:statement.nextStatementId||'$end',
+    return {applied:true,completed:true,nextStatementId:flow.nextStatementId,
       event:{type:'BREAK',action:'BREAK',statementId:statement.id,
-        nextStatementId:statement.nextStatementId||'$end',wasCorrect:true}};
+        nextStatementId:flow.nextStatementId,effects:semantic.effects,wasCorrect:true}};
   },
 
   rollbackCompletion(ctx){

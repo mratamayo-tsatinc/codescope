@@ -1,88 +1,41 @@
-# CodeScope — Interactive Programming Activities
+# CodeScope implementation handoff
 
-CodeScope is an extensible shell for interactive programming activities. It
-preserves the original operator-precedence activity while supporting opt-in
-declaration and assignment chains and isolated activity plugins such as token
-classification.
+CodeScope is an extensible shell for interactive programming activities. Read
+[`AGENTS.md`](AGENTS.md) and the contracts under [`docs/`](docs/) before making
+changes. Those documents are the durable project handoff.
 
-## AI implementation handshake
+## Current architecture
 
-Every AI agent must begin with [`AGENTS.md`](AGENTS.md). It links the normative
-foundation, behavior, UI/UX, extension, validation, and current-state contracts
-under `docs/`. These files replace conversation history as the durable project
-handoff and should be kept synchronized with explicitly approved changes.
+- `js/profiles.js` is the single declarative profile catalog. Profiles describe
+  content, lesson focus, interaction, presentation, and scoring. They do not
+  select a parser, semantic engine, or content adapter.
+- `js/language-core.js`, the shared expression and statement services, and
+  `js/program-parser.js` own supported C/Java syntax and meaning.
+- `js/source-program-pipeline.js` owns manifest validation, metadata, seeded
+  source materialization, and the single path from a live exercise file to
+  canonical Program IR.
+- Program Core owns ordered execution and supplies shell semantics to statement
+  interaction adapters.
+- Plugins own activity interaction and presentation. They consume canonical IR,
+  effects, diagnostics, and traces instead of implementing language semantics.
+- Source libraries own authored files. A manifest is the only membership and
+  ordering authority; files are parsed at runtime for each new session.
 
-## What remains unchanged
+Generated legacy expressions remain supported through the
+`legacy-expression` interaction adapter. Declaration, assignment, unary,
+input, output, selection, switch, `break`, return, and loop constructs share
+the same core behavior across compatible activities.
 
-- The 18 current profiles and seeded expression generation
-- Student-controlled substitution and operator selection
-- Precedence checking and canonical playback
-- Practice/exam rules, timer, persistence and score formulas
-- Drawers, connector lines, variable-state display and animations
+## Release validation
 
-Existing generated items are automatically wrapped as one
-`legacy-expression` statement. Their original fields remain authoritative, so
-the compatibility layer does not translate or duplicate active expression
-state.
-
-## Profiles
-
-The original 18 profiles are unchanged and still use one
-`legacy-expression` statement. `declaration-chain` teaches executable
-declarations. Eight additive assignment profiles progress through `=`, `+=`,
-`-=`, `*=`, `/=`, `%=` and dependent mixed chains before unlocking the same
-final-expression evaluator.
-
-Compound assignments use an explicit read–modify–write interaction: the
-student reveals the target's current memory value, resolves the RHS, then
-applies the compound operator. The two values converge into one updated target
-card before the existing expression-to-memory animation writes it back. Plain
-`=` assignments keep the original compact destination-and-RHS behavior.
-
-For a dependent declaration such as `int y = x + 5;`, the student substitutes
-the initialized value of `x`, evaluates the initializer, and clicks `=` to
-commit `y` to program memory. Declaration evaluation and assignment checks are
-included in the same per-item point budget.
-
-## Extensible foundation
-
-- `js/program-ir.js` defines language-neutral statement/expression shapes.
-- `js/program-core.js` owns ordered programs and statement/renderer registries.
-- `js/legacy-expression-plugin.js` adapts the existing activity to the new
-  dispatch contract.
-- `renderProgramItem()` is now the main rendering entry point.
-- Existing saved items without a program envelope are upgraded in memory when
-  restored.
-- `js/declaration-statement-plugin.js` implements declaration semantics.
-- `js/assignment-statement-plugin.js` implements assignment semantics.
-- `js/program-item-builder.js` adapts generated operands into dependency chains.
-- `js/render-declaration.js` and `js/render-assignment.js` are thin adapters
-  over the shared legacy expression timeline.
-
-See `docs/statement-plugin-guide.md` for the extension boundary and planned
-declaration and assignment flow.
-
-## Run
-
-Serve this directory over HTTP. The existing login loader expects
-`data/students.csv` with two columns:
-
-```csv
-email,studentNumber
-student@example.edu,2026-0001
-```
-
-The real student list is intentionally not included.
-
-## Tests
-
-Run:
+Run the complete gate from the repository root:
 
 ```sh
-node tests/run-tests.js
+node tests/release-gate.js
 ```
 
-The suite checks syntax/load ordering, deterministic generation parity against
-the original supplied files, compatibility-envelope behavior, plugin dispatch,
-statement advancement, all assignment operators, immutable-target rejection,
-multi-statement scoring, and preservation of legacy generated output.
+It validates JavaScript syntax, browser asset order, exercise manifests,
+language coverage, architecture boundaries, responsive presentation contracts,
+the compatibility baseline, and the full behavior suite. The approved Phase
+0–10 migration is recorded in `docs/core-architecture-roadmap.md` and
+`docs/core-architecture-phase-10-release.md`.

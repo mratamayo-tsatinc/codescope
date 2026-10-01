@@ -325,6 +325,29 @@ function resolvedPointsPerItem(profile){
 // changes to those files.
 // ----------------------------------------------------------------------------
 const DEFAULT_EXTRAS = { unaryWrap: {enabled:false, operators:[], forms:[], fraction:0} };
+const DEFAULT_CORRECT_SOLUTION_VISIBILITY = Object.freeze({practice:true, exam:false});
+
+function finalizeProfileFeedback(rawFeedback,profileId){
+  if(rawFeedback==null)return null;
+  const feedback=Object.assign({},rawFeedback),setting=rawFeedback.showCorrectSolution;
+  if(setting!==undefined){
+    const validBoolean=typeof setting==='boolean';
+    const validModes=setting&&typeof setting==='object'&&!Array.isArray(setting)
+      &&['practice','exam'].every(mode=>setting[mode]===undefined||typeof setting[mode]==='boolean');
+    if(!validBoolean&&!validModes)
+      throw new Error(`Profile '${profileId||'unknown'}': feedback.showCorrectSolution must be a boolean or a {practice, exam} boolean map`);
+    feedback.showCorrectSolution=validModes?Object.assign({},setting):setting;
+  }
+  return feedback;
+}
+
+function profileShowsCorrectSolution(profile,mode){
+  const setting=profile&&profile.feedback&&profile.feedback.showCorrectSolution;
+  if(typeof setting==='boolean')return setting;
+  if(setting&&typeof setting==='object'&&typeof setting[mode]==='boolean')return setting[mode];
+  return DEFAULT_CORRECT_SOLUTION_VISIBILITY[mode]===true;
+}
+
 function finalizeProfile(raw){
   if(raw.enabled!==undefined&&typeof raw.enabled!=='boolean')
     throw new Error(`Profile '${raw.meta&&raw.meta.id||'unknown'}': enabled must be a boolean`);
@@ -336,6 +359,12 @@ function finalizeProfile(raw){
       meta: Object.assign({},raw.meta),
       scoring: Object.assign({},raw.scoring),
       activity: Object.assign({},raw.activity),
+      content: raw.content ? Object.assign({},raw.content,{
+        source:raw.content.source?Object.assign({},raw.content.source):undefined,
+        values:raw.content.values?Object.assign({},raw.content.values):undefined,
+        selection:raw.content.selection?Object.assign({},raw.content.selection):undefined,
+      }) : null,
+      feedback: finalizeProfileFeedback(raw.feedback,raw.meta&&raw.meta.id),
       enabled: raw.enabled!==false,
     };
     p.id = p.meta.id;
@@ -353,10 +382,15 @@ function finalizeProfile(raw){
       unaryWrap: Object.assign({}, DEFAULT_EXTRAS.unaryWrap, (raw.extras && raw.extras.unaryWrap) || {})
     }),
     scoring: Object.assign({}, raw.scoring),
-    // Program behavior is opt-in. Existing profiles omit this field and are
-    // adapted to the unchanged single-expression activity by state.js.
-    program: raw.program ? Object.assign({}, raw.program) : null,
-    content: raw.content ? Object.assign({},raw.content) : null,
+    lesson: raw.lesson ? Object.assign({},raw.lesson) : null,
+    interaction: raw.interaction ? Object.assign({},raw.interaction) : null,
+    presentation: raw.presentation ? Object.assign({},raw.presentation) : null,
+    feedback: finalizeProfileFeedback(raw.feedback,raw.meta&&raw.meta.id),
+    content: raw.content ? Object.assign({},raw.content,{
+      source:raw.content.source?Object.assign({},raw.content.source):undefined,
+      values:raw.content.values?Object.assign({},raw.content.values):undefined,
+      selection:raw.content.selection?Object.assign({},raw.content.selection):undefined,
+    }) : null,
     manualResponses: raw.manualResponses ? Object.assign({}, raw.manualResponses) : null,
     template: raw.template,
     enabled: raw.enabled!==false,

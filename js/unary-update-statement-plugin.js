@@ -13,23 +13,24 @@ function unaryUpdateDependenciesReady(statement,program){
   return !!(target&&target.initialized&&target.mutable!==false);
 }
 
-function unaryUpdateDelta(statement){
-  return statement.operator==='++'?1:-1;
-}
-
 function unaryUpdateSource(statement){
   return statement.form==='prefix'
     ? `${statement.operator}${statement.target};`
     : `${statement.target}${statement.operator};`;
 }
 
-function syncUnaryUpdateFromMemory(statement,program){
+function syncUnaryUpdateFromMemory(statement,program,semantics){
   const runtime=statement.runtime;
   if(!runtime||runtime.trace.length>0) return;
   const operand=runtime.workingFlat&&runtime.workingFlat.operands[0];
   const target=program.memory[statement.target];
   if(operand&&operand.kind==='unary'&&operand.inner&&target){
     operand.inner.declaredValue=target.value;
+    const evaluation=semantics.execute(statement,program.memory);
+    runtime.expectedBefore=target.value;
+    runtime.expectedAfter=evaluation.value;
+    runtime.semanticTrace=evaluation.trace;
+    runtime.expectedEffects=evaluation.effects;
     runtime.history[0]=deepCloneFlat(runtime.workingFlat);
   }
 }
@@ -65,7 +66,8 @@ registerStatementPlugin({
     if(!runtime||runtime.checked||!unaryUpdateDependenciesReady(statement,program)){
       return {applied:false};
     }
-    syncUnaryUpdateFromMemory(statement,program);
+    const semantics=programSemanticsForContext(ctx);
+    syncUnaryUpdateFromMemory(statement,program,semantics);
     const apply=ctx.services&&ctx.services.applyExpressionAction;
     const applied=typeof apply==='function'&&!!apply(runtime,action);
     if(!applied) return {applied:false};
@@ -74,8 +76,9 @@ registerStatementPlugin({
     const target=program.memory[statement.target];
     const beforeValue=target.value;
     const unaryStep=runtime.trace&&runtime.trace[runtime.trace.length-1];
-    const assignedValue=unaryStep&&Object.prototype.hasOwnProperty.call(unaryStep,'writeValue')
-      ?unaryStep.writeValue:beforeValue+unaryUpdateDelta(statement);
+    if(!unaryStep||!Object.prototype.hasOwnProperty.call(unaryStep,'writeValue'))
+      throw new Error(`Unary interaction did not produce a write for '${statement.target}'`);
+    const assignedValue=unaryStep.writeValue;
     if(unaryStep&&unaryStep.manualResponse) unaryStep.manualResponseCountsAsWrite=true;
     normalizeUnaryUpdateResult(runtime,assignedValue);
     runtime.checked=true;
@@ -85,9 +88,8 @@ registerStatementPlugin({
     runtime.wasCorrectAssignment=assignedValue===runtime.expectedAfter;
     runtime.correctSteps=0;
     runtime.totalOpSteps=0;
-    program.memory[statement.target]=Object.assign({},target,{
-      value:assignedValue,initialized:true,lastStatementId:statement.id
-    });
+    semantics.applyEffects(program.memory,[semantics.writeEffect(statement,beforeValue,assignedValue)],
+      statement.id,'bindings');
     if(Array.isArray(item._bindings)){
       const binding=item._bindings.find(candidate=>candidate.name===statement.target);
       if(binding) binding._flashed=false;

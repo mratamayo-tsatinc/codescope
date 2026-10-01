@@ -46,9 +46,10 @@ ID and asks the plugin to validate them.
 
 | Component | Knows |
 |---|---|
-| Shell | Session, mode, navigation, persistence, drawers, shared modal, total scoring, design tokens. |
+| Shell | Session, mode, navigation, persistence, drawers, shared modal, shared Program Terminal surface, total scoring, design tokens. |
 | Profile | Which capabilities, targets, categories, counts, policies, and checks compose this lesson. |
-| Plugin | Canonical domain vocabulary, semantic actions, validation, generation contracts, checking, and solution trace. |
+| Language core | Supported program syntax, evaluation, effects, diagnostics, and semantic traces. |
+| Plugin | Activity-domain rules plus learner interaction, checking, feedback, and presentation over canonical state. |
 | Renderer | How current semantic state is displayed and which semantic action a user requests. |
 | Generated item | Language snapshot, source data, required targets, canonical analysis, responses, and persisted progress. |
 
@@ -109,25 +110,47 @@ language-neutral output IR as C `printf` or Java
 set or a generated recipe; they do not embed source text, canonical answers, or
 language-specific interaction logic.
 
-Program Input lives in `plugins/program-input/`. It owns the language adapter,
-input runtime, semantic actions, canonical trace, and keyboard/timeline
-renderer. Code Simulator consumes its public source parser and must not
-reimplement `scanf` or `Scanner.nextInt()` behavior. Exercise files define each
+The language core converts emitted text into canonical terminal state through
+`coreTerminalScreen()` in `js/output-statement-core.js`. The shell-owned
+`js/program-terminal.js` renders that state, positions the insertion cursor,
+plays input/output events, and applies newline, carriage return, and backspace.
+Output plugins may render statement controls and timelines and emit `OUTPUT`
+events; they must not implement a private terminal buffer, cursor, or
+control-character interpreter. This keeps direct, modal, Code Simulator,
+Program Output, Program Input, and future compatible activities on the same
+terminal behavior.
+
+Simulate Output lives in `plugins/simulate-output/` and owns prediction input,
+answer comparison, feedback, and response presentation. It loads a registered
+exercise library through `activity.generator.library` and
+`activity.generator.exerciseSet`. Its source files must not embed
+`@output` or `@variables` answer blocks. The shared source pipeline parses
+each manifest-listed program and generates expected terminal output and final
+initialized mutable memory from language-core effects. Any core diagnostic must
+reject the exercise; the plugin must not add fallback parsing or accept a
+partial generated answer.
+
+Program Input lives in `plugins/program-input/`. It hydrates the interaction
+runtime from canonical Input IR and owns the keyboard/timeline presentation.
+The language core parses and executes `scanf` and `Scanner.nextInt()`; Code
+Simulator consumes that same IR and must not reimplement input grammar or
+semantics. Exercise files define each
 input with `@input target=<name> value=<integer> min=<integer> max=<integer>`;
 profiles choose authored or seeded materialization with
-`content.inputValueMode`.
+`content.values.input`.
 
 Code Simulator source files own exercise-specific value seeding. Their leading
 `@codescope` block may explicitly allowlist literal integer declarations with
 `@seed <name> min=<integer> max=<integer>`. The profile only selects authored or
-seeded rendering through `content.sourceValueMode`; it must not redefine the
+seeded rendering through `content.values.variables`; it must not redefine the
 per-binding ranges. Unlisted bindings remain authored. The content provider
 must reject malformed ranges, duplicate or unknown names, and annotated
 nonliteral initializers before an item enters a session.
 
 Code Simulator lives in `plugins/code-simulator/`. It owns complete-source
-loading and control-flow parsing, while statement behavior stays in registered
-Program Core plugins. The provider must accept any manifest-listed program that
+interaction and presentation. The shell source pipeline owns loading,
+materialization, and control-flow parsing, while adapters consume Program Core
+semantics. The content adapter must accept any manifest-listed program that
 contains at least one supported executable statement; it must not require a
 declaration, selection, output, or return statement merely because an exercise
 set previously focused on that lesson. It currently recognizes declarations,
@@ -138,15 +161,14 @@ delegates to the shared expression runtime, and output delegates to Program
 Output.
 
 A complete-source profile may select an approved exercise library through
-`content.library`. Library owners register their logical ID, physical root, and
+`content.source.library`. Library owners register their logical ID, physical root, and
 supported languages with the shared exercise-library registry. The canonical
 `source-programs` library resolves beneath
 `exercise-libraries/source-programs/` and contains the formatted-output,
 selection-basics, and output-basics sets. It is independent of the plugins that
 parse or present it. Providers must reject unknown library names and must not
-copy exercise files into a plugin directory. The former `program-output` and
-`code-simulator` IDs and `content.sourceLibrary` field are temporary
-compatibility aliases and must not be used by new profiles.
+copy exercise files into a plugin directory. Profiles use the canonical
+`source-programs` ID.
 
 The provider must derive supported statement order and control-flow edges from
 the current fetched source. This includes sequential successors, branch entry
@@ -156,7 +178,7 @@ jump table in plugin JavaScript. `selection.count:'all'` pairs with
 `scoring.itemCount:'manifest'` when a manifest owns the complete activity.
 
 Complete-source profiles may set
-`program.timelinePresentation:'statement-modal'`. This is a shell presentation
+`presentation.timeline:'statement-modal'`. This is a shell presentation
 choice: Program Core keeps the authored source stable and mounts the current
 registered statement renderer inside the shared trace modal. Statement plugins
 must not add modal-specific semantic paths or duplicate their renderer. The
@@ -194,9 +216,9 @@ For source exercise banks, the manifest is the complete membership and order
 authority. Do not restore generated catalogs or copied `raw` source attributes.
 Files absent from a manifest remain inactive.
 
-Do not add I/O, selection, or loop semantics to an existing statement plugin.
-Add a separate semantic registration and renderer. Do not refactor current
-statement-plugin locations without a separately approved migration plan.
+Add new program syntax and meaning to the appropriate shell language-core
+service, then add or extend interaction and rendering separately. Never place
+a second parser or evaluator in a presentation plugin.
 
 ## Public dependencies
 
@@ -215,4 +237,4 @@ maintain a competing identifier validator.
 6. Register dependencies and lifecycle functions.
 7. Add canonical-trace, persistence, Practice, Exam, and accessibility tests.
 8. Add script/style tags in dependency order.
-9. Run the complete suite and the manual checklist.
+9. Run `node tests/release-gate.js` and the applicable manual checklist.

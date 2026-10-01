@@ -1,6 +1,6 @@
 # Implementation Handoff
 
-Last consolidated: 2026-09-28
+Last consolidated: 2026-09-30
 
 ## Current baseline
 
@@ -9,13 +9,43 @@ Last consolidated: 2026-09-28
   CodeScope replacement.
 - Runtime: static vanilla HTML/CSS/classic JavaScript.
 - Profile count: 41, all in `js/profiles.js`.
-- Activity plugins: `token-classification` 1.1.0 and `falling-token-sort` 1.7.0.
-- Statement plugins: legacy expression, declaration, assignment, unary update,
-  Program Output, and Program Input.
+- Activity plugins include Token Classification, Falling Token Sort, and
+  Simulate Output. Program Output, Program Input, and Code Simulator provide
+  source-program interaction and presentation capabilities.
+- The shell language core owns expression and statement meaning. Statement
+  adapters cover legacy expression, declaration, assignment, unary update,
+  input, output, selection, `break`, return, and loop control.
 - Persistence: browser localStorage; no backend database.
-- Full test command: `node tests/run-tests.js`.
+- Full release command: `node tests/release-gate.js`.
+
+### Core architecture migration
+
+- Phases 0–10 are complete. The canonical plan and gates are in
+  `docs/core-architecture-roadmap.md`.
+- Profiles declare `content`, `lesson`, `interaction`, `presentation`, and
+  `scoring`; they do not name providers, parsers, or semantic engines.
+- `js/source-program-pipeline.js` parses live, manifest-listed exercise files
+  through one shared C/Java program parser.
+- Plugins consume canonical Program IR and shell-produced effects and traces.
+  They own learner interaction and presentation, not duplicate language logic.
+- `tests/release-gate.js` guards script order, manifests, C/Java coverage,
+  removed compatibility paths, responsive contracts, and all regressions.
 
 ## Recently completed foundations
+
+### Simulate Output shared content and answers
+
+- Moved the `it3-midterm-a` bank from the Simulate Output plugin into
+  `exercise-libraries/source-programs/c/it3-midterm-a/`.
+- The profile selects the registered `source-programs` library and its
+  manifest-owned exercise set. Changing activity content remains a two-step
+  source-file plus `manifest.json` workflow.
+- Removed embedded `@output` and `@variables` blocks. The shared source
+  pipeline now derives expected terminal output and final initialized mutable
+  memory from canonical Program IR and effects.
+- Simulate Output still owns answer entry, comparison, feedback, and response
+  presentation. A core diagnostic rejects an exercise instead of allowing an
+  incomplete generated key.
 
 ### Program Input
 
@@ -49,7 +79,7 @@ Last consolidated: 2026-09-28
 - C and Java source banks live under
   `exercise-libraries/source-programs/<language>/<exerciseSet>/`; each
   `manifest.json` alone controls membership and order.
-- Runtime parsing supports the current beginner declaration, expression,
+- Shared core parsing supports the current declaration, expression,
   assignment, unary update, `printf`, and `System.out.print/println` subset,
   including multiple identifiers in one output statement.
 - Source-backed items store serializable Program IR. The dedicated Source
@@ -63,26 +93,28 @@ Last consolidated: 2026-09-28
 
 ### Code Simulator
 
-- `plugins/code-simulator/` owns the complete-source provider. The existing
+- `plugins/code-simulator/` owns the complete-source interaction adapter. The existing
   `selection-statements-source` ID is retained for saved progress, while its
-  user-facing name and provider are Code Simulator.
-- `program-output-source-flow` now also uses the Code Simulator provider and
+  user-facing name remains Code Simulator.
+- `program-output-source-flow` now also uses Code Simulator presentation and
   statement-modal presentation. Its `library:'source-programs'` setting uses
   the independent formatted-output C/Java manifests and source files as the
   single authored bank. The shared exercise-library registry resolves that ID;
-  Program Output continues to own output semantics.
+  Program Output continues to own output interaction and presentation; the
+  language core owns output semantics.
 - Source-backed Program Output and Code Simulator profiles use
   `selection.count:'all'` with `scoring.itemCount:'manifest'`. The manifest now
   owns membership, item total, order, and category maximum score.
 - Code Simulator sources allowlist seedable literal declarations with embedded
   `@seed name min=… max=…` metadata. The profile uses
-  `sourceValueMode:'seeded'`; switching it to `'authored'` preserves every
+  `content.values.variables:'seeded'`; switching it to `'authored'` preserves every
   source initializer. Unlisted bindings remain fixed and derived expressions
   recalculate from the materialized declarations.
-- The simulator accepts any listed source containing at least one supported
+- The shared source pipeline accepts any listed source containing at least one supported
   executable statement. It does not require declarations or a selection. It
-  currently parses declarations, assignments, unary updates, output, selection,
-  and C return statements; unsupported lines remain muted source context.
+  recognizes declarations, assignments, unary updates, input, output,
+  selections, switch `break`, C return, and loop control; unsupported lines
+  remain muted source context.
 - The simulator derives sequential successors, branch targets, clause
   exits, and post-decision statements from each current fetched file. Adding a
   supported decision or statement requires only the source edit and manifest
@@ -99,7 +131,7 @@ Last consolidated: 2026-09-28
 - Random selection-program generation is deferred. Authored switch programs
   support explicit `break;` and realistic fall-through when it is omitted.
 - The Code Simulator profile opts into
-  `program.timelinePresentation:'statement-modal'`. Its complete source remains
+  `presentation.timeline:'statement-modal'`. Its complete source remains
   stable in one filename-labelled, syntax-highlighted file panel with a
   continuous line-number gutter. Each statement plugin supplies the active
   row's interaction plan: a one-step declaration or literal output executes in
@@ -179,7 +211,8 @@ Last consolidated: 2026-09-28
   pass-through instead, making unsorted tokens exit below the lane and restart
   from new horizontal positions. A token released outside a bucket continues
   falling from its release point, including after a rejected Practice drop.
-- Current statement plugins are not yet moved into plugin directories.
+- Statement adapters remain split between shared `js/` files and presentation
+  plugin directories; their location does not change semantic ownership.
 - C and Java identifier analysis intentionally follows the app's documented
   supported character patterns; advanced Unicode and implementation-reserved
   edge cases are outside the beginner profiles.
@@ -213,7 +246,7 @@ Last consolidated: 2026-09-28
 ## Recommended first action for the next agent
 
 1. Read root `AGENTS.md` and every linked contract.
-2. Run `node tests/run-tests.js` before editing.
+2. Run `node tests/release-gate.js` before editing.
 3. Inspect the task's relevant plugin/profile and confirm current behavior.
 4. State which contract sections the task affects.
 5. Implement with regression coverage and run the full suite again.

@@ -1,16 +1,63 @@
 // ============================================================================
 // PROGRAM CORE — statement-agnostic orchestration
 // ----------------------------------------------------------------------------
-// An activity item is now allowed to represent a whole program. The core only
-// knows that a program has ordered statements; statement meaning is supplied
-// by registered plugins. Existing profiles are wrapped as one
-// `legacy-expression` statement so their behavior and persisted item fields
-// remain unchanged.
+// An activity item may represent a whole program. Program Core owns ordering,
+// dispatch, and access to shell language semantics. Registered adapters own
+// learner interaction and presentation for each statement kind. Existing
+// profiles are wrapped as one `legacy-expression` statement so their behavior
+// and persisted item fields remain unchanged.
 // ============================================================================
 
 const PROGRAM_SCHEMA_VERSION = 1;
 const statementPluginRegistry = new Map();
 const statementRendererRegistry = new Map();
+
+// Statement adapters control learner interaction and presentation. They
+// receive language meaning exclusively through this shell-owned service.
+// Keeping this boundary explicit prevents a presentation plugin from growing
+// its own evaluator or control-flow implementation.
+function programSemanticServices(program){
+  const activeProgram=program||{language:'c',memory:{}};
+  const unavailable=name=>{throw new Error(`Program semantic service '${name}' is unavailable`);};
+  return Object.freeze({
+    execute(statement,memory,options){
+      if(typeof coreExecuteStatement!=='function') return unavailable('executeStatement');
+      options=options||{};
+      return coreExecuteStatement({language:options.language||activeProgram.language||'c',statement,
+        memory:memory||activeProgram.memory||{},phase:options.phase});
+    },
+    evaluateAndApply(statement,memory,options){
+      if(typeof evaluateAndApplyCoreStatement!=='function') return unavailable('evaluateAndApplyStatement');
+      options=options||{};
+      return evaluateAndApplyCoreStatement(statement,memory||activeProgram.memory||{},
+        options.language||activeProgram.language||'c',options.statementId||statement.id,options.mode);
+    },
+    applyEffects(memory,effects,statementId,mode){
+      if(typeof applyCoreStatementEffects!=='function') return unavailable('applyStatementEffects');
+      return applyCoreStatementEffects(memory||activeProgram.memory||{},effects,statementId,mode);
+    },
+    selectBranch(statement,value){
+      if(typeof coreSelectBranch!=='function') return unavailable('selectBranch');
+      return coreSelectBranch(statement,value);
+    },
+    assignmentValue(operator,currentValue,rhsValue){
+      if(typeof coreApplyAssignmentOperator!=='function') return unavailable('assignmentOperator');
+      return coreApplyAssignmentOperator(operator,currentValue,rhsValue);
+    },
+    declarationEffect(statement,value,initialized){
+      if(typeof coreDeclarationEffect!=='function') return unavailable('declarationEffect');
+      return coreDeclarationEffect(statement,value,initialized);
+    },
+    writeEffect(statement,previousValue,nextValue){
+      if(typeof coreWriteEffect!=='function') return unavailable('writeEffect');
+      return coreWriteEffect(statement,previousValue,nextValue);
+    }
+  });
+}
+
+function programSemanticsForContext(ctx){
+  return ctx&&ctx.semantics||programSemanticServices(ctx&&ctx.program);
+}
 
 function assertStatementKind(kind){
   if(typeof kind !== 'string' || !kind.trim()) throw new Error('A statement plugin requires a non-empty kind');
@@ -143,7 +190,8 @@ function dispatchProgramAction(item, action, services){
   }
   const plugin = statementPluginFor(statement);
   if(!plugin || typeof plugin.applyAction !== 'function') return {applied:false, reason:'unsupported-statement'};
-  const result = plugin.applyAction({program, statement, item, action, services:services||{}}) || {applied:false};
+  const result = plugin.applyAction({program, statement, item, action, services:services||{},
+    semantics:programSemanticServices(program)}) || {applied:false};
   if(result.applied){
     program.statements.forEach(candidate=>{
       if(candidate!==statement) candidate._uiJustCompleted=false;
@@ -163,7 +211,8 @@ function classifyRejectedProgramAction(item,action){
   const statement=currentProgramStatement(item);
   const plugin=statementPluginFor(statement);
   if(!plugin||typeof plugin.classifyRejectedAction!=='function') return null;
-  return plugin.classifyRejectedAction({program,statement,item,action})||null;
+  return plugin.classifyRejectedAction({program,statement,item,action,
+    semantics:programSemanticServices(program)})||null;
 }
 
 function checkProgramItem(item, services){
@@ -171,7 +220,8 @@ function checkProgramItem(item, services){
   const statement = currentProgramStatement(item);
   const plugin = statementPluginFor(statement);
   if(!plugin || typeof plugin.check !== 'function') return {applied:false, reason:'unsupported-statement'};
-  const result = plugin.check({program, statement, item, services:services||{}}) || {applied:false};
+  const result = plugin.check({program, statement, item, services:services||{},
+    semantics:programSemanticServices(program)}) || {applied:false};
   if(result.event) program.events.push(result.event);
   if(Array.isArray(result.events)) program.events.push(...result.events);
   if(result.completed) advanceProgram(program);
@@ -191,7 +241,8 @@ function undoProgramAction(item, services){
   const statement = currentProgramStatement(item);
   const plugin = statementPluginFor(statement);
   if(plugin && typeof plugin.undo === 'function'){
-    const local = plugin.undo({program, statement, item, services:services||{}}) || {applied:false};
+    const local = plugin.undo({program, statement, item, services:services||{},
+      semantics:programSemanticServices(program)}) || {applied:false};
     if(local.applied) return local;
   }
   if(!program) return {applied:false};
@@ -204,7 +255,8 @@ function undoProgramAction(item, services){
   const previous = program.statements[previousIndex];
   const previousPlugin = statementPluginFor(previous);
   if(!previousPlugin || typeof previousPlugin.rollbackCompletion !== 'function') return {applied:false};
-  const result = previousPlugin.rollbackCompletion({program, statement:previous, item, services:services||{}}) || {applied:false};
+  const result = previousPlugin.rollbackCompletion({program, statement:previous, item, services:services||{},
+    semantics:programSemanticServices(program)}) || {applied:false};
   if(!result.applied) return result;
   if(previousId!=null) program.executionHistory.pop();
   if(current) current.status = 'locked';
@@ -221,7 +273,8 @@ function resetProgramAction(item, services){
   program.statements.forEach((statement, index)=>{
     const plugin = statementPluginFor(statement);
     if(plugin && typeof plugin.reset === 'function'){
-      const result = plugin.reset({program, statement, item, services:services||{}}) || {applied:false};
+      const result = plugin.reset({program, statement, item, services:services||{},
+        semantics:programSemanticServices(program)}) || {applied:false};
       changed = changed || !!result.applied;
     }
     statement.status = index===0 ? 'active' : 'locked';

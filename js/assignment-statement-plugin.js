@@ -40,16 +40,21 @@ function assignmentDependenciesReady(statement,program){
   });
 }
 
-function syncAssignmentOperandsFromMemory(statement,program){
+function syncAssignmentOperandsFromMemory(statement,program,semantics){
   const runtime = statement.runtime;
   if(!runtime || runtime.trace.length>0) return;
   if(runtime.originalTree&&typeof applyProgramMemoryToTree==='function'){
     applyProgramMemoryToTree(runtime.originalTree,program.memory);
-    runtime.expectedRhs=evalTree(runtime.originalTree);
+    const evaluation=semantics.execute(statement,program.memory);
+    const assignStep=[...evaluation.trace].reverse().find(step=>step.action==='ASSIGN');
+    runtime.expectedRhs=assignStep?assignStep.rhsValue:evaluation.value;
+    runtime.expectedAfter=evaluation.value;
+    runtime.expectedEffects=evaluation.effects.filter(effect=>effect.scope==='expression');
+    runtime.semanticTrace=evaluation.trace;
     const target=program.memory[statement.target];
     if(target&&(target.initialized||!isCompoundAssignment(statement))){
       runtime.expectedBefore=target.value;
-      runtime.expectedAfter=applyAssignmentOperator(statement.operator,target.value,runtime.expectedRhs);
+      runtime.expectedAfter=semantics.assignmentValue(statement.operator,target.value,runtime.expectedRhs);
     }
     runtime.canonicalTrace=buildCanonicalTrace(runtime.originalTree);
   }
@@ -64,8 +69,9 @@ function syncAssignmentOperandsFromMemory(statement,program){
 }
 
 function applyAssignmentOperator(operator,currentValue,rhsValue){
-  if(operator==='=') return rhsValue;
-  return evalOp(operator.slice(0,-1),currentValue,rhsValue);
+  if(typeof coreApplyAssignmentOperator!=='function')
+    throw new Error('Core assignment semantics are unavailable');
+  return coreApplyAssignmentOperator(operator,currentValue,rhsValue);
 }
 
 registerStatementPlugin({
@@ -93,7 +99,8 @@ registerStatementPlugin({
     const {statement,program,action,item} = ctx;
     const runtime = statement.runtime;
     if(!runtime || runtime.checked || !assignmentDependenciesReady(statement,program)) return {applied:false};
-    syncAssignmentOperandsFromMemory(statement,program);
+    const semantics=programSemanticsForContext(ctx);
+    syncAssignmentOperandsFromMemory(statement,program,semantics);
 
     if(action.type==='reveal-assignment-target'){
       if(!isCompoundAssignment(statement) || runtime.targetRevealed) return {applied:false};
@@ -119,7 +126,7 @@ registerStatementPlugin({
       const target = program.memory[statement.target];
       const beforeValue = isCompoundAssignment(statement) ? runtime.targetReadValue : target.value;
       const rhsValue = flatOperandValue(runtime.workingFlat.operands[0]);
-      const computedValue = applyAssignmentOperator(statement.operator,beforeValue,rhsValue);
+      const computedValue = semantics.assignmentValue(statement.operator,beforeValue,rhsValue);
       const assignedValue = action.manualResponse ? action.manualResponse.value : computedValue;
       const evalSteps = runtime.trace.filter(step=>step.action==='EVALUATE');
       runtime.checked = true;
@@ -134,11 +141,15 @@ registerStatementPlugin({
       runtime.correctSteps = evalSteps.filter(step=>step.wasCorrect).length;
       runtime.totalOpSteps = evalSteps.length;
       runtime.wasCorrectAssignment = assignedValue===runtime.expectedAfter;
-      program.memory[statement.target] = Object.assign({},target,{
-        value:assignedValue,
-        initialized:true,
-        lastStatementId:statement.id
-      });
+      const effects=typeof coreExpressionWriteEffectsFromTrace==='function'
+        ?coreExpressionWriteEffectsFromTrace(runtime.trace,runtime.expectedEffects):[];
+      const affectedTargets=[statement.target,...effects.map(effect=>effect.target)];
+      runtime.beforeEffectMemory=typeof captureCoreMemoryTargets==='function'
+        ?captureCoreMemoryTargets(program.memory,affectedTargets):null;
+      runtime.expressionEffects=effects;
+      if(typeof applyCoreExpressionEffects==='function') applyCoreExpressionEffects(program.memory,effects,statement.id);
+      semantics.applyEffects(program.memory,[semantics.writeEffect(statement,target.value,assignedValue)],
+        statement.id,'bindings');
       if(Array.isArray(item._bindings)){
         const binding = item._bindings.find(b=>b.name===statement.target);
         if(binding) binding._flashed = false;
@@ -147,6 +158,7 @@ registerStatementPlugin({
         type:'ASSIGN',action:'ASSIGN',statementId:statement.id,
         target:statement.target,operator:statement.operator,
         beforeValue,rhsValue,value:assignedValue,
+        effects,
         expectedValue:runtime.expectedAfter,
         wasCorrect:runtime.wasCorrectAssignment
       }};
@@ -211,7 +223,9 @@ registerStatementPlugin({
   rollbackCompletion(ctx){
     const runtime = ctx.statement.runtime;
     if(!runtime || !runtime.checked) return {applied:false};
-    if(runtime.beforeMemory) ctx.program.memory[ctx.statement.target]=Object.assign({},runtime.beforeMemory);
+    if(typeof restoreCoreMemoryTargets==='function'&&runtime.beforeEffectMemory)
+      restoreCoreMemoryTargets(ctx.program.memory,runtime.beforeEffectMemory);
+    else if(runtime.beforeMemory) ctx.program.memory[ctx.statement.target]=Object.assign({},runtime.beforeMemory);
     runtime.checked=false;
     runtime.beforeMemory=null;
     runtime.rhsValue=null;
@@ -221,6 +235,8 @@ registerStatementPlugin({
     runtime.wasCorrectAssignment=null;
     runtime.correctSteps=0;
     runtime.totalOpSteps=0;
+    runtime.beforeEffectMemory=null;
+    runtime.expressionEffects=[];
     if(Array.isArray(ctx.item._bindings)){
       const binding=ctx.item._bindings.find(b=>b.name===ctx.statement.target);
       if(binding) binding._flashed=true;
@@ -252,6 +268,8 @@ registerStatementPlugin({
     runtime.wasCorrectAssignment=null;
     runtime.correctSteps=0;
     runtime.totalOpSteps=0;
+    runtime.beforeEffectMemory=null;
+    runtime.expressionEffects=[];
     return {applied:changed};
   },
 

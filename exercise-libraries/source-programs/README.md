@@ -17,9 +17,17 @@ Changing an exercise set requires two deliberate steps:
 2. Add, remove, or reorder its filename in that directory's `manifest.json`.
 
 Only manifest-listed files are loaded. Source files absent from the manifest
-remain inactive. The active CodeScope language chooses the language directory,
-and a profile's `content.exerciseSet` chooses the exercise-set directory.
+remain inactive. The active CodeScope language chooses the language directory.
+Complete-source profiles select the set through
+`content.source.exerciseSet`; activity profiles such as Simulate Output use
+`activity.generator.exerciseSet`. Both select this library with the
+`source-programs` ID registered by `library.js`.
 
-`library.js` registers the canonical `source-programs` ID. The former
-`program-output` and `code-simulator` library IDs are compatibility aliases for
-saved configuration; new profiles should use `source-programs`.
+Simulate Output source files are ordinary programs. They must not contain
+`@output` or `@variables` answer blocks. The shared source pipeline parses
+the current file and generates expected terminal output and final initialized
+mutable memory from language-core effects. A core diagnostic rejects the
+exercise so unsupported source cannot silently produce a partial answer key.
+
+The current `it3-midterm-a` bank is C-only. A Java profile needs a matching
+`java/<exercise-set>/manifest.json` and Java source files.

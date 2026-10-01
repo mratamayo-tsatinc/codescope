@@ -67,6 +67,13 @@ unless the user explicitly approves a change.
 - Persisted Exam attempts restore the saved item and Program IR snapshot. Live
   file edits apply to newly generated sessions, never midway through a saved
   attempt.
+- Simulate Output loads its manifest and ordinary source files from the
+  registered shared exercise library. Exercise files do not contain trusted
+  expected-output or final-memory metadata.
+- Simulate Output expected terminal output and final initialized mutable memory
+  are generated from canonical language-core effects. Constants are excluded
+  from the mutable-memory answer. Any parse or semantic diagnostic rejects the
+  exercise rather than producing a partial answer key.
 
 ## Scoring principles
 
@@ -122,6 +129,11 @@ unless the user explicitly approves a change.
   events to the program output buffer. Character playback is presentation and
   does not create additional scoring checks.
 - A displayed `\\n` escape cue becomes one real newline in Program Output.
+- Program Terminal derives text and insertion-point position from one canonical
+  terminal state. `\\r` moves the visible cursor to column zero of the current
+  row immediately, so later output overwrites that row from its beginning;
+  `\\b` moves the cursor back one column. Direct and modal output use the same
+  behavior in every compatible activity.
 - A Program Output source-file profile uses the active language folder and its
   configured exercise-set manifest. Only manifest-listed files become items,
   in manifest order unless seeded shuffle is enabled.
@@ -173,7 +185,7 @@ unless the user explicitly approves a change.
   leading `@codescope` metadata. Unlisted variables and constants retain their
   authored initializers, while derived declarations retain their expressions
   and recalculate from seeded dependencies.
-- The profile selects `sourceValueMode:'authored'` or `'seeded'`. Seeded mode
+- The profile selects `content.values.variables:'authored'` or `'seeded'`. Seeded mode
   updates the displayed source, Program IR, memory, conditions, and canonical
   results together. Persisted items retain the materialized source and values.
 - `if`, `if/else`, and `else if` conditions reuse the established expression
@@ -199,7 +211,7 @@ unless the user explicitly approves a change.
   `break;` or the end of the switch. A switch without a matching case or
   `default` continues after the switch.
 - A complete-source profile may opt into
-  `program.timelinePresentation:'statement-modal'`. The authored source then
+  `presentation.timeline:'statement-modal'`. The authored source then
   remains one stable file view with its exercise filename, language, continuous
   line-number gutter, preserved whitespace, and source syntax highlighting.
   Only the current executable line is interactive, and evaluation rows are not
@@ -229,7 +241,7 @@ unless the user explicitly approves a change.
   or keyboard scrolling during a highlight transition transfers scroll control
   to the learner: the transition still completes, but its final render and focus
   preserve the learner's viewport instead of snapping to the active line.
-- Profiles that omit `timelinePresentation` retain the established inline
+- Profiles that omit `presentation.timeline` retain the established inline
   timeline.
 
 ## Token Classification

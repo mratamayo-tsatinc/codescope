@@ -28,8 +28,11 @@ screenshots or one renderer in isolation when a shared contract already exists.
 
 - `js/profiles.js` is the only profile catalog.
 - `js/state.js` owns shell defaults and session policy.
-- `plugins/<plugin-id>/` owns an activity plugin's behavior and presentation.
-- `tests/run-tests.js` is the compatibility gate.
+- `js/language-core.js` and its registered services own program-language syntax
+  and semantics.
+- `plugins/<plugin-id>/` owns an activity plugin's domain interaction and presentation.
+- `tests/release-gate.js` is the complete release gate;
+  `tests/run-tests.js` is its focused behavior suite.
 - The contract documents above are normative product requirements. If current
   code and a contract disagree, report the conflict and determine whether it is
   a defect or an intentionally superseded decision. Never silently rewrite a
@@ -38,16 +41,18 @@ screenshots or one renderer in isolation when a shared contract already exists.
 ## Non-negotiable architecture
 
 - CodeScope is an activity-agnostic shell, not an expression-only application.
-- Profiles describe activities; plugins provide canonical domain behavior.
+- Profiles describe activities. The language core provides canonical program
+  behavior; plugins provide activity-domain behavior and presentation.
 - Profiles never live inside plugin directories.
 - Plugin-specific JavaScript, CSS, language catalogs, generators, renderers,
   feedback, and assets stay inside that plugin's directory.
 - The shell may expose reusable services but must not hardcode a plugin's
   categories, targets, lesson purpose, or answers.
-- Canonical answers come from domain analyzers, not profile-authored answer
-  strings or renderer assumptions.
-- Existing statement plugins in `js/` remain in place until a separately
-  approved refactor. Do not opportunistically move them.
+- Canonical answers come from language-core semantics or activity-domain
+  analyzers, not profile-authored answer strings or renderer assumptions.
+- Statement adapters may remain in `js/` or presentation plugin directories,
+  but they must consume Program Core semantics and must not add fallback
+  language parsers or evaluators.
 - Preserve classic-script ordering in `index.html`; there is no module bundler.
 
 ## Non-negotiable behavior
@@ -61,7 +66,7 @@ screenshots or one renderer in isolation when a shared contract already exists.
 - Feedback auto-opens after Check when policy permits release.
 - Scoring uses semantic checks/actions, not DOM state or animation completion.
 - A valid but incorrect student-derived value propagates and is scored once.
-- Execute `node tests/run-tests.js` after every implementation.
+- Execute `node tests/release-gate.js` after every implementation.
 
 ## UI obligations
 
@@ -79,9 +84,8 @@ screenshots or one renderer in isolation when a shared contract already exists.
 2. State the affected contract and files.
 3. Make the smallest coherent change.
 4. Add or update regression coverage.
-5. Run the complete compatibility suite.
+5. Run the complete release gate.
 6. Report touched files, tests, and any remaining limitation.
 
 When working in a user-selected local folder, edit that folder directly. Do not
 create ZIP handoffs unless the user explicitly requests one.
-

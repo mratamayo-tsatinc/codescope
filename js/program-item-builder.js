@@ -56,13 +56,19 @@ function namedValueTree(declaration,memory){
 
 function buildAssignmentStatementRuntime(target,operator,rhsTree,memory,index){
   const expectedBefore=memory[target];
-  const expectedRhs=evalTree(rhsTree);
-  const expectedAfter=applyAssignmentOperator(operator,expectedBefore,expectedRhs);
-  const statement=assignmentStatement({id:`assignment-${index+1}`,target,operator,value:engineNodeToProgramIr(rhsTree)});
+  const rhsIr=engineNodeToProgramIr(rhsTree);
+  const statement=assignmentStatement({id:`assignment-${index+1}`,target,operator,value:rhsIr});
+  const semantic=evaluateAndApplyCoreStatement(statement,memory,'c',statement.id,'raw');
+  const assignStep=[...semantic.trace].reverse().find(step=>step.action==='ASSIGN');
+  if(!assignStep) throw new Error(`Assignment semantics did not produce '${target}'`);
+  const expectedRhs=assignStep.rhsValue;
+  const expectedAfter=semantic.value;
   statement.runtime=buildDeclarationRuntime(rhsTree,expectedRhs);
   statement.runtime.expectedBefore=expectedBefore;
   statement.runtime.expectedRhs=expectedRhs;
   statement.runtime.expectedAfter=expectedAfter;
+  statement.runtime.expectedEffects=semantic.effects.filter(effect=>effect.scope==='expression');
+  statement.runtime.semanticTrace=semantic.trace;
   statement.runtime.beforeValue=null;
   statement.runtime.rhsValue=null;
   statement.runtime.targetRevealed=false;
@@ -71,7 +77,6 @@ function buildAssignmentStatementRuntime(target,operator,rhsTree,memory,index){
   statement.runtime.assignmentResultNodeId=null;
   statement.runtime.assignmentMergePending=false;
   statement.dependencies=[...collectExpressionDependencies(statement.value)];
-  memory[target]=expectedAfter;
   return statement;
 }
 
@@ -113,17 +118,20 @@ function buildAssignmentLessonStatements(item,lesson,memory){
 
 function buildUnaryUpdateStatementRuntime(target,operator,form,memory,index){
   const expectedBefore=memory[target];
-  const expectedAfter=expectedBefore+(operator==='++'?1:-1);
   const tree=makeUnary(operator,form,makeNamed('variable',target,expectedBefore));
   const statement=unaryUpdateStatement({
     id:`unary-update-${index+1}`,target,operator,form
   });
+  const semantic=evaluateAndApplyCoreStatement(statement,memory,'c',statement.id,'raw');
+  const expectedAfter=semantic.value;
   statement.runtime=buildDeclarationRuntime(tree,expectedAfter);
   statement.runtime.expectedBefore=expectedBefore;
   statement.runtime.expectedAfter=expectedAfter;
   statement.runtime.beforeMemory=null;
   statement.runtime.beforeValue=null;
   statement.runtime.assignedValue=null;
+  statement.runtime.expectedEffects=semantic.effects;
+  statement.runtime.semanticTrace=semantic.trace;
 
   // The generic unary engine correctly models postfix expression values as
   // the original value. In a standalone statement that value is discarded;
@@ -138,7 +146,6 @@ function buildUnaryUpdateStatementRuntime(target,operator,form,memory,index){
     finalStep.expressionAfter=renderString(finalTree);
   }
   statement.dependencies=[target];
-  memory[target]=expectedAfter;
   return statement;
 }
 
@@ -200,11 +207,14 @@ function buildOutputStatementRuntime(spec,index,memory){
     parts:spec.parts
   });
   statement.runtime={
-    parts:statement.parts.map(part=>({
-      stagedValue:null,
-      resolvedValue:null,
-      expectedValue:part.kind==='expression'?memory[part.expression.name]:null
-    })),
+    parts:statement.parts.map(part=>{
+      if(part.kind!=='expression')return {stagedValue:null,resolvedValue:null,
+        expectedValue:null,initialStagedValue:null};
+      const evaluated=coreEvaluateExpression({language:'c',expression:part.expression,memory});
+      const initialStagedValue=part.expression.kind==='identifier'?null:evaluated.value;
+      return {stagedValue:initialStagedValue,resolvedValue:null,
+        expectedValue:evaluated.value,initialStagedValue};
+    }),
     trace:[],checked:false,assignedValue:null,wasCorrectAssignment:null,
     correctSteps:0,totalOpSteps:0
   };
@@ -258,20 +268,21 @@ function rebuildFinalExpressionForMemory(item,memory){
 }
 
 function buildGeneratedProgram(item, profile){
-  const cfg = profile && profile.program;
-  if(!cfg || cfg.declarations !== 'interactive'){
+  const lesson=profile&&profile.lesson||{},interaction=profile&&profile.interaction||{};
+  const lessonFocus=lesson.focus||null,lessonVariant=lesson.variant||null;
+  if(interaction.declarations !== 'interactive'){
     ensureProgramEnvelope(item);
     return item.program;
   }
 
-  const isAssignmentLesson=!!cfg.assignmentLesson;
-  const isUnaryUpdateLesson=!!cfg.unaryUpdateLesson;
-  const isMixedUpdateLesson=!!cfg.mixedUpdateLesson;
-  const isOutputLesson=!!cfg.outputLesson;
+  const isAssignmentLesson=lessonFocus==='assignment';
+  const isUnaryUpdateLesson=lessonFocus==='unary-update';
+  const isMixedUpdateLesson=lessonFocus==='assignment-unary';
+  const isOutputLesson=lessonFocus==='output';
   const isProgramLesson=isAssignmentLesson||isUnaryUpdateLesson||isMixedUpdateLesson||isOutputLesson;
   const outputVariables=isOutputLesson?item.decls.filter(declaration=>declaration.kind==='variable'):[];
   if(isOutputLesson&&outputVariables.length<3){
-    throw new Error(`${profile.id}: outputLesson requires at least three variable declarations`);
+    throw new Error(`${profile.id}: output lesson requires at least three variable declarations`);
   }
   if(isOutputLesson){
     outputVariables[2].value=outputVariables[0].value+outputVariables[1].value;
@@ -299,14 +310,14 @@ function buildGeneratedProgram(item, profile){
   if(isAssignmentLesson){
     const expectedMemory={};
     item.decls.forEach(decl=>{expectedMemory[decl.name]=decl.value;});
-    statements.push(...buildAssignmentLessonStatements(item,cfg.assignmentLesson,expectedMemory));
+    statements.push(...buildAssignmentLessonStatements(item,lessonVariant,expectedMemory));
     rebuildFinalExpressionForMemory(item,expectedMemory);
   }
 
   if(isUnaryUpdateLesson){
     const expectedMemory={};
     item.decls.forEach(decl=>{expectedMemory[decl.name]=decl.value;});
-    statements.push(...buildUnaryUpdateLessonStatements(item,cfg.unaryUpdateLesson,expectedMemory));
+    statements.push(...buildUnaryUpdateLessonStatements(item,lessonVariant,expectedMemory));
     rebuildFinalExpressionForMemory(item,expectedMemory);
   }
 
@@ -320,7 +331,7 @@ function buildGeneratedProgram(item, profile){
   if(isOutputLesson){
     const expectedMemory={};
     item.decls.forEach(decl=>{expectedMemory[decl.name]=decl.value;});
-    statements.push(...buildOutputLessonStatements(item,cfg.outputLesson,expectedMemory));
+    statements.push(...buildOutputLessonStatements(item,lessonVariant,expectedMemory));
     // End with the established expression check using the derived sum from
     // memory. This keeps scoring, feedback, solution playback and persistence
     // on the same path as every other expression based program profile.
@@ -339,6 +350,6 @@ function buildGeneratedProgram(item, profile){
     language:(typeof state === 'object' && state && state.language) || 'java'
   });
   item.program.mode = isProgramLesson ? 'interactive-program' : 'interactive-declarations';
-  item.program.scoreAssignments = cfg.scoreAssignments !== false;
+  item.program.scoreAssignments = profileScoresStatementCommits(profile);
   return item.program;
 }

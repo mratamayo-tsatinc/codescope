@@ -414,7 +414,7 @@ function beginSourceFlowTransition(item,settleMs=0){
 
 function programTimelinePresentation(item){
   const profile=item&&PROFILES.find(candidate=>candidate.id===item.profileId);
-  return profile&&profile.program&&profile.program.timelinePresentation||'inline';
+  return profileTimelineMode(profile);
 }
 
 function programUsesStatementTraceModal(item){
@@ -491,8 +491,8 @@ function renderStatementTraceMemory(item){
 }
 
 function renderStatementTraceOutput(item){
-  if(typeof renderProgramOutputPanel==='function'){
-    const panel=renderProgramOutputPanel(item,item.program,{surface:'modal'});
+  if(typeof renderProgramTerminalPanel==='function'){
+    const panel=renderProgramTerminalPanel(item,item.program,{surface:'modal'});
     if(panel&&panel.classList) panel.classList.add('statement-trace-output');
     return panel;
   }
@@ -688,8 +688,8 @@ function renderProgramWorkspaceShell(container,item,program){
     ?varFinalPanelVisibleForItem(item)
     :(typeof varFinalPanelShouldRender==='function'&&varFinalPanelShouldRender(item));
   const memoryHost=hasMemory?h('div',{class:'program-memory-dock-host','aria-live':'polite'}):null;
-  const outputPanel=hasOutput&&typeof renderProgramOutputPanel==='function'
-    ?renderProgramOutputPanel(item,program):null;
+  const outputPanel=hasOutput&&typeof renderProgramTerminalPanel==='function'
+    ?renderProgramTerminalPanel(item,program):null;
   const context=renderProgramContextShell(memoryHost,outputPanel,'main');
   if(context) workspace.appendChild(h('div',{class:'program-workspace-layout'},flow,context));
   else workspace.appendChild(flow);
@@ -958,7 +958,7 @@ function renderSession(container){
       try{ mfBlock = renderMomentFeedbackBlock(item); }catch(e){ mfBlock = null; }
       if(mfBlock) fb.appendChild(mfBlock);
     }
-    if(state.mode==='practice'){
+    if(correctSolutionAvailable(currentProfile(),item)){
       fb.appendChild(h('button',{class:'solution-toggle', onclick:toggleSolution}, item.showSolution ? 'Hide correct solution' : 'Show correct solution'));
       if(item.showSolution){
         fb.appendChild(hasInteractiveDeclarations

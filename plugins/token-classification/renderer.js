@@ -57,7 +57,8 @@ function tcRenderInvalidSelection(item){
       h('div',{class:'invalid-execution-message'},terminal?'This item cannot continue. Credit earned before this selection has been retained.':'This token is not an assessed target under the current profile.'),
       !terminal&&state.mode==='practice'?h('button',{class:'invalid-execution-recovery',type:'button',onclick:handleUndo},h('i',{class:'fa-solid fa-rotate-left'}),h('span',{},'Undo invalid selection')):null));
 }
-function tcToggleSolution(){const item=currentItem();if(!item||!item.activityKind||state.mode==='exam')return;item.showSolution=!item.showSolution;render();}
+function tcToggleSolution(){const item=currentItem();if(!item||!item.activityKind
+  ||!correctSolutionAvailable(currentProfile(),item))return;item.showSolution=!item.showSolution;render();}
 function tcRender({container,item,profile}){
   const currentIndex=tcCurrentStatementIndex(item);
   item.statements.forEach(statement=>{const lineState=tcStatementState(item,statement);statement.status=lineState==='checked-wrong'?'invalid':

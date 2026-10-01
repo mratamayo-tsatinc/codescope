@@ -38,6 +38,20 @@ function evalOp(op,a,b){
     default: throw new EngineError('UNKNOWN_OP:'+op);
   }
 }
+function evaluateUnaryOperation(operator,form,base,writeOverride){
+  if(operator==='!'){
+    const expressionValue=writeOverride===undefined?!base:writeOverride;
+    return {expressionValue,writeValue:expressionValue,hasWrite:false};
+  }
+  if(operator!=='++'&&operator!=='--') throw new EngineError('UNKNOWN_UNARY:'+operator);
+  const computed=base+(operator==='++'?1:-1);
+  const writeValue=writeOverride===undefined?computed:writeOverride;
+  return {
+    expressionValue:form==='postfix'?base:writeValue,
+    writeValue,
+    hasWrite:true
+  };
+}
 class EngineError extends Error{ constructor(code){ super(code); this.code=code; } }
 
 // Renders any engine value (number OR boolean) the way it should read as
@@ -49,6 +63,10 @@ function formatValue(v,dataType){
   if(dataType==='char'){
     const escaped=String(v).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\t/g,'\\t').replace(/\r/g,'\\r');
     return `'${escaped}'`;
+  }
+  if(dataType==='string'){
+    const escaped=String(v).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\t/g,'\\t').replace(/\r/g,'\\r');
+    return `"${escaped}"`;
   }
   return v<0 ? '('+v+')' : String(v);
 }
@@ -69,12 +87,7 @@ function makeUnary(op, form, inner){ return {id:nextId(), kind:'unary', op, form
 function unaryBaseValue(node){ return node.inner.kind==='literal' ? node.inner.value : node.inner.declaredValue; }
 function unaryComputedValue(node){
   const base = unaryBaseValue(node);
-  if(node.op==='!') return !base;
-  const delta = node.op==='++' ? 1 : -1;
-  // Prefix: the expression sees the already-incremented value. Postfix: the
-  // expression sees the ORIGINAL value (the increment is a side effect that
-  // only matters for later reuse of the same variable, out of this app's scope).
-  return node.form==='prefix' ? base+delta : base;
+  return evaluateUnaryOperation(node.op,node.form,base).expressionValue;
 }
 function isNumeric(node){
   return node.kind==='literal'

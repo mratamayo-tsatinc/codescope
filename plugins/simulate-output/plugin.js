@@ -1,13 +1,17 @@
 function soValidateProfile(profile){
   const generator=profile.activity&&profile.activity.generator;
-  if(!generator||typeof generator.exerciseSet!=='string'||!generator.exerciseSet.trim())
-    throw new Error(`${profile.id}: simulate-output requires generator.exerciseSet`);
+  if(!generator||typeof generator.library!=='string'||!generator.library.trim()
+    ||typeof generator.exerciseSet!=='string'||!generator.exerciseSet.trim())
+    throw new Error(`${profile.id}: simulate-output requires generator.library and generator.exerciseSet`);
+  soPathSlug(generator.library,`${profile.id}: library`);
   soPathSlug(generator.exerciseSet,`${profile.id}: exerciseSet`);
   if(profile.itemCount!=='manifest')throw new Error(`${profile.id}: itemCount must be 'manifest'`);
-  if(profile.pointsPerItem!=='exercise-metadata')
-    throw new Error(`${profile.id}: pointsPerItem must be 'exercise-metadata'`);
+  if(profile.pointsPerItem!=='generated-answer')
+    throw new Error(`${profile.id}: pointsPerItem must be 'generated-answer'`);
   if(generator.shuffle!==undefined&&typeof generator.shuffle!=='boolean')
     throw new Error(`${profile.id}: generator.shuffle must be a boolean`);
+  for(const [label,mode] of [['variables',profileVariableValueMode(profile)],['input',profileInputValueMode(profile)]])
+    if(!['authored','seeded'].includes(mode))throw new Error(`${profile.id}: ${label} value mode must be 'authored' or 'seeded'`);
 }
 
 function soCanonicalTrace({item}){

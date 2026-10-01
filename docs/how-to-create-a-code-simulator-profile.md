@@ -27,20 +27,15 @@ language is active:
 
 ```js
 content:{
-  provider:'code-simulator',
   mode:'source-files',
-  library:'source-programs',
-  exerciseSet:'selection-basics',
-  sourceValueMode:'seeded', // or 'authored'
-  inputValueMode:'seeded',  // or 'authored'
-  presentation:'source-flow',
+  source:{library:'source-programs',exerciseSet:'selection-basics'},
+  values:{variables:'seeded',input:'seeded'}, // either may be 'authored'
   selection:{count:'all',shuffle:false},
 },
-program:{
-  declarations:'interactive',
-  scoreAssignments:true,
-  timelinePresentation:'statement-modal',
-}
+lesson:{focus:'program-flow',constructs:['selection']},
+interaction:{declarations:'interactive'},
+presentation:{workspace:'source-program',timeline:'statement-modal'},
+scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true}
 ```
 
 Use `scoring.itemCount:'manifest'` when the manifest owns the complete set.
@@ -48,9 +43,8 @@ Use `scoring.itemCount:'manifest'` when the manifest owns the complete set.
 All complete-source profiles use the independently registered
 `source-programs` library. The exercise set selects `selection-basics`,
 `formatted-output`, `output-basics`, or another authored set without coupling
-the content to its consumer plugin. The former `code-simulator` and
-`program-output` library IDs, and the `sourceLibrary` field name, remain
-temporary compatibility aliases for saved configuration.
+the content to its consumer plugin. Use the canonical `source-programs`
+library ID and nested `content.source` fields.
 
 ## Supported source behavior
 
@@ -82,22 +76,25 @@ The leading metadata block may allowlist literal integer declarations:
 @title Attendance qualification
 @seed score min=60 max=100
 @seed absences min=0 max=10
+@seed balance min=1000 max=1400 step=100
 */
 ```
 
-With `sourceValueMode:'seeded'`, each listed binding uses its inclusive range.
+With `content.values.variables:'seeded'`, each listed binding uses its inclusive range.
+An optional positive `step` restricts generated values to the sequence beginning
+at `min`; omitted integer steps default to `1`.
 Bindings absent from `@seed` remain authored. With `'authored'`, every source
 initializer remains unchanged. Malformed, duplicate, unknown, and nonliteral
 seed targets are load errors.
 
 Input values use separate `@input target=<name> value=<integer> min=<integer>
-max=<integer>` directives. `inputValueMode` selects the authored value or its
+max=<integer>` directives. `content.values.input` selects the authored value or its
 inclusive source-local range. See
 `docs/how-to-create-a-program-input-profile.md` for the interaction contract.
 
-## Compatibility
+## Saved progress
 
 The current catalog retains profile ID `selection-statements-source` so saved
-Practice and Exam progress can still resolve it. Its provider and visible name
-are Code Simulator. `program-selection` remains accepted only as a legacy
-provider alias for older saved configurations.
+Practice and Exam progress can still resolve it. Its presentation is Code
+Simulator. Saved progress uses the stable profile ID and does not depend on a
+provider alias.

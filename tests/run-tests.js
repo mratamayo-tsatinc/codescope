@@ -3,8 +3,10 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const {assertPhaseZeroBaseline} = require('./phase0-baseline');
 
 const ROOT = path.resolve(__dirname, '..');
+const loadedScriptsByContext = new WeakMap();
 
 function context(){
   const storage = new Map();
@@ -25,13 +27,26 @@ function context(){
 }
 
 function load(ctx, names){
-  names.forEach(name=>{
+  const loaded=loadedScriptsByContext.get(ctx)||new Set();
+  loadedScriptsByContext.set(ctx,loaded);
+  const expanded=names.slice();
+  if(expanded.includes('program-item-builder.js')){
+    const semanticDependencies=['language-core.js','expression-parser.js','expression-semantics.js',
+      'output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js',
+      'statement-semantics.js'];
+    const insertion=expanded.includes('program-core.js')?expanded.indexOf('program-core.js')
+      :expanded.indexOf('program-item-builder.js');
+    expanded.splice(insertion,0,...semanticDependencies.filter(name=>!expanded.includes(name)&&!loaded.has(name)));
+  }
+  expanded.forEach(name=>{
+    if(loaded.has(name)) return;
     const filename = path.join(ROOT, 'js', name);
     let source=fs.readFileSync(filename,'utf8');
     // Generator and renderer tests exercise every authored profile regardless
     // of the deployment visibility selected in the disk configuration.
     if(name==='profiles.js')source=source.replace(/enabled:false,/g,'enabled:true,');
     vm.runInContext(source, ctx, {filename});
+    loaded.add(name);
   });
 }
 
@@ -114,6 +129,9 @@ function testScriptManifestParses(){
   assert(localScripts.includes('plugins/program-input/parser.js'));
   assert(localScripts.includes('plugins/program-input/statement.js'));
   assert(localScripts.includes('plugins/program-input/renderer.js'));
+  assert(localScripts.includes('js/program-terminal.js'));
+  assert(localScripts.indexOf('js/dom-helpers.js')<localScripts.indexOf('js/program-terminal.js'));
+  assert(localScripts.indexOf('js/program-terminal.js')<localScripts.indexOf('js/render-session.js'));
   assert(html.includes('plugins/program-input/styles.css'));
   assert(html.includes('plugins/code-simulator/styles.css'));
   assert(!html.includes('plugins/program-selection/'));
@@ -691,7 +709,7 @@ function generatedSnapshotHash(){
   const json = evaluate(ctx, `(()=>{
     __idCounter = 1;
     initializeSeededRandom(1592594996);
-    const result = PROFILES.filter(p=>!p.program).map(p=>{
+    const result = PROFILES.filter(p=>!p.content&&!p.lesson).map(p=>{
       const x = generateInstance(p);
       return {
         profile:p.id,
@@ -732,6 +750,1024 @@ function testParenthesesOverrideProfile(){
     assert(item.flat.includes('(')&&item.flat.includes(')'));
     assert.strictEqual(item.runs,1);
   });
+}
+
+function testLanguageCoreContracts(){
+  const ctx=context();
+  load(ctx,['program-ir.js','language-core.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const location=languageCoreSourceLocation({filename:'Task.c',start:{line:3,column:5},end:{line:3,column:12}});
+    const expression=binaryExpression('+',
+      unaryExpression('++',identifierExpression('p'),{form:'prefix'}),
+      unaryExpression('++',identifierExpression('q'),{form:'postfix'}));
+    const statement=declarationStatement({id:'decl-sum',name:'sum',initializer:expression,sourceSpan:location});
+    assertExpressionIr(expression);assertStatementIr(statement);
+    const program=languageCoreProgramIr({language:'C',source:'int sum = ++p + q++;',statements:[statement]});
+    registerLanguageCoreService('parseExpression',request=>({
+      ir:expression,
+      dependencies:['p','q','p'],
+      diagnostics:[{code:'BASELINE_INFO',severity:'info',message:'compatibility service',location}],
+      effects:[],trace:[]
+    }));
+    registerLanguageCoreService('evaluateExpression',request=>({
+      value:9,
+      dependencies:['p','q'],
+      effects:[
+        {kind:'write',target:'p',previousValue:4,nextValue:5},
+        {kind:'write',target:'q',previousValue:4,nextValue:5}
+      ],
+      trace:[
+        {action:'UNARY',operator:'++',form:'prefix',target:'p',result:5,writeValue:5},
+        {action:'UNARY',operator:'++',form:'postfix',target:'q',result:4,writeValue:5},
+        {action:'EVALUATE',operator:'+',result:9}
+      ]
+    }));
+    const parsed=coreParseExpression({language:'C',source:'++p + q++',symbols:{p:4,q:4},location});
+    const evaluated=coreEvaluateExpression({language:'c',expression:parsed.ir,memory:{p:4,q:4}});
+    let duplicateRejected=false,unknownRejected=false,missingRejected=false,invalidIrRejected=false;
+    try{registerLanguageCoreService('parseExpression',()=>({}));}catch(error){duplicateRejected=/already registered/.test(error.message);}
+    try{registerLanguageCoreService('unknown',()=>({}));}catch(error){unknownRejected=/Unknown/.test(error.message);}
+    try{coreParseStatement({language:'c',source:'int x = 1;'});}catch(error){missingRejected=/not registered/.test(error.message);}
+    try{assertExpressionIr({kind:'unary',operator:'++'});}catch(error){invalidIrRejected=/operand/.test(error.message);}
+    return JSON.stringify({
+      contractVersion:LANGUAGE_CORE_CONTRACT_VERSION,
+      irVersions:[EXPRESSION_IR_SCHEMA_VERSION,STATEMENT_IR_SCHEMA_VERSION,PROGRAM_IR_SCHEMA_VERSION],
+      services:LANGUAGE_CORE_SERVICE_NAMES,
+      location,
+      programLanguage:program.language,
+      programSchema:program.schemaVersion,
+      statementKind:program.statements[0].kind,
+      parsedVersion:parsed.contractVersion,
+      parsedDependencies:parsed.dependencies,
+      diagnostic:parsed.diagnostics[0],
+      evaluatedValue:evaluated.value,
+      effects:evaluated.effects,
+      trace:evaluated.trace,
+      duplicateRejected,unknownRejected,missingRejected,invalidIrRejected,
+      serializable:!!JSON.parse(JSON.stringify({program,parsed,evaluated}))
+    });
+  })()`));
+  assert.strictEqual(result.contractVersion,1);
+  assert.deepStrictEqual(result.irVersions,[1,1,1]);
+  assert.deepStrictEqual(result.services,['parseExpression','parseStatement','evaluateExpression','executeStatement','parseProgram']);
+  assert.deepStrictEqual(result.location,{filename:'Task.c',start:{line:3,column:5},end:{line:3,column:12}});
+  assert.strictEqual(result.programLanguage,'c');
+  assert.strictEqual(result.programSchema,1);
+  assert.strictEqual(result.statementKind,'declaration');
+  assert.strictEqual(result.parsedVersion,1);
+  assert.deepStrictEqual(result.parsedDependencies,['p','q']);
+  assert.strictEqual(result.diagnostic.code,'BASELINE_INFO');
+  assert.strictEqual(result.evaluatedValue,9);
+  assert.deepStrictEqual(result.effects.map(effect=>[effect.kind,effect.target,effect.previousValue,effect.nextValue]),[
+    ['write','p',4,5],['write','q',4,5]
+  ]);
+  assert.deepStrictEqual(result.trace.map(step=>[step.action,step.result,step.writeValue||null]),[
+    ['UNARY',5,5],['UNARY',4,5],['EVALUATE',9,null]
+  ]);
+  assert(result.duplicateRejected&&result.unknownRejected&&result.missingRejected&&result.invalidIrRejected&&result.serializable);
+}
+
+function testSharedExpressionParser(){
+  const programOutputSource=fs.readFileSync(path.join(ROOT,'plugins','program-output','content.js'),'utf8');
+  const codeSimulatorSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','content.js'),'utf8');
+  assert(!programOutputSource.includes('function poExpressionTokens'));
+  assert(!codeSimulatorSource.includes('function csExpressionTokens'));
+  const ctx=context();
+  load(ctx,['engine.js','flat-model.js','program-ir.js','language-core.js','expression-parser.js','program-item-builder.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const symbols={
+      p:{kind:'variable',value:4,initialized:true,dataType:'int'},
+      q:{kind:'variable',value:4,initialized:true,dataType:'int'},
+      x:{kind:'variable',value:2,initialized:true,dataType:'int'},
+      LIMIT:{kind:'constant',value:10,initialized:true,dataType:'int',mutable:false}
+    };
+    const normalize=node=>{
+      if(node.kind==='literal')return {kind:'literal',value:node.value,dataType:node.dataType||null};
+      if(node.kind==='identifier')return {kind:'identifier',name:node.name};
+      if(node.kind==='unary')return {kind:'unary',operator:node.operator,form:node.form,operand:normalize(node.operand)};
+      return {kind:'binary',operator:node.operator,left:normalize(node.left),right:normalize(node.right)};
+    };
+    const generated=engineNodeToProgramIr(makeBinOp('+',
+      makeUnary('++','prefix',makeNamed('variable','p',4)),
+      makeUnary('++','postfix',makeNamed('variable','q',4))));
+    const c=coreParseExpression({language:'c',source:'++p + q++',symbols,
+      location:{filename:'TaskPapa.c',start:{line:53,column:15},end:{line:53,column:24}}});
+    const java=coreParseExpression({language:'java',source:'++p + q++',symbols});
+    const engineTree=coreExpressionIrToEngineTree(c.ir,symbols);
+    const precedence=coreParseExpression({language:'c',source:'1 + x * 3 < LIMIT && !false',symbols});
+    const character=coreParseExpression({language:'c',source:"'B'",symbols});
+    let constantUnaryRejected=false,doublePostfixRejected=false,unknownRejected=false;
+    try{coreParseExpression({language:'c',source:'LIMIT++',symbols});}catch(error){constantUnaryRejected=/mutable variable/.test(error.message);}
+    try{coreParseExpression({language:'c',source:'p++++',symbols});}catch(error){doublePostfixRejected=/unsupported expression/.test(error.message);}
+    try{coreParseExpression({language:'c',source:'missing + 1',symbols});}catch(error){unknownRejected=/used before it is initialized/.test(error.message);}
+    return JSON.stringify({
+      c:normalize(c.ir),java:normalize(java.ir),generated:normalize(generated),
+      dependencies:c.dependencies,value:evalTree(engineTree),canonicalActions:buildCanonicalTrace(engineTree).steps.map(step=>step.action),
+      precedence:normalize(precedence.ir),character:normalize(character.ir),
+      constantUnaryRejected,doublePostfixRejected,unknownRejected
+    });
+  })()`));
+  assert.deepStrictEqual(result.c,result.generated);
+  assert.deepStrictEqual(result.java,result.generated);
+  assert.deepStrictEqual(result.dependencies,['p','q']);
+  assert.strictEqual(result.value,9);
+  assert.deepStrictEqual(result.canonicalActions,['SUBSTITUTE','UNARY','SUBSTITUTE','UNARY','EVALUATE']);
+  assert.strictEqual(result.precedence.operator,'&&');
+  assert.strictEqual(result.precedence.left.operator,'<');
+  assert.strictEqual(result.precedence.left.left.operator,'+');
+  assert.strictEqual(result.precedence.left.left.right.operator,'*');
+  assert.strictEqual(result.precedence.right.operator,'!');
+  assert.deepStrictEqual(result.character,{kind:'literal',value:'B',dataType:'char'});
+  assert(result.constantUnaryRejected&&result.doublePostfixRejected&&result.unknownRejected);
+}
+
+function testSharedExpressionSemantics(){
+  const ctx=context();
+  load(ctx,['engine.js','flat-model.js','program-ir.js','language-core.js','expression-parser.js','expression-semantics.js','output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js','statement-parser.js','statement-semantics.js',
+    'program-core.js','declaration-statement-plugin.js','assignment-statement-plugin.js','program-item-builder.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const binding=value=>({kind:'variable',mutable:true,initialized:true,value});
+    const symbols={p:binding(4),q:binding(4)};
+    const parsed=coreParseExpression({language:'c',source:'++p + q++',symbols});
+    const sourceMemory={p:binding(4),q:binding(4)};
+    const evaluated=coreEvaluateExpression({language:'c',expression:parsed.ir,memory:sourceMemory});
+    const inputUnchanged=sourceMemory.p.value===4&&sourceMemory.q.value===4;
+    const appliedMemory={p:binding(4),q:binding(4)};
+    const snapshot=captureCoreMemoryTargets(appliedMemory,['p','q']);
+    applyCoreExpressionEffects(appliedMemory,evaluated.effects,'semantic-test');
+    const appliedValues={p:appliedMemory.p.value,q:appliedMemory.q.value};
+    restoreCoreMemoryTargets(appliedMemory,snapshot);
+    const restoredValues={p:appliedMemory.p.value,q:appliedMemory.q.value};
+
+    const declaration=declarationStatement({id:'decl-sum',name:'sum',initializer:parsed.ir});
+    declaration.binding.kind='variable';
+    declaration.dependencies=['p','q'];
+    declaration.runtime=buildDeclarationRuntime(coreExpressionIrToEngineTree(parsed.ir,symbols),9);
+    declaration.runtime.workingFlat=flattenInstance(makeLiteral(9));
+    declaration.runtime.history=[deepCloneFlat(declaration.runtime.workingFlat)];
+    declaration.runtime.trace=evaluated.trace.map(step=>Object.assign({wasCorrect:true},step));
+    declaration.runtime.expectedEffects=evaluated.effects;
+    const declarationProgram=createProgram([declaration],{language:'c',memory:{p:binding(4),q:binding(4)}});
+    const declarationItem={program:declarationProgram,_bindings:[]};
+    const declarationCommit=statementPluginFor(declaration).applyAction({statement:declaration,program:declarationProgram,
+      item:declarationItem,action:{type:'commit-assignment'},services:{}});
+    const declarationValues={p:declarationProgram.memory.p.value,q:declarationProgram.memory.q.value,
+      sum:declarationProgram.memory.sum.value};
+    const declarationRollback=statementPluginFor(declaration).rollbackCompletion({statement:declaration,
+      program:declarationProgram,item:declarationItem});
+    const declarationRestored={p:declarationProgram.memory.p.value,q:declarationProgram.memory.q.value,
+      hasSum:Object.prototype.hasOwnProperty.call(declarationProgram.memory,'sum')};
+
+    const assignment=assignmentStatement({id:'assign-x',target:'x',operator:'=',value:parsed.ir});
+    assignment.dependencies=['p','q'];
+    assignment.runtime=buildDeclarationRuntime(coreExpressionIrToEngineTree(parsed.ir,symbols),9);
+    assignment.runtime.expectedBefore=0;assignment.runtime.expectedRhs=9;assignment.runtime.expectedAfter=9;
+    assignment.runtime.workingFlat=flattenInstance(makeLiteral(9));
+    assignment.runtime.history=[deepCloneFlat(assignment.runtime.workingFlat)];
+    assignment.runtime.trace=evaluated.trace.map(step=>Object.assign({wasCorrect:true},step));
+    assignment.runtime.expectedEffects=evaluated.effects;
+    const assignmentProgram=createProgram([assignment],{language:'c',memory:{x:binding(0),p:binding(4),q:binding(4)}});
+    const assignmentItem={program:assignmentProgram,_bindings:[]};
+    const assignmentCommit=statementPluginFor(assignment).applyAction({statement:assignment,program:assignmentProgram,
+      item:assignmentItem,action:{type:'commit-assignment'},services:{}});
+    const assignmentValues={x:assignmentProgram.memory.x.value,p:assignmentProgram.memory.p.value,q:assignmentProgram.memory.q.value};
+    const assignmentRollback=statementPluginFor(assignment).rollbackCompletion({statement:assignment,
+      program:assignmentProgram,item:assignmentItem});
+    const assignmentRestored={x:assignmentProgram.memory.x.value,p:assignmentProgram.memory.p.value,q:assignmentProgram.memory.q.value};
+    return JSON.stringify({
+      value:evaluated.value,inputUnchanged,
+      effectKinds:evaluated.effects.map(effect=>effect.kind),
+      writes:evaluated.effects.filter(effect=>effect.kind==='write').map(effect=>[effect.target,effect.previousValue,effect.nextValue,effect.form]),
+      trace:evaluated.trace.map(step=>[step.action,typeof step.target==='string'?step.target:null,step.result,step.writeValue]),
+      appliedValues,restoredValues,
+      declarationApplied:declarationCommit.applied,declarationEffects:declarationCommit.event.effects.length,
+      declarationValues,declarationRollback:declarationRollback.applied,declarationRestored,
+      assignmentApplied:assignmentCommit.applied,assignmentEffects:assignmentCommit.event.effects.length,
+      assignmentValues,assignmentRollback:assignmentRollback.applied,assignmentRestored
+    });
+  })()`));
+  assert.strictEqual(result.value,9);
+  assert(result.inputUnchanged);
+  assert.deepStrictEqual(result.effectKinds,['read','write','read','write']);
+  assert.deepStrictEqual(result.writes,[['p',4,5,'prefix'],['q',4,5,'postfix']]);
+  assert.deepStrictEqual(result.trace,[
+    ['SUBSTITUTE','p',null,null],['UNARY','p',5,5],
+    ['SUBSTITUTE','q',null,null],['UNARY','q',4,5],['EVALUATE',null,9,null]
+  ]);
+  assert.deepStrictEqual(result.appliedValues,{p:5,q:5});
+  assert.deepStrictEqual(result.restoredValues,{p:4,q:4});
+  assert(result.declarationApplied&&result.declarationRollback&&result.declarationEffects===2);
+  assert.deepStrictEqual(result.declarationValues,{p:5,q:5,sum:9});
+  assert.deepStrictEqual(result.declarationRestored,{p:4,q:4,hasSum:false});
+  assert(result.assignmentApplied&&result.assignmentRollback&&result.assignmentEffects===2);
+  assert.deepStrictEqual(result.assignmentValues,{x:9,p:5,q:5});
+  assert.deepStrictEqual(result.assignmentRestored,{x:0,p:4,q:4});
+}
+
+function testSharedStatementParser(){
+  const programOutputSource=fs.readFileSync(path.join(ROOT,'plugins','program-output','content.js'),'utf8');
+  const codeSimulatorSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','content.js'),'utf8');
+  assert(!programOutputSource.includes('const declarationPattern='));
+  assert(!programOutputSource.includes('const unary=/'));
+  assert(!programOutputSource.includes('const assignment=/'));
+  assert(!codeSimulatorSource.includes('const unary=/'));
+  assert(!codeSimulatorSource.includes('const assignment=/'));
+  const ctx=context();
+  load(ctx,['engine.js','program-ir.js','language-core.js','expression-parser.js','output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js','statement-parser.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const variable=(value,initialized=true)=>({kind:'variable',mutable:true,value,initialized,dataType:'int'});
+    const constant=value=>({kind:'constant',mutable:false,value,initialized:true,dataType:'int'});
+    const cDeclaration=coreParseStatement({language:'c',source:'const float rate = 1.5;',symbols:{},
+      location:{filename:'Shared.c',start:{line:4,column:3},end:{line:4,column:26}}});
+    const javaDeclaration=coreParseStatement({language:'java',source:"final char grade = 'B';",symbols:{}});
+    const uninitialized=coreParseStatement({language:'c',source:'int score;',symbols:{}});
+    const assign=coreParseStatement({language:'c',source:'score = 75;',symbols:{score:variable(undefined,false)}});
+    const compound=coreParseStatement({language:'java',source:'score += 5;',symbols:{score:variable(75)}});
+    const prefix=coreParseStatement({language:'c',source:'++score;',symbols:{score:variable(75)}});
+    const postfix=coreParseStatement({language:'java',source:'score--;',symbols:{score:variable(75)}});
+    const breakStatement=coreParseStatement({language:'c',source:'break;',symbols:{}});
+    const returnStatement=coreParseStatement({language:'c',source:'return 0;',symbols:{}});
+    const javaInput=coreParseStatement({language:'java',source:'score = scanner.nextInt();',
+      symbols:{score:variable(undefined,false)},inputValues:{score:12}});
+    let immutableRejected=false,uninitializedCompoundRejected=false,duplicateRejected=false;
+    try{coreParseStatement({language:'c',source:'LIMIT = 3;',symbols:{LIMIT:constant(2)}});}catch(error){immutableRejected=/mutable variable/.test(error.message);}
+    try{coreParseStatement({language:'c',source:'score += 3;',symbols:{score:variable(undefined,false)}});}catch(error){uninitializedCompoundRejected=/before it is initialized/.test(error.message);}
+    try{coreParseStatement({language:'c',source:'int score = 1;',symbols:{score:variable(0)}});}catch(error){duplicateRejected=/duplicate declaration/.test(error.message);}
+    return JSON.stringify({
+      cKind:cDeclaration.ir.kind,cBinding:cDeclaration.ir.binding,cValue:cDeclaration.ir.initializer.value,
+      cLine:cDeclaration.ir.sourceSpan.start.line,
+      javaKind:javaDeclaration.ir.kind,javaBinding:javaDeclaration.ir.binding,javaValue:javaDeclaration.ir.initializer.value,
+      uninitialized:uninitialized.ir.initialized,
+      assignKind:assign.ir.kind,assignOperator:assign.ir.operator,assignValue:assign.ir.value.value,
+      compoundKind:compound.ir.kind,compoundOperator:compound.ir.operator,compoundDependencies:compound.dependencies,
+      prefix:[prefix.ir.kind,prefix.ir.operator,prefix.ir.form,prefix.dependencies],
+      postfix:[postfix.ir.kind,postfix.ir.operator,postfix.ir.form,postfix.dependencies],
+      breakKind:breakStatement.ir.kind,returnKind:returnStatement.ir.kind,returnValue:returnStatement.ir.value,
+      inputKind:javaInput.ir.kind,inputReader:javaInput.ir.readerName,inputValue:javaInput.ir.reads[0].expectedValue,
+      immutableRejected,uninitializedCompoundRejected,duplicateRejected
+    });
+  })()`));
+  assert.strictEqual(result.cKind,'declaration');
+  assert.deepStrictEqual(result.cBinding,{name:'rate',dataType:'float',mutable:false,kind:'constant'});
+  assert.strictEqual(result.cValue,1.5);
+  assert.strictEqual(result.cLine,4);
+  assert.strictEqual(result.javaKind,'declaration');
+  assert.deepStrictEqual(result.javaBinding,{name:'grade',dataType:'char',mutable:false,kind:'constant'});
+  assert.strictEqual(result.javaValue,'B');
+  assert.strictEqual(result.uninitialized,false);
+  assert.deepStrictEqual([result.assignKind,result.assignOperator,result.assignValue],['assignment','=',75]);
+  assert.deepStrictEqual([result.compoundKind,result.compoundOperator,result.compoundDependencies],['assignment','+=',[]]);
+  assert.deepStrictEqual(result.prefix,['unary-update','++','prefix',['score']]);
+  assert.deepStrictEqual(result.postfix,['unary-update','--','postfix',['score']]);
+  assert.deepStrictEqual([result.breakKind,result.returnKind,result.returnValue],['program-break','program-return',0]);
+  assert.deepStrictEqual([result.inputKind,result.inputReader,result.inputValue],['input','scanner',12]);
+  assert(result.immutableRejected&&result.uninitializedCompoundRejected&&result.duplicateRejected);
+}
+
+function testSharedStatementSemantics(){
+  const declarationPlugin=fs.readFileSync(path.join(ROOT,'js','declaration-statement-plugin.js'),'utf8');
+  const assignmentPlugin=fs.readFileSync(path.join(ROOT,'js','assignment-statement-plugin.js'),'utf8');
+  assert(declarationPlugin.includes('programSemanticsForContext'));
+  assert(assignmentPlugin.includes('programSemanticsForContext'));
+  assert(!declarationPlugin.includes('coreExecuteStatement'));
+  assert(!assignmentPlugin.includes('coreExecuteStatement'));
+  const ctx=context();
+  load(ctx,['engine.js','program-ir.js','language-core.js','expression-parser.js','expression-semantics.js','output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js',
+    'statement-parser.js','statement-semantics.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const binding=(value,options)=>Object.assign({kind:'variable',mutable:true,initialized:true,value,dataType:'int'},options||{});
+    const source={p:binding(4),q:binding(4)};
+    const parsed=coreParseStatement({language:'c',source:'int sum = ++p + q++;',symbols:source});
+    const declaration=coreExecuteStatement({language:'c',statement:parsed.ir,memory:source});
+    const sourceUnchanged=source.p.value===4&&source.q.value===4&&!source.sum;
+    const applied={p:binding(4),q:binding(4)};
+    applyCoreStatementEffects(applied,declaration.effects,'decl-sum','bindings');
+    const afterDeclaration={p:applied.p.value,q:applied.q.value,sum:applied.sum.value};
+
+    const assignmentIr=coreParseStatement({language:'c',source:'sum += p;',symbols:applied}).ir;
+    const assignment=coreExecuteStatement({language:'c',statement:assignmentIr,memory:applied});
+    applyCoreStatementEffects(applied,assignment.effects,'assign-sum','bindings');
+    const afterAssignment=applied.sum.value;
+
+    const unaryIr=coreParseStatement({language:'c',source:'p--;',symbols:applied}).ir;
+    const unary=coreExecuteStatement({language:'c',statement:unaryIr,memory:applied});
+    applyCoreStatementEffects(applied,unary.effects,'unary-p','bindings');
+
+    const raw={x:2};
+    const rawAssignment=assignmentStatement({target:'x',operator:'*=',value:literalExpression(3)});
+    const rawResult=evaluateAndApplyCoreStatement(rawAssignment,raw,'c','raw-assignment','raw');
+    const uninitialized=coreExecuteStatement({language:'c',statement:declarationStatement({name:'empty',dataType:'float',initialized:false}),memory:{}});
+    const flowBreak=coreExecuteStatement({language:'c',statement:programBreakStatement({}),memory:{}});
+    const flowReturn=coreExecuteStatement({language:'c',statement:programReturnStatement({value:0}),memory:{}});
+    let constantRejected=false;
+    try{coreExecuteStatement({language:'c',statement:assignmentStatement({target:'LIMIT',operator:'=',value:literalExpression(2)}),
+      memory:{LIMIT:binding(1,{kind:'constant',mutable:false})}});}catch(error){constantRejected=/mutable variable/.test(error.message);}
+    return JSON.stringify({
+      declarationValue:declaration.value,sourceUnchanged,
+      declarationEffects:declaration.effects.map(effect=>[effect.kind,effect.scope,effect.target,effect.nextValue]),
+      declarationTrace:declaration.trace.map(step=>step.action),afterDeclaration,
+      assignmentValue:assignment.value,assignmentEffects:assignment.effects.map(effect=>[effect.kind,effect.scope,effect.target,effect.nextValue]),
+      afterAssignment,
+      unaryValue:unary.value,unaryEffects:unary.effects.map(effect=>[effect.kind,effect.target,effect.nextValue]),afterUnary:applied.p.value,
+      rawValue:rawResult.value,rawMemory:raw.x,
+      uninitializedValue:uninitialized.value,uninitializedEffect:uninitialized.effects[0],
+      breakEffect:flowBreak.effects[0],returnEffect:flowReturn.effects[0],constantRejected
+    });
+  })()`));
+  assert.strictEqual(result.declarationValue,9);
+  assert(result.sourceUnchanged);
+  assert.deepStrictEqual(result.declarationEffects,[
+    ['read','expression','p',null],['write','expression','p',5],
+    ['read','expression','q',null],['write','expression','q',5],
+    ['declare','statement','sum',9]
+  ]);
+  assert.deepStrictEqual(result.declarationTrace,['SUBSTITUTE','UNARY','SUBSTITUTE','UNARY','EVALUATE','DECLARE']);
+  assert.deepStrictEqual(result.afterDeclaration,{p:5,q:5,sum:9});
+  assert.strictEqual(result.assignmentValue,14);
+  assert.deepStrictEqual(result.assignmentEffects,[['read','expression','p',null],['write','statement','sum',14]]);
+  assert.strictEqual(result.afterAssignment,14);
+  assert.strictEqual(result.unaryValue,4);
+  assert.deepStrictEqual(result.unaryEffects,[['read','p',null],['write','p',4]]);
+  assert.strictEqual(result.afterUnary,4);
+  assert.deepStrictEqual([result.rawValue,result.rawMemory],[6,6]);
+  assert.strictEqual(result.uninitializedValue,undefined);
+  assert.strictEqual(result.uninitializedEffect.kind,'declare');
+  assert.strictEqual(result.uninitializedEffect.initialized,false);
+  assert.deepStrictEqual([result.breakEffect.flow,result.breakEffect.nextStatementId],['break','$end']);
+  assert.deepStrictEqual([result.returnEffect.flow,result.returnEffect.value],['return',0]);
+  assert(result.constantRejected);
+}
+
+function testSharedProgramParser(){
+  const ctx=context();
+  load(ctx,['engine.js','program-ir.js','language-core.js','expression-parser.js','expression-semantics.js','output-statement-core.js','input-statement-core.js','selection-statement-core.js',
+    'loop-statement-core.js','statement-parser.js','statement-semantics.js','program-parser.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const cSource='#include <stdio.h>\\n\\nint main() {\\n  int p = 4;\\n  int q = 4;\\n  printf("start\\\\n");\\n  if (p <= q) {\\n    p++;\\n  }\\n  int sum = ++p + q++;\\n  return 0;\\n}';
+    const javaSource='class Demo {\\n  public static void main(String[] args) {\\n    int x = 1;\\n    x += 2;\\n    System.out.println(x);\\n  }\\n}';
+    const c=coreParseProgram({language:'c',source:cSource,filename:'Program.c'});
+    const java=coreParseProgram({language:'java',source:javaSource,filename:'Demo.java'});
+    return JSON.stringify({
+      cLanguage:c.ir.language,cKinds:c.ir.statements.map(statement=>statement.kind),
+      cLines:c.ir.statements.map(statement=>statement.sourceSpan.start.line),
+      cIds:c.ir.statements.map(statement=>statement.id),
+      cMemory:Object.fromEntries(Object.entries(c.ir.metadata.expectedMemory).map(([name,row])=>[name,row.value])),
+      cDiagnostics:c.diagnostics.map(diagnostic=>[diagnostic.code,diagnostic.recoverable,diagnostic.location.start.line]),
+      cEffects:c.effects.map(effect=>[effect.statementId,effect.kind,effect.target||null,effect.nextValue]),
+      cTraceStatements:[...new Set(c.trace.map(step=>step.statementId))],
+      javaLanguage:java.ir.language,javaKinds:java.ir.statements.map(statement=>statement.kind),
+      javaMemory:Object.fromEntries(Object.entries(java.ir.metadata.expectedMemory).map(([name,row])=>[name,row.value])),
+      javaDiagnostics:java.diagnostics.map(diagnostic=>diagnostic.code),
+      serializable:!!JSON.parse(JSON.stringify({c,java}))
+    });
+  })()`));
+  assert.strictEqual(result.cLanguage,'c');
+  assert.deepStrictEqual(result.cKinds,['declaration','declaration','output','selection','unary-update','declaration','program-return']);
+  assert.deepStrictEqual(result.cLines,[4,5,6,7,8,10,11]);
+  assert.deepStrictEqual(result.cIds,['declaration-1','declaration-2','output-1','selection-1','unary-update-1','declaration-3','program-return-1']);
+  assert.deepStrictEqual(result.cMemory,{p:6,q:5,sum:10});
+  assert.deepStrictEqual(result.cDiagnostics,[]);
+  assert(result.cEffects.some(row=>row[0]==='declaration-3'&&row[1]==='declare'&&row[2]==='sum'&&row[3]===10));
+  assert(result.cTraceStatements.includes('unary-update-1')&&result.cTraceStatements.includes('program-return-1'));
+  assert.strictEqual(result.javaLanguage,'java');
+  assert.deepStrictEqual(result.javaKinds,['declaration','assignment','output']);
+  assert.deepStrictEqual(result.javaMemory,{x:3});
+  assert.deepStrictEqual(result.javaDiagnostics,[]);
+  assert(result.serializable);
+}
+
+function testSharedOutputStatementCore(){
+  const contentSource=fs.readFileSync(path.join(ROOT,'plugins','program-output','content.js'),'utf8');
+  assert(!contentSource.includes('function poSplitArguments'));
+  assert(!contentSource.includes('function poOutputPartsFromFormat'));
+  assert(!contentSource.includes('function poSplitJavaConcatenation'));
+  const ctx=context();
+  load(ctx,['engine.js','program-ir.js','language-core.js','expression-parser.js','expression-semantics.js',
+    'output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js','statement-parser.js','statement-semantics.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const binding=(value,dataType)=>({kind:'variable',mutable:true,initialized:true,value,dataType});
+    const memory={score:binding(75,'int'),price:binding(9.5,'float'),letter:binding('B','char')};
+    const c=coreParseStatement({language:'c',source:'printf("Score: %d Price: %.2f Letter: %c %%\\\\n", score, price, letter);',
+      symbols:memory,location:{filename:'Output.c',start:{line:7,column:1},end:{line:7,column:80}}});
+    const cEvaluation=coreExecuteStatement({language:'c',statement:c.ir,memory});
+    const java=coreParseStatement({language:'java',source:'System.out.println("Score: " + score + " Letter: " + letter);',symbols:memory});
+    const javaEvaluation=coreExecuteStatement({language:'java',statement:java.ir,memory});
+    const terminal=coreTerminalScreen('Loading......\\rLoading Done!\\nNext\\b!');
+    let unsupportedFormat=false,uninitializedRejected=false;
+    try{coreParseStatement({language:'c',source:'printf("%x", score);',symbols:memory});}catch(error){unsupportedFormat=/unsupported printf format/.test(error.message);}
+    try{coreParseStatement({language:'java',source:'System.out.print(missing);',symbols:memory});}catch(error){uninitializedRejected=/used before it is initialized/.test(error.message);}
+    return JSON.stringify({
+      cKind:c.ir.kind,cLine:c.ir.sourceSpan.start.line,cNewline:c.ir.newline,
+      cFormats:c.ir.parts.filter(part=>part.kind==='expression').map(part=>part.format),
+      cText:cEvaluation.value,cEffectKinds:cEvaluation.effects.map(effect=>effect.kind),
+      cTrace:cEvaluation.trace.map(step=>step.action),cDependencies:c.dependencies,
+      javaKind:java.ir.kind,javaNewline:java.ir.newline,javaText:javaEvaluation.value,
+      javaParts:java.ir.parts.map(part=>part.kind),javaDependencies:java.dependencies,
+      terminalText:terminal.text,terminalLines:terminal.lines,
+      unsupportedFormat,uninitializedRejected
+    });
+  })()`));
+  assert.deepStrictEqual([result.cKind,result.cLine,result.cNewline],['output',7,true]);
+  assert.deepStrictEqual(result.cFormats,['d','.2f','c']);
+  assert.strictEqual(result.cText,'Score: 75 Price: 9.50 Letter: B %\n');
+  assert.deepStrictEqual(result.cEffectKinds,['read','read','read','output']);
+  assert.deepStrictEqual(result.cTrace,
+    ['SUBSTITUTE','FORMAT_OUTPUT_VALUE','SUBSTITUTE','FORMAT_OUTPUT_VALUE','SUBSTITUTE','FORMAT_OUTPUT_VALUE','PRINT']);
+  assert.deepStrictEqual(result.cDependencies,['score','price','letter']);
+  assert.deepStrictEqual([result.javaKind,result.javaNewline,result.javaText],['output',true,'Score: 75 Letter: B\n']);
+  assert.deepStrictEqual(result.javaParts,['text','expression','text','expression']);
+  assert.deepStrictEqual(result.javaDependencies,['score','letter']);
+  assert.strictEqual(result.terminalText,'Loading Done!\nNex!');
+  assert.deepStrictEqual(result.terminalLines,['Loading Done!','Nex!']);
+  assert(result.unsupportedFormat&&result.uninitializedRejected);
+}
+
+function testSharedInputStatementCore(){
+  const parserSource=fs.readFileSync(path.join(ROOT,'plugins','program-input','parser.js'),'utf8');
+  assert(!parserSource.includes('function programInputParseC'));
+  assert(!parserSource.includes('function programInputParseJava'));
+  const ctx=context();
+  load(ctx,['engine.js','program-ir.js','language-core.js','expression-parser.js','expression-semantics.js',
+    'output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js','statement-parser.js','statement-semantics.js','program-parser.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const variable=(dataType='int')=>({kind:'variable',mutable:true,initialized:false,value:undefined,dataType});
+    const cMemory={x:variable(),y:variable(),z:variable()};
+    const c=coreParseStatement({language:'c',source:'scanf("%d %d %d", &x, &y, &z);',symbols:cMemory,
+      inputValues:{x:4,y:7,z:2},location:{filename:'Input.c',start:{line:8,column:1},end:{line:8,column:40}}});
+    const cEvaluation=coreExecuteStatement({language:'c',statement:c.ir,memory:cMemory});
+    applyCoreStatementEffects(cMemory,cEvaluation.effects,'input-1','bindings');
+    const javaMemory={score:variable()};
+    const java=coreParseStatement({language:'java',source:'score = scanner.nextInt();',symbols:javaMemory,inputValues:{score:91}});
+    const javaEvaluation=coreExecuteStatement({language:'java',statement:java.ir,memory:javaMemory});
+    applyCoreStatementEffects(javaMemory,javaEvaluation.effects,'input-2','bindings');
+    const program=coreParseProgram({language:'c',filename:'InputProgram.c',inputValues:{value:13},source:
+      '#include <stdio.h>\\nint main() {\\n  int value;\\n  scanf("%d", &value);\\n  printf("Value: %d\\\\n", value);\\n  return 0;\\n}'});
+    let addressRejected=false,typeRejected=false;
+    try{coreParseStatement({language:'c',source:'scanf("%d", x);',symbols:{x:variable()},inputValues:{x:1}});}catch(error){addressRejected=/&identifier/.test(error.message);}
+    try{coreParseStatement({language:'c',source:'scanf("%d", &price);',symbols:{price:variable('float')},inputValues:{price:1}});}catch(error){typeRejected=/mutable int target/.test(error.message);}
+    return JSON.stringify({
+      cKind:c.ir.kind,cLine:c.ir.sourceSpan.start.line,cSyntax:c.ir.inputSyntax,cReader:c.ir.readerName,
+      cTargets:c.ir.reads.map(read=>read.target),cRaw:c.ir.rawInput,cDependencies:c.dependencies,
+      cEffectKinds:cEvaluation.effects.map(effect=>effect.kind),cTrace:cEvaluation.trace.map(step=>step.action),
+      cMemory:Object.fromEntries(Object.entries(cMemory).map(([name,row])=>[name,row.value])),
+      javaKind:java.ir.kind,javaReader:java.ir.readerName,javaRaw:java.ir.rawInput,javaValue:javaMemory.score.value,
+      programKinds:program.ir.statements.map(statement=>statement.kind),
+      programOutput:program.effects.find(effect=>effect.kind==='output').text,
+      programMemory:program.ir.metadata.expectedMemory.value.value,
+      addressRejected,typeRejected
+    });
+  })()`));
+  assert.deepStrictEqual([result.cKind,result.cLine,result.cSyntax,result.cReader],['input',8,'c','scanf']);
+  assert.deepStrictEqual(result.cTargets,['x','y','z']);
+  assert.strictEqual(result.cRaw,'4 7 2');
+  assert.deepStrictEqual(result.cDependencies,['x','y','z']);
+  assert.deepStrictEqual(result.cEffectKinds,['input','write','write','write']);
+  assert.deepStrictEqual(result.cTrace,['CALL_INPUT','INPUT_SUBMIT','CONVERT_INPUT_BATCH','WRITE_INPUT','WRITE_INPUT','WRITE_INPUT']);
+  assert.deepStrictEqual(result.cMemory,{x:4,y:7,z:2});
+  assert.deepStrictEqual([result.javaKind,result.javaReader,result.javaRaw,result.javaValue],['input','scanner','91',91]);
+  assert.deepStrictEqual(result.programKinds,['declaration','input','output','program-return']);
+  assert.strictEqual(result.programOutput,'Value: 13\n');
+  assert.strictEqual(result.programMemory,13);
+  assert(result.addressRejected&&result.typeRejected);
+}
+
+function testSharedSelectionStatementCore(){
+  const contentSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','content.js'),'utf8');
+  const statementSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','statement.js'),'utf8');
+  assert(!contentSource.includes("const match=/^\\s*(?:}\\s*)?(if|else\\s+if)"));
+  assert(!contentSource.includes('const caseMatch='));
+  assert(contentSource.includes('coreSwitchLabel'));
+  assert(statementSource.includes('programSemanticsForContext'));
+  assert(!statementSource.includes('coreSelectBranch'));
+  assert(!statementSource.includes('coreExecuteStatement'));
+  const ctx=context();
+  load(ctx,['engine.js','program-ir.js','language-core.js','expression-parser.js','expression-semantics.js',
+    'output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js','statement-parser.js','statement-semantics.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const variable=value=>({kind:'variable',mutable:true,initialized:true,value,dataType:'int'});
+    const memory={score:variable(82),absences:variable(2),day:variable(2),x:variable(1)};
+    const branches=[
+      {when:true,label:'TRUE',targetLine:8,nextStatementId:'output-pass'},
+      {when:false,label:'FALSE',targetLine:10,nextStatementId:'output-fail'}
+    ];
+    const conditional=coreParseStatement({language:'c',source:'if (score >= 75 && absences < 5) {',symbols:memory,branches,
+      location:{filename:'Selection.c',start:{line:7,column:1},end:{line:7,column:42}}});
+    const conditionResult=coreExecuteStatement({language:'c',statement:conditional.ir,memory});
+    const elseIf=coreParseStatement({language:'java',source:'} else if (score == 75) {',symbols:memory,branches});
+    const switchBranches=[
+      {value:1,label:'case 1',nextStatementId:'one'},
+      {value:2,label:'case 2',nextStatementId:'two'},
+      {default:true,label:'default',nextStatementId:'other'}
+    ];
+    const switched=coreParseStatement({language:'c',source:'switch (day) {',symbols:memory,branches:switchBranches});
+    const switchResult=coreExecuteStatement({language:'c',statement:switched.ir,memory});
+    const numericLabel=coreSwitchLabel('case -1:',{language:'c'},memory,
+      languageCoreSourceLocation({start:{line:12,column:1},end:{line:12,column:9}}));
+    const characterLabel=coreSwitchLabel("case 'B':",{language:'java'},memory,
+      languageCoreSourceLocation({start:{line:13,column:1},end:{line:13,column:10}}));
+    const defaultLabel=coreSwitchLabel('default:',{language:'c'},memory,
+      languageCoreSourceLocation({start:{line:14,column:1},end:{line:14,column:9}}));
+    const mutating=coreParseStatement({language:'c',source:'if (++x > 1) {',symbols:memory,branches});
+    const mutationResult=coreExecuteStatement({language:'c',statement:mutating.ir,memory});
+    const unchanged=memory.x.value===1;
+    applyCoreStatementEffects(memory,mutationResult.effects,'selection-mutation','bindings');
+    return JSON.stringify({
+      kind:conditional.ir.kind,selectionKind:conditional.ir.selectionKind,line:conditional.ir.sourceSpan.start.line,
+      dependencies:conditional.dependencies,value:conditionResult.value,
+      flow:conditionResult.effects.find(effect=>effect.kind==='flow'),trace:conditionResult.trace.map(step=>step.action),
+      elseIfKind:elseIf.ir.selectionKind,
+      switchKind:switched.ir.selectionKind,switchValue:switchResult.value,
+      switchFlow:switchResult.effects.find(effect=>effect.kind==='flow'),
+      switchLabels:[numericLabel.value,characterLabel.value,defaultLabel.default],
+      mutationValue:mutationResult.value,mutationWrites:mutationResult.effects.filter(effect=>effect.kind==='write')
+        .map(effect=>[effect.target,effect.previousValue,effect.nextValue]),unchanged,appliedX:memory.x.value
+    });
+  })()`));
+  assert.deepStrictEqual([result.kind,result.selectionKind,result.line],['selection','if',7]);
+  assert.deepStrictEqual(result.dependencies,['score','absences']);
+  assert.strictEqual(result.value,true);
+  assert.deepStrictEqual([result.flow.flow,result.flow.label,result.flow.targetLine,result.flow.nextStatementId],
+    ['branch','TRUE',8,'output-pass']);
+  assert.deepStrictEqual(result.trace,['SUBSTITUTE','EVALUATE','SUBSTITUTE','EVALUATE','EVALUATE','BRANCH']);
+  assert.strictEqual(result.elseIfKind,'else-if');
+  assert.deepStrictEqual([result.switchKind,result.switchValue,result.switchFlow.label,result.switchFlow.nextStatementId],
+    ['switch',2,'case 2','two']);
+  assert.deepStrictEqual(result.switchLabels,[-1,'B',true]);
+  assert.strictEqual(result.mutationValue,true);
+  assert.deepStrictEqual(result.mutationWrites,[['x',1,2]]);
+  assert(result.unchanged&&result.appliedX===2);
+}
+
+function testSharedLoopStatementCore(){
+  const ctx=context();
+  load(ctx,['engine.js','program-ir.js','language-core.js','expression-parser.js','expression-semantics.js',
+    'output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js',
+    'statement-parser.js','statement-semantics.js','program-parser.js','program-item-builder.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const variable=value=>({kind:'variable',mutable:true,initialized:true,value,dataType:'int'});
+    const branches=[
+      {when:true,label:'CONTINUE',targetLine:5,nextStatementId:'loop-body'},
+      {when:false,label:'EXIT',targetLine:8,nextStatementId:'after-loop'}
+    ];
+    const memory={i:variable(0),limit:variable(3)};
+    const whileLoop=coreParseStatement({language:'c',source:'while (i < limit) {',symbols:memory,branches,
+      location:{filename:'Loops.c',start:{line:4,column:1},end:{line:4,column:22}}});
+    const whileResult=coreExecuteStatement({language:'c',statement:whileLoop.ir,memory});
+    const forLoop=coreParseStatement({language:'java',source:'for (i = 0; i < limit; i++) {',symbols:memory,branches});
+    const initResult=coreExecuteStatement({language:'java',statement:forLoop.ir,memory,phase:'initialize'});
+    applyCoreStatementEffects(memory,initResult.effects,'for-init','bindings');
+    const conditionResult=coreExecuteStatement({language:'java',statement:forLoop.ir,memory});
+    const updateResult=coreExecuteStatement({language:'java',statement:forLoop.ir,memory,phase:'update'});
+    const unchangedBeforeUpdate=memory.i.value===0;
+    applyCoreStatementEffects(memory,updateResult.effects,'for-update','bindings');
+    const declarationFor=coreParseStatement({language:'c',source:'for (int j = 0; j < 2; j++) {',symbols:memory,branches});
+    const doEntry=coreParseStatement({language:'c',source:'do {',symbols:memory,branches});
+    const doEntryResult=coreExecuteStatement({language:'c',statement:doEntry.ir,memory});
+    const doTail=parseCoreLoopStatement({language:'c',source:'while (i < limit);',doWhile:true},
+      coreExpressionSymbolTable(memory),languageCoreSourceLocation({start:{line:9,column:1},end:{line:9,column:19}}));
+    const program=coreParseProgram({language:'c',filename:'LoopProgram.c',source:
+      'int main() {\\n  int i = 0;\\n  while (i < 3) {\\n    i++;\\n  }\\n  for (i = 0; i < 2; i++) {\\n    i += 1;\\n  }\\n  do {\\n    i--;\\n  } while (i > 0);\\n  return 0;\\n}'});
+    return JSON.stringify({
+      whileKind:whileLoop.ir.loopKind,whileDependencies:whileLoop.dependencies,whileValue:whileResult.value,
+      whileFlow:whileResult.effects.find(effect=>effect.kind==='flow'),whileTrace:whileResult.trace.map(step=>step.action),
+      forKind:forLoop.ir.loopKind,initializerKind:forLoop.ir.initializer.kind,updateKind:forLoop.ir.update.kind,
+      initScope:initResult.effects.map(effect=>effect.scope),conditionValue:conditionResult.value,
+      updateScope:updateResult.effects.map(effect=>effect.scope),unchangedBeforeUpdate,updatedI:memory.i.value,
+      declarationInitializer:declarationFor.ir.initializer.kind,declarationTarget:declarationFor.ir.initializer.binding.name,
+      doKind:doEntry.ir.loopKind,doValue:doEntryResult.value,doFlow:doEntryResult.effects.find(effect=>effect.kind==='flow').flow,
+      doTailKind:doTail.loopKind,
+      programKinds:program.ir.statements.map(statement=>statement.kind),
+      programLoopKinds:program.ir.statements.filter(statement=>statement.kind==='loop').map(statement=>statement.loopKind),
+      programDiagnostics:program.diagnostics.map(diagnostic=>diagnostic.code),
+      serializable:!!JSON.parse(JSON.stringify({whileLoop,forLoop,program}))
+    });
+  })()`));
+  assert.deepStrictEqual([result.whileKind,result.whileValue],['while',true]);
+  assert.deepStrictEqual(result.whileDependencies,['i','limit']);
+  assert.deepStrictEqual([result.whileFlow.flow,result.whileFlow.label,result.whileFlow.nextStatementId],
+    ['loop-branch','CONTINUE','loop-body']);
+  assert.deepStrictEqual(result.whileTrace,['SUBSTITUTE','SUBSTITUTE','EVALUATE','LOOP_CONDITION']);
+  assert.deepStrictEqual([result.forKind,result.initializerKind,result.updateKind],['for','assignment','unary-update']);
+  assert(result.initScope.every(scope=>scope==='loop-initializer'));
+  assert(result.conditionValue&&result.unchangedBeforeUpdate&&result.updatedI===1);
+  assert(result.updateScope.every(scope=>scope==='loop-update'));
+  assert.deepStrictEqual([result.declarationInitializer,result.declarationTarget],['declaration','j']);
+  assert.deepStrictEqual([result.doKind,result.doValue,result.doFlow,result.doTailKind],['do',true,'loop-branch','do-while']);
+  assert.deepStrictEqual(result.programKinds,['declaration','loop','unary-update','loop','assignment','loop','unary-update','loop','program-return']);
+  assert.deepStrictEqual(result.programLoopKinds,['while','for','do','do-while']);
+  assert.deepStrictEqual(result.programDiagnostics,[]);
+  assert(result.serializable);
+}
+
+function testPhase4BUnsupportedConstructs(){
+  const ctx=context();
+  load(ctx,['engine.js','program-ir.js','language-core.js','expression-parser.js','expression-semantics.js',
+    'output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js',
+    'statement-parser.js','statement-semantics.js','program-parser.js','program-item-builder.js']);
+  const fixture=(set,name)=>fs.readFileSync(path.join(ROOT,'exercise-libraries','source-programs','c',set,name),'utf8');
+  ctx.phase4bJuliet=fixture('simulate-output-variables','TaskJuliet.c');
+  ctx.phase4bOscar=fixture('simulate-basic-output','TaskOscar.c');
+  ctx.phase4bSierra=fixture('simulate-output-variables','TaskSierra.c');
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const summarize=(filename,source)=>{
+      const parsed=coreParseProgram({language:'c',filename,source});
+      const memory=parsed.ir.metadata.expectedMemory;
+      return {kinds:parsed.ir.statements.map(statement=>statement.kind),
+        declarations:parsed.ir.statements.filter(statement=>statement.kind==='declaration').map(statement=>({
+          name:statement.binding.name,dataType:statement.binding.dataType,mutable:statement.binding.mutable,
+          syntax:statement.declarationSyntax||null,value:memory[statement.binding.name]&&memory[statement.binding.name].value})),
+        formats:parsed.ir.statements.filter(statement=>statement.kind==='output').flatMap(statement=>
+          statement.parts.filter(part=>part.kind==='expression').map(part=>part.format)),
+        output:parsed.effects.filter(effect=>effect.kind==='output').map(effect=>effect.text).join(''),
+        diagnostics:parsed.diagnostics.map(diagnostic=>[diagnostic.code,diagnostic.location.start.line]),
+        dependencies:parsed.dependencies};
+    };
+    const literal=coreParseExpression({language:'c',source:'"hello"',symbols:{}}).ir;
+    const expressionOutput=coreParseStatement({language:'c',source:'printf("Total: %d\\n", 2 + 3 * 4);',symbols:{}});
+    const expressionResult=coreExecuteStatement({language:'c',statement:expressionOutput.ir,memory:{}});
+    const expressionRuntime=buildOutputStatementRuntime(expressionOutput.ir,0,{});
+    const dynamicIndex=expressionRuntime.parts.findIndex(part=>part.kind==='expression');
+    return JSON.stringify({literal,
+      expressionFormat:expressionOutput.ir.parts.find(part=>part.kind==='expression').format,
+      expressionKind:expressionOutput.ir.parts.find(part=>part.kind==='expression').expression.kind,
+      expressionSource:expressionOutput.ir.parts.find(part=>part.kind==='expression').source,
+      expressionResult:expressionResult.value,expressionExpected:expressionRuntime.runtime.parts[dynamicIndex].expectedValue,
+      expressionStaged:expressionRuntime.runtime.parts[dynamicIndex].stagedValue,
+      stringDisplay:formatValue('Maria','string'),
+      juliet:summarize('TaskJuliet.c',phase4bJuliet),
+      sierra:summarize('TaskSierra.c',phase4bSierra)});
+  })()`));
+  assert.deepStrictEqual(result.literal,{kind:'literal',value:'hello',dataType:'string'});
+  assert.deepStrictEqual([result.expressionFormat,result.expressionKind,result.expressionSource,result.expressionResult,
+    result.expressionExpected,result.expressionStaged],['d','binary','2 + 3 * 4','Total: 14\n',14,14]);
+  assert.strictEqual(result.stringDisplay,'"Maria"');
+  assert.deepStrictEqual(result.juliet.diagnostics,[]);
+  assert(result.juliet.declarations.some(row=>row.name==='name'&&row.dataType==='string'&&row.value==='Maria'
+    &&row.syntax==='char-array'));
+  assert.deepStrictEqual(result.juliet.formats,['s','d','.1f','c','.2f','0.4f']);
+  assert.strictEqual(result.juliet.output,
+    'Name: Maria\nAge: 20\nHeight: 165.5 cm\nGrade: A\nPi (2 decimals): 3.14\nPi (4 decimals): 3.1416\n');
+  assert.deepStrictEqual(result.sierra.diagnostics,[]);
+  assert(result.sierra.declarations.some(row=>row.name==='TAX_RATE'&&row.syntax==='define'&&!row.mutable&&row.value===0.08));
+  assert(result.sierra.declarations.some(row=>row.name==='SHOP_NAME'&&row.dataType==='string'&&row.value==='Tech Haven'));
+  assert(result.sierra.formats.includes('s')&&result.sierra.formats.includes('0.4f'));
+  assert.strictEqual(result.sierra.output,
+    'Welcome to Tech Haven!\nCustomer: "Diego"\nQuantity: 2\nSubtotal: 2400.00\nIs loyal member: 1\nDiscount: 240.00\nTax: 172.8000\nFinal Total: 2332.80\nHave a great day, Diego!\n');
+}
+
+function testSharedSourceProgramPipeline(){
+  const programOutputSource=fs.readFileSync(path.join(ROOT,'plugins','program-output','content.js'),'utf8');
+  const codeSimulatorSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','content.js'),'utf8');
+  const simulateOutputSource=fs.readFileSync(path.join(ROOT,'plugins','simulate-output','generator.js'),'utf8');
+  assert(programOutputSource.includes('sourceProgramValidateManifest'));
+  assert(programOutputSource.includes('sourceProgramParseExercise'));
+  assert(!programOutputSource.includes('function poMetadataAndSource'));
+  assert(!programOutputSource.includes('coreParseProgram('));
+  assert(codeSimulatorSource.includes('sourceProgramMetadataAndSource'));
+  assert(codeSimulatorSource.includes('sourceProgramParseExercise'));
+  assert(!codeSimulatorSource.includes('function csSeedDirectives'));
+  assert(!codeSimulatorSource.includes('function csMaterializeSource'));
+  assert(!codeSimulatorSource.includes('coreParseProgram('));
+  assert(simulateOutputSource.includes('sourceProgramValidateManifest'));
+  assert(simulateOutputSource.includes('sourceProgramParseExercise'));
+
+  const ctx=context();
+  load(ctx,['engine.js','program-ir.js','language-core.js','expression-parser.js','expression-semantics.js',
+    'output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js',
+    'statement-parser.js','statement-semantics.js','program-parser.js','source-program-pipeline.js']);
+  ctx.pipelineFixture=`/* @codescope
+ * @title Seeded source
+ * @result x
+ * @seed x min=2 max=4
+ */
+#include <stdio.h>
+int main() {
+  int x = 1;
+  printf("%d\\n", x);
+  return 0;
+}`;
+  ctx.steppedSeedFixture=`/* @codescope
+ * @title Stepped seed
+ * @seed balance min=1000 max=1400 step=100
+ * @seed price min=9.50 max=10.50 step=0.25 decimals=2
+ */
+#include <stdio.h>
+int main() {
+  int balance = 1200;
+  float price = 10.00;
+  printf("%d\\n", balance);
+  return 0;
+}`;
+  ctx.multiSeedFixture=`/* @codescope
+ * @title Store Transaction
+ * @seed itemCost min=430 max=470
+ * @seed quantity min=2 max=4
+ */
+#include <stdio.h>
+int main(void) {
+  int itemCost = 450, quantity = 3, discount = 50;
+  printf("%d %d %d\\n", itemCost, quantity, discount);
+  return 0;
+}`;
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const authored=sourceProgramParseExercise({raw:pipelineFixture,filename:'Seed.c',language:'c',
+      sourceValueMode:'authored',randomInteger:()=>4});
+    const seeded=sourceProgramParseExercise({raw:pipelineFixture,filename:'Seed.c',language:'c',
+      sourceValueMode:'seeded',randomInteger:()=>4});
+    const stepped=Array.from({length:5},(_,slot)=>sourceProgramParseExercise({raw:steppedSeedFixture,
+      filename:'Stepped.c',language:'c',sourceValueMode:'seeded',randomInteger:()=>slot}));
+    const multi=sourceProgramParseExercise({raw:multiSeedFixture,filename:'Store.c',language:'c',
+      sourceValueMode:'seeded',randomInteger:min=>min});
+    const invalidSteps=[];
+    for(const metadata of ['@seed x min=1 max=5 step=0','@seed x min=1 max=5 step=-1']){
+      try{sourceProgramSeedDirectives(metadata,'Invalid.c');}catch(error){invalidSteps.push(error.message);}
+    }
+    const manifest=sourceProgramValidateManifest({title:'  Demo  ',exercises:['One.c','Two.c']},'manifest.json');
+    const errors=[];
+    for(const candidate of [
+      {exercises:['../One.c']},{exercises:['One.c','One.c']},{exercises:[]}
+    ]){try{sourceProgramValidateManifest(candidate,'bad.json');}catch(error){errors.push(error.message);}}
+    return JSON.stringify({manifest,errors,authored:{title:authored.title,resultName:authored.resultName,
+      source:authored.source,templateSource:authored.templateSource,seedValues:authored.seedValues,
+      kinds:authored.coreProgramResult.ir.statements.map(statement=>statement.kind),
+      diagnostics:authored.coreProgramResult.diagnostics.map(diagnostic=>diagnostic.code),
+      lineKeys:[...authored.statementsByLine.keys()]},seeded:{source:seeded.source,
+      templateSource:seeded.templateSource,seedValues:seeded.seedValues,
+      kinds:seeded.coreProgramResult.ir.statements.map(statement=>statement.kind)},
+      steppedValues:stepped.map(entry=>entry.seedValues.balance),
+      steppedFloatValues:stepped.map(entry=>entry.seedValues.price),
+      steppedSources:stepped.map(entry=>entry.source),invalidSteps,
+      multi:{source:multi.source,seedValues:multi.seedValues,
+        declarations:multi.coreProgramResult.ir.statements.filter(statement=>statement.kind==='declaration')
+          .map(statement=>statement.binding.name),memory:multi.coreProgramResult.ir.metadata.expectedMemory}});
+  })()`));
+  assert.deepStrictEqual(result.manifest,{title:'Demo',exercises:['One.c','Two.c']});
+  assert.strictEqual(result.errors.length,3);
+  assert.strictEqual(result.authored.title,'Seeded source');
+  assert.strictEqual(result.authored.resultName,'x');
+  assert(!result.authored.source.includes('@codescope'));
+  assert(result.authored.source.includes('int x = 1;'));
+  assert.deepStrictEqual(result.authored.seedValues,{x:1});
+  assert.deepStrictEqual(result.authored.diagnostics,[]);
+  assert.deepStrictEqual(result.authored.kinds,['declaration','output','program-return']);
+  assert(result.authored.lineKeys.length===3);
+  assert(result.seeded.source.includes('int x = 4;'));
+  assert(result.seeded.templateSource.includes('int x = 1;'));
+  assert.deepStrictEqual(result.seeded.seedValues,{x:4});
+  assert.deepStrictEqual(result.seeded.kinds,result.authored.kinds);
+  assert.deepStrictEqual(result.steppedValues,[1000,1100,1200,1300,1400]);
+  assert.deepStrictEqual(result.steppedFloatValues,[9.5,9.75,10,10.25,10.5]);
+  result.steppedSources.forEach((source,index)=>assert(source.includes(`int balance = ${1000+index*100};`)));
+  assert.strictEqual(result.invalidSteps.length,2);
+  assert(result.multi.source.includes('int itemCost = 430, quantity = 2, discount = 50;'));
+  assert.deepStrictEqual(result.multi.seedValues,{itemCost:430,quantity:2});
+  assert.deepStrictEqual(result.multi.declarations,['itemCost','quantity','discount']);
+  assert.strictEqual(result.multi.memory.itemCost.value,430);
+  assert.strictEqual(result.multi.memory.quantity.value,2);
+  assert.strictEqual(result.multi.memory.discount.value,50);
+
+  for(const language of ['c','java']){
+    const directory=path.join(ROOT,'exercise-libraries','source-programs',language,'output-basics');
+    const manifest=JSON.parse(fs.readFileSync(path.join(directory,'manifest.json'),'utf8'));
+    for(const filename of manifest.exercises){
+      const raw=fs.readFileSync(path.join(directory,filename),'utf8');
+      ctx.releaseExerciseRaw=raw;ctx.releaseExerciseFilename=filename;ctx.releaseExerciseLanguage=language;
+      const parsed=JSON.parse(evaluate(ctx,`(()=>{const result=sourceProgramParseExercise({
+        raw:releaseExerciseRaw,filename:releaseExerciseFilename,language:releaseExerciseLanguage,
+        sourceValueMode:'authored'});return JSON.stringify({
+          diagnostics:result.coreProgramResult.diagnostics.map(diagnostic=>diagnostic.code),
+          kinds:result.coreProgramResult.ir.statements.map(statement=>statement.kind)
+        });})()`));
+      const authoredOutputCount=(raw.match(language==='c'?/\bprintf\s*\(/g:/\bSystem\.out\.print(?:ln)?\s*\(/g)||[]).length;
+      assert.deepStrictEqual(parsed.diagnostics,[],`${language}/${filename} must parse without core diagnostics`);
+      assert.strictEqual(parsed.kinds.filter(kind=>kind==='output').length,authoredOutputCount,
+        `${language}/${filename} must expose every authored output statement`);
+      assert(parsed.kinds.includes('output'),`${language}/${filename} must contain an output statement`);
+    }
+  }
+}
+
+function testPluginResponsibilityMigration(){
+  const interactionFiles=[
+    'js/declaration-statement-plugin.js','js/assignment-statement-plugin.js',
+    'js/unary-update-statement-plugin.js','js/program-break.js','js/program-return.js',
+    'plugins/program-output/statement.js','plugins/program-input/statement.js',
+    'plugins/code-simulator/statement.js'
+  ];
+  interactionFiles.forEach(filename=>{
+    const source=fs.readFileSync(path.join(ROOT,filename),'utf8');
+    assert(!source.includes('coreExecuteStatement('),`${filename} must consume Program Core semantics`);
+    assert(!source.includes('coreSelectBranch('),`${filename} must not select control flow`);
+    assert(!source.includes('evaluateUnaryOperation('),`${filename} must not implement unary semantics`);
+  });
+  ['plugins/program-output/statement.js','plugins/program-input/statement.js',
+    'plugins/code-simulator/statement.js'].forEach(filename=>{
+    const source=fs.readFileSync(path.join(ROOT,filename),'utf8');
+    assert(source.includes('programSemanticsForContext'));
+  });
+  ['plugins/program-output/content.js','plugins/code-simulator/content.js'].forEach(filename=>{
+    const source=fs.readFileSync(path.join(ROOT,filename),'utf8');
+    assert(!source.includes("typeof evaluateAndApplyCoreStatement==='function'"));
+    assert(!source.includes('if(!semantic)'));
+  });
+
+  const ctx=context();
+  load(ctx,['engine.js','program-ir.js','language-core.js','expression-parser.js','expression-semantics.js',
+    'output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js',
+    'statement-parser.js','statement-semantics.js','program-core.js']);
+  loadRelative(ctx,['plugins/program-output/manifest.js','plugins/program-input/manifest.js',
+    'plugins/code-simulator/manifest.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const binding=value=>({name:'x',kind:'variable',dataType:'int',mutable:true,initialized:true,value});
+    const statement=assignmentStatement({id:'core-owned-assignment',target:'x',operator:'+=',value:literalExpression(3)});
+    const program=createProgram([statement],{language:'c',memory:{x:binding(4)}});
+    const semantics=programSemanticServices(program);
+    const executed=semantics.execute(statement,program.memory);
+    semantics.applyEffects(program.memory,executed.effects,statement.id,'bindings');
+    return JSON.stringify({value:executed.value,memory:program.memory.x.value,
+      trace:executed.trace.map(step=>step.action),manifests:[
+        {owner:PROGRAM_OUTPUT_PLUGIN_MANIFEST.semanticOwner,responsibilities:PROGRAM_OUTPUT_PLUGIN_MANIFEST.responsibilities,
+          capabilities:PROGRAM_OUTPUT_PLUGIN_MANIFEST.capabilities},
+        {owner:PROGRAM_INPUT_PLUGIN_MANIFEST.semanticOwner,responsibilities:PROGRAM_INPUT_PLUGIN_MANIFEST.responsibilities,
+          capabilities:PROGRAM_INPUT_PLUGIN_MANIFEST.capabilities},
+        {owner:CODE_SIMULATOR_PLUGIN_MANIFEST.semanticOwner,responsibilities:CODE_SIMULATOR_PLUGIN_MANIFEST.responsibilities,
+          capabilities:CODE_SIMULATOR_PLUGIN_MANIFEST.capabilities}
+      ]});
+  })()`));
+  assert.deepStrictEqual([result.value,result.memory,result.trace],[7,7,['ASSIGN']]);
+  result.manifests.forEach(manifest=>{
+    assert.strictEqual(manifest.owner,'language-core');
+    assert(manifest.responsibilities.includes('interaction')&&manifest.responsibilities.includes('presentation'));
+    assert(!manifest.capabilities.some(capability=>['declaration','assignment','unary-update','input','output',
+      'if','if-else','if-else-if','switch-case','break','switch-fall-through','return'].includes(capability)));
+  });
+}
+
+function testProfileSchemaSimplification(){
+  const catalogSource=fs.readFileSync(path.join(ROOT,'js','profiles.js'),'utf8');
+  assert(!/\bprovider\s*:/.test(catalogSource),'Current profiles must not select content providers');
+  assert(!/\bprogram\s*:/.test(catalogSource),'Current profiles must not carry legacy program configuration');
+
+  const ctx=context();
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const select=id=>PROFILES.find(profile=>profile.id===id);
+    const output=select('program-output-basics');
+    const sourcedOutput=select('program-output-source-flow');
+    const input=select('program-input-source-flow');
+    const simulator=select('selection-statements-source');
+    const assignment=select('assignment-basic');
+    return JSON.stringify({
+      currentProfilesHaveNoProvider:PROFILES.every(profile=>!profile.content||!Object.prototype.hasOwnProperty.call(profile.content,'provider')),
+      currentProfilesHaveNoProgram:PROFILES.every(profile=>!Object.prototype.hasOwnProperty.call(profile,'program')),
+      output:{lesson:output.lesson,source:profileContentSource(output),workspace:profileWorkspacePresentation(output),
+        timeline:profileTimelineMode(output),commits:profileScoresStatementCommits(output)},
+      sourcedOutput:{lesson:sourcedOutput.lesson,source:profileContentSource(sourcedOutput),
+        variables:profileVariableValueMode(sourcedOutput),workspace:profileWorkspacePresentation(sourcedOutput)},
+      input:{lesson:input.lesson,inputValues:profileInputValueMode(input),source:profileContentSource(input)},
+      simulator:{lesson:simulator.lesson,source:profileContentSource(simulator),workspace:profileWorkspacePresentation(simulator)},
+      assignment:{lesson:assignment.lesson,interaction:assignment.interaction}
+    });
+  })()`));
+  assert(result.currentProfilesHaveNoProvider&&result.currentProfilesHaveNoProgram);
+  assert.deepStrictEqual(result.output.lesson,{focus:'output',variant:'formatted-values'});
+  assert.strictEqual(result.output.workspace,'statement-flow');
+  assert.strictEqual(result.output.timeline,'inline');
+  assert.strictEqual(result.output.commits,true);
+  assert.deepStrictEqual(result.sourcedOutput.source,{library:'source-programs',exerciseSet:'formatted-output'});
+  assert.strictEqual(result.sourcedOutput.variables,'authored');
+  assert.strictEqual(result.sourcedOutput.workspace,'source-program');
+  assert.strictEqual(result.input.inputValues,'seeded');
+  assert.strictEqual(result.input.lesson.focus,'input');
+  assert.strictEqual(result.simulator.lesson.focus,'program-flow');
+  assert.strictEqual(result.simulator.workspace,'source-program');
+  assert.deepStrictEqual(result.assignment.lesson,{focus:'assignment',variant:'basic-set'});
+  assert.strictEqual(result.assignment.interaction.declarations,'interactive');
+}
+
+function testDuplicateCodeRemoval(){
+  assert(!fs.existsSync(path.join(ROOT,'js','profiles_.js')),'Obsolete duplicate profile catalog must stay removed');
+  const profiles=fs.readFileSync(path.join(ROOT,'js','profiles.js'),'utf8');
+  const generator=fs.readFileSync(path.join(ROOT,'js','generator.js'),'utf8');
+  const activityCore=fs.readFileSync(path.join(ROOT,'js','activity-core.js'),'utf8');
+  const outputContent=fs.readFileSync(path.join(ROOT,'plugins','program-output','content.js'),'utf8');
+  const inputParser=fs.readFileSync(path.join(ROOT,'plugins','program-input','parser.js'),'utf8');
+  const simulatorContent=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','content.js'),'utf8');
+  const sourceLibrary=fs.readFileSync(path.join(ROOT,'exercise-libraries','source-programs','library.js'),'utf8');
+
+  ['sourceLibrary','sourceValueMode','inputValueMode','timelinePresentation','assignmentLesson:',
+    'unaryUpdateLesson:','mixedUpdateLesson:','outputLesson:'].forEach(token=>
+    assert(!profiles.includes(token),`profiles.js retains retired configuration '${token}'`));
+  assert(!generator.includes('raw.program'));
+  assert(!activityCore.includes('profile.content.provider'));
+  assert(!simulatorContent.includes("id:'program-selection'"));
+  assert(!sourceLibrary.includes('aliases:'));
+
+  ['poProgramBody','poSplitStatements','poParseExpression','poParseCOutput','poParseJavaOutput']
+    .forEach(name=>assert(!outputContent.includes(`function ${name}`),`Program Output retains duplicate parser ${name}`));
+  assert(!outputContent.includes('coreParseStatement('));
+  assert(!simulatorContent.includes('coreParseStatement('));
+  assert(!simulatorContent.includes('poParseCOutput('));
+  assert(!simulatorContent.includes('poParseJavaOutput('));
+  assert(!inputParser.includes('function programInputParseSourceLine'));
+  assert(inputParser.includes('function programInputHydrateStatement'));
+}
+
+function testFeaturePropagationProof(){
+  const ctx=context();
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
+    'program-ir.js','language-core.js','expression-parser.js','expression-semantics.js',
+    'output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js',
+    'statement-parser.js','statement-semantics.js','program-parser.js','source-program-pipeline.js',
+    'program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js','assignment-statement-plugin.js',
+    'program-return.js','program-break.js','activity-core.js','source-library-registry.js']);
+  loadRelative(ctx,['exercise-libraries/source-programs/library.js','plugins/program-output/manifest.js',
+    'plugins/program-output/statement.js','plugins/program-input/manifest.js','plugins/program-input/parser.js',
+    'plugins/program-input/statement.js']);
+  load(ctx,['program-item-builder.js']);
+  loadRelative(ctx,['plugins/program-output/content.js','plugins/code-simulator/manifest.js',
+    'plugins/code-simulator/statement.js','plugins/code-simulator/content.js',
+    'plugins/simulate-output/manifest.js','plugins/simulate-output/generator.js']);
+
+  const names=['TaskPapa.c','TaskJuliet.c','TaskOscar.c','TaskSierra.c'];
+  ctx.phase9Rows=names.map(filename=>({filename,raw:fs.readFileSync(path.join(ROOT,'exercise-libraries','source-programs','c',
+    filename==='TaskOscar.c'?'simulate-basic-output':'simulate-output-variables',filename),'utf8')}));
+  ctx.phase9Manifest={title:'Phase 9 propagation fixtures',exercises:names};
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const expressionSignature=expression=>!expression?null:expression.kind==='binary'
+      ?{kind:'binary',operator:expression.operator,left:expressionSignature(expression.left),right:expressionSignature(expression.right)}
+      :expression.kind==='unary'?{kind:'unary',operator:expression.operator,form:expression.form,
+        operand:expressionSignature(expression.operand)}
+      :expression.kind==='identifier'?{kind:'identifier',name:expression.name}
+      :{kind:'literal',value:expression.value,dataType:expression.dataType||null};
+    const semanticSignature=program=>program.statements.map(statement=>({
+      kind:statement.kind,
+      declaration:statement.kind==='declaration'?{
+        name:statement.binding.name,dataType:statement.binding.dataType,syntax:statement.declarationSyntax||null,
+        initializer:expressionSignature(statement.initializer)}:null,
+      unary:statement.kind==='unary-update'?{target:statement.target,operator:statement.operator,form:statement.form}:null,
+      output:statement.kind==='output'?statement.parts.map(part=>part.kind==='expression'
+        ?{kind:'expression',format:part.format,expression:expressionSignature(part.expression)}
+        :{kind:'text',value:part.value}):null
+    }));
+    const outputProfile=PROFILES.find(profile=>profile.id==='program-output-basics');
+    const simulatorProfile=PROFILES.find(profile=>profile.id==='selection-statements-source');
+    const simulateProfile={id:'phase9-simulate',activity:{generator:{library:'source-programs',exerciseSet:'phase9',shuffle:false}}};
+    soInstallExerciseBank('exercise-libraries/source-programs/c/phase9/manifest.json','c','phase9',phase9Manifest,phase9Rows);
+    const generationContext={};
+    const summaries=phase9Rows.map((row,index)=>{
+      const exercise={id:row.filename.replace(/\.[^.]+$/,''),filename:row.filename,raw:row.raw};
+      const core=coreParseProgram({language:'c',filename:row.filename,source:row.raw});
+      const simulate=soParseExercise(exercise,'c');
+      const output=poParseSourceExercise(exercise,'c');
+      const simulator=csParseExercise(exercise,'c','authored','authored');
+      const outputItem=poBuildSourceItem(outputProfile,exercise,'c',index+1);
+      const simulatorItem=csBuildItem(simulatorProfile,exercise,'c',index+1);
+      const simulateItem=soGenerateItem({profile:simulateProfile,index,language:'c',generationContext});
+      const signature=JSON.stringify(semanticSignature(core.ir));
+      const coreOutput=core.effects.filter(effect=>effect.kind==='output').map(effect=>effect.text).join('').trimEnd();
+      const expectedOutput=simulate.expectedLines.join('\\n').trimEnd();
+      return {filename:row.filename,diagnostics:core.diagnostics.map(diagnostic=>diagnostic.code),
+        sameCore:{simulate:JSON.stringify(semanticSignature(simulate.coreProgram))===signature,
+          output:JSON.stringify(semanticSignature(output.coreProgram))===signature,
+          simulator:JSON.stringify(semanticSignature(simulator.coreProgram))===signature},
+        outputMatches:coreOutput===expectedOutput,
+        activityFilename:simulateItem.filename,
+        outputKinds:outputItem.program.statements.map(statement=>statement.kind),
+        simulatorKinds:simulatorItem.program.statements.map(statement=>statement.kind),
+        memory:simulator.memory,
+        formats:core.ir.statements.filter(statement=>statement.kind==='output').flatMap(statement=>
+          statement.parts.filter(part=>part.kind==='expression').map(part=>part.format)),
+        declarations:core.ir.statements.filter(statement=>statement.kind==='declaration').map(statement=>({
+          name:statement.binding.name,type:statement.binding.dataType,syntax:statement.declarationSyntax||null,
+          mutable:statement.binding.mutable,initializer:statement.initializer}))};
+    });
+    return JSON.stringify(summaries);
+  })()`));
+
+  assert.deepStrictEqual(result.map(row=>row.filename),names);
+  result.forEach(row=>{
+    assert.deepStrictEqual(row.diagnostics,[],`${row.filename} must parse without core diagnostics`);
+    assert(Object.values(row.sameCore).every(Boolean),
+      `${row.filename} must expose the same canonical IR to every compatible adapter: ${JSON.stringify(row.sameCore)}`);
+    assert(row.outputMatches,`${row.filename} generated Simulate Output answer must match core output`);
+    assert.strictEqual(row.activityFilename,row.filename);
+    assert(row.outputKinds.includes('output')&&row.outputKinds.includes('legacy-expression'));
+    assert(row.simulatorKinds.includes('output')&&row.simulatorKinds.includes('program-return'));
+  });
+  const papa=result.find(row=>row.filename==='TaskPapa.c');
+  const papaSum=papa.declarations.find(row=>row.name==='sum').initializer;
+  assert.deepStrictEqual([papa.memory.p,papa.memory.q,papa.memory.sum],[5,5,9]);
+  assert.strictEqual(papaSum.kind,'binary');
+  assert.deepStrictEqual([papaSum.left.kind,papaSum.left.form,papaSum.right.kind,papaSum.right.form],
+    ['unary','prefix','unary','postfix']);
+  const juliet=result.find(row=>row.filename==='TaskJuliet.c');
+  assert(juliet.declarations.some(row=>row.name==='name'&&row.type==='string'&&row.syntax==='char-array'));
+  assert.deepStrictEqual(juliet.formats,['s','d','.1f','c','.2f','0.4f']);
+  const oscar=result.find(row=>row.filename==='TaskOscar.c');
+  assert(oscar.declarations.some(row=>row.name==='TAX_RATE'&&row.syntax==='define'&&!row.mutable));
+  const sierra=result.find(row=>row.filename==='TaskSierra.c');
+  assert(sierra.formats.includes('s')&&sierra.formats.includes('0.4f'));
 }
 
 function testProgramCore(){
@@ -1012,7 +2048,7 @@ function testAssignmentOperatorProfiles(){
   ]);
   const result=JSON.parse(evaluate(ctx,`(()=>{
     initializeSeededRandom(778899);
-    const profiles=PROFILES.filter(p=>p.program&&p.program.assignmentLesson);
+    const profiles=PROFILES.filter(p=>p.lesson&&p.lesson.focus==='assignment');
     const operators=new Set();
     const cueWords={'+=':'Add','-=':'Subtract','*=':'Multiply','/=':'Divide','%=':'remainder'};
     const operationCuesCorrect=Object.entries(cueWords).every(([operator,word])=>
@@ -1418,7 +2454,25 @@ function testExamSettingsAndTimeoutPolicy(){
 }
 
 function run(){
+  const phaseZeroBaseline=assertPhaseZeroBaseline(ROOT);
   testScriptManifestParses();
+  testCorrectSolutionProfilePolicy();
+  testLanguageCoreContracts();
+  testSharedExpressionParser();
+  testSharedExpressionSemantics();
+  testSharedStatementParser();
+  testSharedStatementSemantics();
+  testSharedProgramParser();
+  testSharedOutputStatementCore();
+  testSharedInputStatementCore();
+  testSharedSelectionStatementCore();
+  testSharedLoopStatementCore();
+  testPhase4BUnsupportedConstructs();
+  testSharedSourceProgramPipeline();
+  testPluginResponsibilityMigration();
+  testProfileSchemaSimplification();
+  testDuplicateCodeRemoval();
+  testFeaturePropagationProof();
   testConnectorCoordinatesRespectActivityZoom();
   testPracticeRetryPlacement();
   testTokenClassificationPlugin();
@@ -1428,7 +2482,7 @@ function run(){
   testLegacyUnaryMutationCards();
   testInvalidExecutionAlertIsStatementScoped();
   const hash = generatedSnapshotHash();
-  assert.strictEqual(hash, '8a2a85b83925b9a726fbce6351d76c7cb59b96bb87779f66064422e74378f53b');
+  assert.strictEqual(hash, phaseZeroBaseline.generatedExpressionHash);
   testParenthesesOverrideProfile();
   testProgramCore();
   testLegacyExpressionIntegration();
@@ -1445,6 +2499,37 @@ function run(){
   testManualResponseProfilesAndPropagation();
   testManualResponseResolvedUnaryOperands();
   console.log('All CodeScope compatibility and extension tests passed.');
+}
+
+function testCorrectSolutionProfilePolicy(){
+  const ctx=context();
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','state.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const base={meta:{id:'feedback-policy-test',name:'Feedback policy',description:'test'},
+      shape:{operandSources:{literal:2},operandRange:{min:1,max:2},allowNegativeOperands:false},
+      operators:{allowed:['+']},template:'operand op operand',scoring:{itemCount:1,pointsPerItem:1}};
+    const legacy=finalizeProfile(base);
+    const hiddenPractice=finalizeProfile(Object.assign({},base,{feedback:{showCorrectSolution:{practice:false}}}));
+    const enabledExam=finalizeProfile(Object.assign({},base,{feedback:{showCorrectSolution:{exam:true}}}));
+    const booleanOverride=finalizeProfile(Object.assign({},base,{feedback:{showCorrectSolution:false}}));
+    state.mode='practice';state.examExpired=false;
+    const checked={checked:true};
+    const practiceDefault=correctSolutionAvailable(legacy,checked);
+    const practiceOverride=correctSolutionAvailable(hiddenPractice,checked);
+    state.mode='exam';
+    const examDefault=correctSolutionAvailable(legacy,checked);
+    const examBeforeRelease=correctSolutionAvailable(enabledExam,checked);
+    state.examExpired=true;state.examPolicy=Object.assign({},activeExamPolicy(),{feedbackRelease:'after-timeout'});
+    const examOverride=correctSolutionAvailable(enabledExam,checked);
+    return JSON.stringify({practiceDefault,practiceOverride,examDefault,examBeforeRelease,examOverride,
+      booleanPractice:profileShowsCorrectSolution(booleanOverride,'practice'),
+      booleanExam:profileShowsCorrectSolution(booleanOverride,'exam')});
+  })()`));
+  assert.deepStrictEqual(result,{practiceDefault:true,practiceOverride:false,examDefault:false,
+    examBeforeRelease:false,examOverride:true,booleanPractice:false,booleanExam:false});
+  assert.throws(()=>evaluate(ctx,`finalizeProfile({meta:{id:'invalid-feedback'},shape:{operandSources:{literal:2}},
+    operators:{allowed:['+']},template:'operand op operand',scoring:{itemCount:1,pointsPerItem:1},
+    feedback:{showCorrectSolution:{practice:'yes'}}})`),/feedback\.showCorrectSolution/);
 }
 
 function testConnectorCoordinatesRespectActivityZoom(){
@@ -1567,8 +2652,13 @@ function testTokenClassificationPlugin(){
 
 function testSimulateOutputPlugin(){
   const ctx=context();
-  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','activity-core.js']);
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js',
+    'program-ir.js','language-core.js','expression-parser.js','expression-semantics.js',
+    'output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js',
+    'statement-parser.js','statement-semantics.js','program-parser.js','source-program-pipeline.js','activity-core.js',
+    'source-library-registry.js']);
   loadRelative(ctx,[
+    'exercise-libraries/source-programs/library.js',
     'plugins/simulate-output/manifest.js',
     'plugins/simulate-output/generator.js','plugins/simulate-output/actions.js',
     'plugins/simulate-output/feedback.js','plugins/simulate-output/renderer.js',
@@ -1578,25 +2668,30 @@ function testSimulateOutputPlugin(){
   ctx.document={querySelector:()=>null};
   ctx.savedEdits=0;
   ctx.saveSessionProgress=()=>{ctx.savedEdits++;};
-  const manifest=JSON.parse(fs.readFileSync(path.join(ROOT,'plugins','simulate-output','exercises','c','it3-midterm-a','manifest.json'),'utf8'));
+  const exerciseSet='simulate-output-variables';
+  const manifest=JSON.parse(fs.readFileSync(path.join(ROOT,'exercise-libraries','source-programs','c',exerciseSet,'manifest.json'),'utf8'));
   const rows=manifest.exercises.map(filename=>({filename,raw:fs.readFileSync(
-    path.join(ROOT,'plugins','simulate-output','exercises','c','it3-midterm-a',filename),'utf8')}));
+    path.join(ROOT,'exercise-libraries','source-programs','c',exerciseSet,filename),'utf8')}));
   rows.push({filename:'Unlisted.c',raw:rows[0].raw});
   ctx.testManifest=manifest;ctx.testExerciseRows=rows;
-  evaluate(ctx,"soInstallExerciseBank('plugins/simulate-output/exercises/c/it3-midterm-a/manifest.json','c','it3-midterm-a',testManifest,testExerciseRows)");
+  evaluate(ctx,"soInstallExerciseBank('exercise-libraries/source-programs/c/simulate-output-variables/manifest.json','c','simulate-output-variables',testManifest,testExerciseRows)");
+  ctx.hotelFixture=fs.readFileSync(path.join(ROOT,'exercise-libraries','source-programs','c','simulate-basic-output','TaskHotel.c'),'utf8');
   ctx.javaManifest={title:'Java - Simulate Output',exercises:['Hello.java']};
-  ctx.javaRows=[{filename:'Hello.java',raw:'/*\n@output\nHello\n@variables\ncount = 1\n*/\npublic class Hello { public static void main(String[] args) { System.out.println("Hello"); } }'}];
-  evaluate(ctx,"soInstallExerciseBank('plugins/simulate-output/exercises/java/java-basics/manifest.json','java','java-basics',javaManifest,javaRows)");
-  const catalog=JSON.parse(evaluate(ctx,"JSON.stringify(soCatalog(PROFILES.find(profile=>profile.id==='c-simulate-output'),'c'))"));
-  assert.strictEqual(catalog.length,19);
+  ctx.javaRows=[{filename:'Hello.java',raw:'public class Hello { public static void main(String[] args) { int count = 1; System.out.println("Hello"); } }'}];
+  evaluate(ctx,"soInstallExerciseBank('exercise-libraries/source-programs/java/java-basics/manifest.json','java','java-basics',javaManifest,javaRows)");
+  const catalog=JSON.parse(evaluate(ctx,"JSON.stringify(soCatalog(PROFILES.find(profile=>profile.id==='simulate-output-variables'),'c'))"));
+  assert.strictEqual(catalog.length,10);
   catalog.forEach(exercise=>{
-    const source=fs.readFileSync(path.join(ROOT,'plugins','simulate-output','exercises','c','it3-midterm-a',exercise.filename),'utf8')
+    const source=fs.readFileSync(path.join(ROOT,'exercise-libraries','source-programs','c',exerciseSet,exercise.filename),'utf8')
       .replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
     assert.strictEqual(exercise.raw,source);
   });
+  ctx.editedSimulateFixture='#include <stdio.h>\nint main(){\n int score = 4;\n score += 3;\n printf("Score: %d\\n", score);\n return 0;\n}';
+  ctx.oldSimulateFixture='/* @output\nwrong\n@variables\nx = 1 */\nint main(){return 0;}';
+  ctx.unsupportedSimulateFixture='int main(){ puts("Hi"); return 0; }';
   const result=JSON.parse(evaluate(ctx,`(()=>{
-    const profile=PROFILES.find(candidate=>candidate.id==='c-simulate-output');
-    const javaProfile={id:'java-output',activity:{generator:{exerciseSet:'java-basics',shuffle:false}}};
+    const profile=PROFILES.find(candidate=>candidate.id==='simulate-output-variables');
+    const javaProfile={id:'java-output',activity:{generator:{library:'source-programs',exerciseSet:'java-basics',shuffle:false}}};
     const javaItem=soGenerateItem({profile:javaProfile,index:0,language:'java',generationContext:{}});
     state.mode='practice';initializeSeededRandom(1234);
     const count=simulateOutputPlugin.itemCount({profile,language:'c'});
@@ -1621,7 +2716,9 @@ function testSimulateOutputPlugin(){
     const fullMaximum=item.maxPoints;
     const traceMatches=soCanonicalTrace({item}).length===item.totalOpSteps;
     item._feedbackAnimated=true;
-    const retry=soRetry({item});
+    initializeSeededRandom(9876);const sourceBeforeRetry=item.source;
+    const retry=soRetry({item,profile});
+    const retryReseeded=item.source!==sourceBeforeRetry;
     const resetClean=!soHasResponse(item)&&!item.checked&&item.points===null
       &&item._feedbackAnimated===false;
     soApplyAction({item,action:{type:'SET_OUTPUT',value:item.expectedLines.join('\\n')+'\\nEXTRA'}});
@@ -1633,6 +2730,14 @@ function testSimulateOutputPlugin(){
     soCheck({item:restored,profile,state});
     const withheld=!soFeedbackReleased(restored);state.examExpired=true;
     const released=soFeedbackReleased(restored);
+    const edited=soParseExercise({id:'Edited',filename:'Edited.c',raw:editedSimulateFixture},'c');
+    const hotel=soParseExercise({id:'Hotel',filename:'TaskHotel.c',raw:hotelFixture},'c');
+    const sierra=items.find(candidate=>candidate.filename==='TaskSierra.c');
+    let embeddedRejected=false,incompleteRejected=false;
+    try{soParseExercise({id:'Old',filename:'Old.c',raw:oldSimulateFixture},'c');}
+    catch(error){embeddedRejected=/embedded answer metadata/.test(error.message);}
+    try{soParseExercise({id:'Unsupported',filename:'Unsupported.c',raw:unsupportedSimulateFixture},'c');}
+    catch(error){incompleteRejected=/cannot generate a complete answer key/.test(error.message);}
     resetRandomGenerator();
     return JSON.stringify({profileActive:!!profile,javaLoaded:javaItem.language==='java'
         &&javaItem.filename==='Hello.java'&&javaItem.maxPoints===2,count:items.length,
@@ -1640,16 +2745,25 @@ function testSimulateOutputPlugin(){
       manifestOrder:items.map(candidate=>candidate.filename).join(',')===testManifest.exercises.join(','),
       deterministic:items.map(candidate=>candidate.exerciseId).join(',')
         ===repeat.map(candidate=>candidate.exerciseId).join(','),
-      allC:items.every(candidate=>candidate.language==='c'),metadataHidden,typingSaved,
-      full:full.applied,metadataScoring:fullScore===fullMaximum,traceMatches,retry:retry.applied,resetClean,
+      allC:items.every(candidate=>candidate.language==='c'),metadataHidden,typingSaved,full:full.applied,
+      generatedScoring:fullScore===fullMaximum,traceMatches,retry:retry.applied,resetClean,
       bankMaximum:items.reduce((sum,candidate)=>sum+activityItemMaxPoints(candidate,profile),0),
+      editedOutput:edited.expectedLines,editedVariables:edited.variables,
+      carriageOutput:hotel.expectedLines,
+      constantsExcluded:!sierra.variables.some(variable=>variable.name==='MEMBER_DISCOUNT_YEARS'
+        ||variable.name==='TAX_RATE'||variable.name==='SHOP_NAME'),embeddedRejected,incompleteRejected,
+      retrySeedStable,
       extraPenalty:extra.outputCorrect===item.expectedLines.length-1,
       snapshotStable,withheld,released});
   })()`));
-  assert.deepStrictEqual(result,{profileActive:true,javaLoaded:true,count:19,unique:19,manifestOrder:true,deterministic:true,
-    allC:true,metadataHidden:true,typingSaved:true,full:true,metadataScoring:true,
-    traceMatches:true,bankMaximum:184,
-    retry:true,resetClean:true,
+  assert.deepStrictEqual(result,{profileActive:true,javaLoaded:true,count:10,unique:10,manifestOrder:true,deterministic:true,
+    allC:true,metadataHidden:true,typingSaved:true,full:true,generatedScoring:true,
+    traceMatches:true,bankMaximum:186,
+    editedOutput:['Score: 7'],editedVariables:[{name:'score',dataType:'int',expected:'7'}],
+    carriageOutput:['Learning escape characters in C','She said, "C programming is fun!"',
+      "It's time to practice.",'File path: C:\\Programs\\C','Loading Done!'],
+    constantsExcluded:true,embeddedRejected:true,incompleteRejected:true,
+    retry:true,resetClean:true,retrySeedStable:true,
     extraPenalty:true,snapshotStable:true,withheld:true,released:true});
 }
 
@@ -1993,7 +3107,7 @@ function testProfileCategoriesAndScopedScores(){
     const hiddenExpression=PROFILES.find(profile=>profile.id==='parens-override-dual');
     const falling=ACTIVITY_PROFILES.find(profile=>profile.id==='falling-identifier-sort');
     PROFILES.push(falling);
-    PROFILES.push(ACTIVITY_PROFILES.find(profile=>profile.id==='c-simulate-output'));
+    PROFILES.push(ACTIVITY_PROFILES.find(profile=>profile.id==='simulate-output-variables'));
     hiddenExpression.enabled=false;
     state.itemsByProfile={
       [expression.id]:[{checked:true,points:0.6,wasCorrectFinal:false}],
@@ -2138,20 +3252,27 @@ function testModeScopedPersistence(){
 function testProgramOutputStatementPlugin(){
   const rendererSource=fs.readFileSync(path.join(ROOT,'plugins','program-output','renderer.js'),'utf8');
   const outputStyles=fs.readFileSync(path.join(ROOT,'plugins','program-output','styles.css'),'utf8');
-  assert(rendererSource.includes("setProgramContextTab('output')"));
+  const terminalSource=fs.readFileSync(path.join(ROOT,'js','program-terminal.js'),'utf8');
+  const terminalStyles=fs.readFileSync(path.join(ROOT,'css','styles.css'),'utf8');
+  assert(terminalSource.includes("setProgramContextTab('output')"));
+  assert(terminalSource.includes('coreTerminalScreen('));
+  assert(!rendererSource.includes('function renderProgramTerminalPanel'));
+  assert(!rendererSource.includes('coreTerminalScreen('));
+  assert(!outputStyles.includes('.program-output-screen{'));
+  assert(terminalStyles.includes('.program-output-screen{'));
   assert(outputStyles.includes('.program-context-main{position:sticky'));
   assert(outputStyles.includes('.program-context-dock.has-tabs .program-context-panel{display:none;}'));
   assert(outputStyles.includes('.program-context-dock.has-tabs .program-context-panel.active{display:block;}'));
   const ctx=context();
   installFakeDom(ctx);
   load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
-    'program-ir.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
+    'program-ir.js','language-core.js','expression-parser.js','expression-semantics.js','output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js','statement-parser.js','statement-semantics.js','program-parser.js','source-program-pipeline.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
     'assignment-statement-plugin.js','program-return.js','program-break.js','activity-core.js','source-library-registry.js']);
   loadRelative(ctx,['exercise-libraries/source-programs/library.js','plugins/program-output/manifest.js','plugins/program-output/statement.js',
     'plugins/program-input/manifest.js','plugins/program-input/parser.js','plugins/program-input/statement.js']);
   load(ctx,['program-item-builder.js']);
   loadRelative(ctx,['plugins/program-output/content.js']);
-  load(ctx,['state.js','dom-helpers.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
+  load(ctx,['state.js','dom-helpers.js','program-terminal.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
     'render-assignment.js','render-unary-update.js','render-session.js']);
   loadRelative(ctx,['plugins/program-output/renderer.js']);
   const installBank=(language)=>{
@@ -2202,7 +3323,16 @@ function testProgramOutputStatementPlugin(){
     const printed=dispatchProgramAction(item,{type:'emit-output',statementId:dynamic.id});
     const cSource=outputStatementSource(dynamic,item);
     const cText=programOutputText(item.program);
-    const panelText=renderProgramOutputPanel(item,item.program).textContent;
+    const panelText=renderProgramTerminalPanel(item,item.program).textContent;
+    const terminalProgram={statements:[],events:[
+      {type:'OUTPUT',text:'Loading......\\r'},
+      {type:'OUTPUT',text:'Loading Done!\\n'}
+    ]};
+    const terminalPanelText=renderProgramTerminalPanel(item,terminalProgram).textContent;
+    const carriageCursor=h('span',{});
+    programTerminalPositionCursor(carriageCursor,coreTerminalScreen('Loading......\\r'));
+    const carriageStatement=coreParseStatement({language:'c',source:'printf("Loading......\\\\r");',symbols:{}}).ir;
+    const carriageSource=outputStatementSource(carriageStatement,{program:{language:'c'}});
     const canonical=buildCanonicalProgramTrace(item);
     item.program.language='java';
     const javaSource=outputStatementSource(dynamic,item);
@@ -2240,10 +3370,9 @@ function testProgramOutputStatementPlugin(){
     const javaItems=poGenerateContentItems({profile:sourceProfile,language:'java',generateDefault:()=>[]});
     const javaMulti=javaItems[1].program.statements.find(statement=>statement.kind==='output');
     const sourceFlowCatalogProfile=PROFILES.find(candidate=>candidate.id==='program-output-source-flow');
-    const sourceFlowProgram=Object.assign({},sourceFlowCatalogProfile.program);
-    delete sourceFlowProgram.timelinePresentation;
     const sourceFlowProfile=Object.assign({},sourceFlowCatalogProfile,{id:'program-output-inline-test',
-      content:Object.assign({},sourceFlowCatalogProfile.content,{provider:'program-output'}),program:sourceFlowProgram});
+      content:Object.assign({},sourceFlowCatalogProfile.content,{provider:'program-output'}),
+      presentation:Object.assign({},sourceFlowCatalogProfile.presentation,{timeline:'inline'})});
     PROFILES.push(sourceFlowProfile);
     const sourceFlowItems=poGenerateContentItems({profile:sourceFlowProfile,language:'c',generateDefault:()=>[]});
     const sourceFlowItem=sourceFlowItems[0];
@@ -2299,9 +3428,9 @@ function testProgramOutputStatementPlugin(){
       sourceProfileSelectionCount:sourceProfile.content.selection.count,
       sourceFlowItemCount:sourceFlowProfile.scoring.itemCount,
       sourceFlowSelectionCount:sourceFlowProfile.content.selection.count,
-      migratedSourceFlowProvider:sourceFlowCatalogProfile.content.provider,
-      migratedSourceFlowLibrary:sourceFlowCatalogProfile.content.library,
-      migratedSourceFlowTimeline:sourceFlowCatalogProfile.program.timelinePresentation,
+      migratedSourceFlowSelectsProvider:Object.prototype.hasOwnProperty.call(sourceFlowCatalogProfile.content,'provider'),
+      migratedSourceFlowLibrary:profileContentSource(sourceFlowCatalogProfile).library,
+      migratedSourceFlowTimeline:profileTimelineMode(sourceFlowCatalogProfile),
       recoveredProgramItems,
       statementCount:kinds.length,
       kinds,
@@ -2310,7 +3439,9 @@ function testProgramOutputStatementPlugin(){
       readTimelineRows,readTimelineCards,combinedTimelineRows,combinedTimelineCards,combinedSubstitutionRows,
       combinedTimelineText,visualStepIds,combineSourceId,
       sourceBinding,bindingColor,formatColor,
-      cSource,javaSource,javaLineSource,cText,panelText,canonicalPrints:canonical.filter(event=>event.action==='PRINT').length,
+      cSource,javaSource,javaLineSource,cText,panelText,terminalPanelText,carriageSource,
+      carriageCursorRow:carriageCursor.attributes['data-terminal-row'],
+      carriageCursorColumn:carriageCursor.attributes['data-terminal-column'],canonicalPrints:canonical.filter(event=>event.action==='PRINT').length,
       canonicalBindings:canonical.filter(event=>event.outputAction).every(event=>!!event.sourceBinding),
       serializable:!!JSON.parse(JSON.stringify(item)).program,
       outputSettings:DEFAULT_APP_SETTINGS.shell.outputPanel.characterDelayMs,
@@ -2357,7 +3488,7 @@ function testProgramOutputStatementPlugin(){
   assert.strictEqual(result.sourceProfileSelectionCount,'all');
   assert.strictEqual(result.sourceFlowItemCount,'manifest');
   assert.strictEqual(result.sourceFlowSelectionCount,'all');
-  assert.strictEqual(result.migratedSourceFlowProvider,'code-simulator');
+  assert.strictEqual(result.migratedSourceFlowSelectsProvider,false);
   assert.strictEqual(result.migratedSourceFlowLibrary,'source-programs');
   assert.strictEqual(result.migratedSourceFlowTimeline,'statement-modal');
   assert.strictEqual(result.recoveredProgramItems,2);
@@ -2386,9 +3517,13 @@ function testProgramOutputStatementPlugin(){
   assert(result.javaLineSource.startsWith('System.out.println("Value of '));
   assert(result.cText.startsWith('OUTPUT LESSON\nValue of '));
   assert(result.panelText.includes('Program Output')&&result.panelText.includes('OUTPUT LESSON'));
+  assert(result.terminalPanelText.includes('Loading Done!'));
+  assert(!result.terminalPanelText.includes('Loading......'));
+  assert.strictEqual(result.carriageSource,'printf("Loading......\\r");');
+  assert.deepStrictEqual([result.carriageCursorRow,result.carriageCursorColumn],['0','0']);
   assert(result.panelText.includes('↵'));
-  assert(rendererSource.includes("pre,escape,"));
-  assert(rendererSource.includes("escape.classList.add('is-visible')"));
+  assert(terminalSource.includes("pre,escape,cursor"));
+  assert(terminalSource.includes("escape.classList.add('is-visible')"));
   assert(rendererSource.includes("style:bindingIdentityStyle(name,'variable')"));
   assert(outputStyles.includes('.program-output-string{color:color-mix(in srgb,var(--text) 74%,var(--text-dim));'));
   assert(!outputStyles.includes('.program-output-string{color:#9fda72;'));
@@ -2398,9 +3533,11 @@ function testProgramOutputStatementPlugin(){
   assert(outputStyles.includes('.program-source-context{opacity:.78;}'));
   assert(outputStyles.includes('.program-source-context-code{min-width:max-content;color:var(--text-dim);font:inherit;'));
   assert(!outputStyles.includes('.program-source-context-code{font-size:11px;}'));
-  assert(!rendererSource.includes("escape.textContent='\\\\n'"));
-  assert(outputStyles.includes('.program-output-escape-cue.is-visible{display:inline-flex'));
-  assert(!outputStyles.includes('.program-output-escape-cue{position:absolute'));
+  assert(!terminalSource.includes("escape.textContent='\\\\n'"));
+  assert(terminalStyles.includes('.program-output-escape-cue.is-visible{display:inline-flex'));
+  assert(terminalStyles.includes('left:calc(13px + var(--terminal-left,0ch))'));
+  assert(terminalSource.includes('programTerminalPositionCursor(cursor,terminalState)'));
+  assert(!terminalStyles.includes('.program-output-escape-cue{position:absolute'));
   assert.strictEqual(result.canonicalPrints,4);
   assert(result.serializable&&result.outputSettings>0);
   assert.deepStrictEqual(result.filenames,cManifest.exercises);
@@ -2449,14 +3586,14 @@ function testProgramOutputStatementPlugin(){
 function testCodeSimulatorPlugin(){
   const ctx=context();installFakeDom(ctx);
   load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
-    'program-ir.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
+    'program-ir.js','language-core.js','expression-parser.js','expression-semantics.js','output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js','statement-parser.js','statement-semantics.js','program-parser.js','source-program-pipeline.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
     'assignment-statement-plugin.js','program-return.js','program-break.js','activity-core.js','source-library-registry.js']);
   loadRelative(ctx,['exercise-libraries/source-programs/library.js','plugins/program-output/manifest.js','plugins/program-output/statement.js',
     'plugins/program-input/manifest.js','plugins/program-input/parser.js','plugins/program-input/statement.js']);
   load(ctx,['program-item-builder.js']);
   loadRelative(ctx,['plugins/program-output/content.js','plugins/code-simulator/manifest.js',
     'plugins/code-simulator/statement.js','plugins/code-simulator/content.js']);
-  load(ctx,['state.js','dom-helpers.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
+  load(ctx,['state.js','dom-helpers.js','program-terminal.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
     'render-assignment.js','render-unary-update.js','render-session.js']);
   loadRelative(ctx,['plugins/program-output/renderer.js','plugins/program-input/renderer.js','plugins/code-simulator/renderer.js']);
   const selectionStatementSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','statement.js'),'utf8');
@@ -2535,6 +3672,7 @@ int main() {
     return 0;
 }`;
   ctx.csTypedFixture=fs.readFileSync(path.join(ROOT,'exercise-libraries','source-programs','c','formatted-output','TypedValues.c'),'utf8');
+  ctx.csTaskPapaFixture=fs.readFileSync(path.join(ROOT,'exercise-libraries','source-programs','c','simulate-output-variables','TaskPapa.c'),'utf8');
   ctx.csUndeclaredSeedFixture=ctx.csSeedFixture.replace('@seed score min=10 max=999','@seed missing min=1 max=2');
   ctx.csDerivedSeedFixture=ctx.csSeedFixture.replace('@seed score min=10 max=999','@seed bonus min=1 max=2');
   ['c','java'].forEach(language=>{
@@ -2553,15 +3691,36 @@ int main() {
     evaluate(ctx,`csInstallExerciseBank('exercise-libraries/source-programs/${language}/formatted-output/manifest.json',
       '${language}','formatted-output',csOutputManifest,csOutputRows)`);
   });
+  ['c','java'].forEach(language=>{
+    const directory=path.join(ROOT,'exercise-libraries','source-programs',language,'output-basics');
+    const manifest=JSON.parse(fs.readFileSync(path.join(directory,'manifest.json'),'utf8'));
+    const rows=manifest.exercises.map(filename=>({filename,raw:fs.readFileSync(path.join(directory,filename),'utf8')}));
+    ctx.csBasicOutputManifest=manifest;ctx.csBasicOutputRows=rows;
+    evaluate(ctx,`csInstallExerciseBank('exercise-libraries/source-programs/${language}/output-basics/manifest.json',
+      '${language}','output-basics',csBasicOutputManifest,csBasicOutputRows)`);
+  });
   const result=JSON.parse(evaluate(ctx,`(()=>{
     const profile=PROFILES.find(candidate=>candidate.id==='selection-statements-source');
     const sourceOutputProfile=PROFILES.find(candidate=>candidate.id==='program-output-source-flow');
+    state.language='c';initializeSeededRandom(404);
+    const basicOutputItems=generateItemsForProfile('test-basic-output');resetRandomGenerator();
+    const taskGolph=basicOutputItems.find(candidate=>candidate.filename==='TaskGolph.c');
+    while(taskGolph.program.status==='running'){
+      const active=taskGolph.program.statements[taskGolph.program.cursor];
+      const action=active.kind==='output'?{type:'emit-output',statementId:active.id}
+        :active.kind==='program-return'?{type:'return-program',statementId:active.id}:null;
+      if(!action)break;
+      dispatchProgramAction(taskGolph,action,{applyExpressionAction});
+    }
+    const taskGolphTerminal=coreTerminalScreen(programOutputText(taskGolph.program));
     initializeSeededRandom(101);const fixtureA=csParseExercise({filename:'SeedFixture.c',raw:csSeedFixture},'c','seeded');
     initializeSeededRandom(101);const fixtureRepeat=csParseExercise({filename:'SeedFixture.c',raw:csSeedFixture},'c','seeded');
     initializeSeededRandom(202);const fixtureB=csParseExercise({filename:'SeedFixture.c',raw:csSeedFixture},'c','seeded');
     const fixtureAuthored=csParseExercise({filename:'SeedFixture.c',raw:csSeedFixture},'c','authored');
     const liveControl=csParseExercise({filename:'LiveControl.c',raw:csLiveControlFixture},'c','authored');
     const mixedStatements=csParseExercise({filename:'MixedStatements.c',raw:csMixedStatementFixture},'c','authored');
+    const taskPapa=csParseExercise({filename:'TaskPapa.c',raw:csTaskPapaFixture},'c','authored');
+    const taskPapaSum=taskPapa.statements.find(candidate=>candidate.kind==='declaration'&&candidate.binding.name==='sum');
     const outputOnly=csParseExercise({filename:'OutputOnly.c',raw:csOutputOnlyFixture},'c','authored');
     const switchFallthrough=csParseExercise({filename:'SwitchFallthrough.c',raw:csSwitchFallthroughFixture},'c','authored');
     const switchFallthroughItem=csBuildItem(profile,{id:'SwitchFallthrough',filename:'SwitchFallthrough.c',raw:csSwitchFallthroughFixture},'c',98);
@@ -2598,8 +3757,8 @@ int main() {
     let undeclaredError='',derivedError='',badRangeError='',duplicateError='',unsupportedOnlyError='';
     try{csParseExercise({filename:'Undeclared.c',raw:csUndeclaredSeedFixture},'c','seeded');}catch(error){undeclaredError=error.message;}
     try{csParseExercise({filename:'Derived.c',raw:csDerivedSeedFixture},'c','seeded');}catch(error){derivedError=error.message;}
-    try{csSeedDirectives('@seed x min=9 max=2','BadRange.c');}catch(error){badRangeError=error.message;}
-    try{csSeedDirectives('@seed x min=1 max=2\\n@seed x min=3 max=4','Duplicate.c');}catch(error){duplicateError=error.message;}
+    try{sourceProgramSeedDirectives('@seed x min=9 max=2','BadRange.c');}catch(error){badRangeError=error.message;}
+    try{sourceProgramSeedDirectives('@seed x min=1 max=2\\n@seed x min=3 max=4','Duplicate.c');}catch(error){duplicateError=error.message;}
     try{csParseExercise({filename:'UnsupportedOnly.c',raw:csUnsupportedOnlyFixture},'c','authored');}catch(error){unsupportedOnlyError=error.message;}
     initializeSeededRandom(2);state.language='c';const items=generateItemsForProfile('selection-statements-source');
     initializeSeededRandom(2);const repeatItems=generateItemsForProfile('selection-statements-source');
@@ -2723,12 +3882,12 @@ int main() {
     statementTraceModalState={item:modalOutputItem,statementId:modalOutputStatement.id,focus:'output-values'};
     const modalOutputEvent={type:'OUTPUT',statementId:modalOutputStatement.id,text:'Modal output sentinel\\n'};
     modalOutputItem.program.events.push(modalOutputEvent);
-    pendingProgramOutputAnimation={item:modalOutputItem,event:modalOutputEvent,onComplete:null};
+    pendingProgramTerminalAnimation={item:modalOutputItem,event:modalOutputEvent,onComplete:null};
     globalThis.requestAnimationFrame=()=>1;
-    const mainOutputMirror=renderProgramOutputPanel(modalOutputItem,modalOutputItem.program);
-    const modalOutputMirror=renderProgramOutputPanel(modalOutputItem,modalOutputItem.program,{surface:'modal'});
-    const modalOutputSurface=programOutputAnimationSurface(modalOutputItem,pendingProgramOutputAnimation);
-    pendingProgramOutputAnimation=null;
+    const mainOutputMirror=renderProgramTerminalPanel(modalOutputItem,modalOutputItem.program);
+    const modalOutputMirror=renderProgramTerminalPanel(modalOutputItem,modalOutputItem.program,{surface:'modal'});
+    const modalOutputSurface=programTerminalAnimationSurface(modalOutputItem,pendingProgramTerminalAnimation);
+    pendingProgramTerminalAnimation=null;
     const memoryBinding=ensureBindings(modalOutputItem)[0];
     modalOutputItem.program.memory[memoryBinding.name]={name:memoryBinding.name,kind:memoryBinding.kind,
       initialized:true,value:314159};
@@ -2737,14 +3896,14 @@ int main() {
     delete memoryBinding._modalTransferPending;
     const settledMemoryMirror=renderStatementTraceMemory(modalOutputItem);
     statementTraceModalState=null;
-    pendingProgramOutputAnimation={item:modalOutputItem,event:modalOutputEvent,onComplete:null};
-    const directOutputSurface=programOutputAnimationSurface(modalOutputItem,pendingProgramOutputAnimation);
-    pendingProgramOutputAnimation=null;
+    pendingProgramTerminalAnimation={item:modalOutputItem,event:modalOutputEvent,onComplete:null};
+    const directOutputSurface=programTerminalAnimationSurface(modalOutputItem,pendingProgramTerminalAnimation);
+    pendingProgramTerminalAnimation=null;
     initializeSeededRandom(2);state.language='java';const javaItems=generateItemsForProfile('selection-statements-source');
     const migratedJavaOutputItems=generateItemsForProfile('program-output-source-flow');
     return JSON.stringify({count:items.length,filenames:items.map(item=>item.filename),kinds,
-      profileName:profile.name,profileProvider:profile.content.provider,
-      sourceValueMode:profile.content.sourceValueMode,timelinePresentation:profile.program.timelinePresentation,
+      profileName:profile.name,profileProvider:profileContentProviderFor(profile).id,
+      sourceValueMode:profileVariableValueMode(profile),timelinePresentation:profileTimelineMode(profile),
       profileItemCount:profile.scoring.itemCount,profileSelectionCount:profile.content.selection.count,
       manifestVersion:CODE_SIMULATOR_PLUGIN_MANIFEST.version,sourcePanels,sourceRows,firstMemoryNames,
       sourceLineCount:first.sourceDisplay.lines.length,sourceActions,directActions,modalActions,activeSourceRows,oldTimelineRows,inlinePanels,
@@ -2778,6 +3937,10 @@ int main() {
       fixtureAuthored:fixtureAuthored.declarations,fixtureSeeded:fixtureA.declarations,fixtureSource:fixtureA.details.source,
       mixedKinds:mixedStatements.statements.map(candidate=>candidate.kind),
       mixedFinalValue:mixedStatements.memory.total,
+      taskPapaSumValue:taskPapaSum.runtime.expectedValue,
+      taskPapaSumEffects:taskPapaSum.runtime.expectedEffects.filter(effect=>effect.kind==='write')
+        .map(effect=>[effect.target,effect.previousValue,effect.nextValue,effect.form]),
+      taskPapaFinalMemory:{p:taskPapa.memory.p,q:taskPapa.memory.q,sum:taskPapa.memory.sum},
       outputOnlyKinds:outputOnly.statements.map(candidate=>candidate.kind),
       switchFallthroughKinds:switchFallthrough.statements.map(candidate=>candidate.kind),
       switchBreakLines:switchFallthrough.sourceDisplay.lines.filter(line=>line.text.trim()==='break;'&&line.supported).length,
@@ -2818,10 +3981,11 @@ int main() {
       javaSwitchBreakTargets:javaItems[3].program.statements.filter(candidate=>candidate.kind==='program-break')
         .map(candidate=>candidate.nextStatementId),
       javaReturnCounts:javaItems.map(item=>item.program.statements.filter(candidate=>candidate.kind==='program-return').length),
-      sourceOutputProvider:sourceOutputProfile.content.provider,sourceOutputLibrary:sourceOutputProfile.content.library,
-      sourceOutputValueMode:sourceOutputProfile.content.sourceValueMode,
-      legacySourceLibraryUrl:csManifestUrl({id:'legacy-source-library',content:{
-        sourceLibrary:'program-output',exerciseSet:'formatted-output'}},'c'),
+      sourceOutputProvider:profileContentProviderFor(sourceOutputProfile).id,
+      sourceOutputLibrary:profileContentSource(sourceOutputProfile).library,
+      sourceOutputValueMode:profileVariableValueMode(sourceOutputProfile),
+      sourceLibraryUrl:csManifestUrl({id:'source-library',content:{source:{
+        library:'source-programs',exerciseSet:'formatted-output'}}},'c'),
       modalOutputSurface,directOutputSurface,
       mainOutputIncludesPending:mainOutputMirror.textContent.includes('Modal output sentinel'),
       modalOutputWithholdsPending:!modalOutputMirror.textContent.includes('Modal output sentinel'),
@@ -2850,6 +4014,10 @@ int main() {
       migratedSourceOutputHasSynthetic:migratedSourceOutputItems.some(item=>item.program.statements.some(candidate=>candidate.kind==='legacy-expression')),
       migratedJavaOutputFilenames:migratedJavaOutputItems.map(item=>item.filename),
       migratedJavaReturnCounts:migratedJavaOutputItems.map(item=>item.program.statements.filter(candidate=>candidate.kind==='program-return').length),
+      basicOutputFilenames:basicOutputItems.map(item=>item.filename),
+      taskGolphKinds:taskGolph.program.statements.map(candidate=>candidate.kind),
+      taskGolphStatus:taskGolph.program.status,taskGolphText:taskGolphTerminal.text,
+      taskGolphCursor:[taskGolphTerminal.row,taskGolphTerminal.column],
       serializable:!!JSON.parse(JSON.stringify(items[2])).program});
   })()`));
   assert.strictEqual(result.count,4);
@@ -2907,7 +4075,7 @@ int main() {
     &&result.sourceFlowTiming.modalCloseSettleMs>=250);
   assert(result.sourceProgramText.includes('#include <stdio.h>')&&result.sourceProgramText.includes('int main() {')
     &&result.sourceProgramText.includes('return 0;')&&result.sourceProgramText.includes('IfStatement.c'));
-  assert.strictEqual(result.manifestVersion,'2.1.0');
+  assert.strictEqual(result.manifestVersion,'3.0.0');
   assert.deepStrictEqual(result.seededSources,result.repeatSources);
   assert.notDeepStrictEqual(result.seededSources,result.changedSources);
   assert.strictEqual(result.retrySeededFilename,result.filenames[0]);
@@ -2924,6 +4092,9 @@ int main() {
   assert(result.fixtureSource.includes(`int score = ${result.fixtureSeeded[2].value};`));
   assert.deepStrictEqual(result.mixedKinds,['declaration','assignment','unary-update','output','program-return']);
   assert.strictEqual(result.mixedFinalValue,6);
+  assert.strictEqual(result.taskPapaSumValue,9);
+  assert.deepStrictEqual(result.taskPapaSumEffects,[['p',4,5,'prefix'],['q',4,5,'postfix']]);
+  assert.deepStrictEqual(result.taskPapaFinalMemory,{p:5,q:5,sum:9});
   assert.deepStrictEqual(result.outputOnlyKinds,['output','program-return']);
   assert.strictEqual(result.outputOnlyDeclarations,0);
   assert(result.outputOnlyContextMuted);
@@ -2932,7 +4103,7 @@ int main() {
   assert.strictEqual(result.dynamicOutputExpected,42);
   assert.strictEqual(result.sourceOutputProvider,'code-simulator');
   assert.strictEqual(result.sourceOutputLibrary,'source-programs');
-  assert.strictEqual(result.legacySourceLibraryUrl,'exercise-libraries/source-programs/c/formatted-output/manifest.json');
+  assert.strictEqual(result.sourceLibraryUrl,'exercise-libraries/source-programs/c/formatted-output/manifest.json');
   assert.strictEqual(result.sourceOutputValueMode,'authored');
   assert.strictEqual(result.modalOutputSurface,'modal');
   assert.strictEqual(result.directOutputSurface,'main');
@@ -2970,6 +4141,14 @@ int main() {
   assert.deepStrictEqual(result.migratedJavaOutputFilenames,
     ['BasicValues.java','MultipleValues.java','EmbeddedLines.java','NoTrailingNewline.java','AssignmentThenOutput.java','TypedValues.java']);
   assert(result.migratedJavaReturnCounts.every(count=>count===0));
+  assert.deepStrictEqual(result.basicOutputFilenames,
+    ['TaskAlpha.c','TaskBravo.c','TaskCharlie.c','TaskDelta.c','TaskEcho.c','TaskFoxtrot.c','TaskGolph.c']);
+  assert.deepStrictEqual(result.taskGolphKinds,
+    ['output','output','output','output','output','output','program-return']);
+  assert.strictEqual(result.taskGolphStatus,'complete');
+  assert.strictEqual(result.taskGolphText,
+    'Learning escape characters in C\nShe said, "C programming is fun!"\nIt\'s time to practice.\nFile path: C:\\Programs\\C\nLoading Done!\n');
+  assert.deepStrictEqual(result.taskGolphCursor,[5,0]);
   assert(result.unsupportedOnlyError.includes('no supported executable statements'));
   assert.deepStrictEqual(result.liveKinds,['declaration','selection','output','output','selection','output','output','program-return']);
   assert.deepStrictEqual(result.liveEdges['selection-1'],['output-1','output-2']);
@@ -2979,7 +4158,7 @@ int main() {
   assert.strictEqual(result.liveEdges['output-3'],'output-4');
   assert.strictEqual(result.liveEdges['output-4'],'program-return');
   assert(result.undeclaredError.includes("undeclared binding 'missing'"));
-  assert(result.derivedError.includes("requires a literal integer initializer"));
+  assert(result.derivedError.includes("requires an integer literal initializer"));
   assert(result.badRangeError.includes("invalid @seed range for 'x'"));
   assert(result.duplicateError.includes("duplicate @seed directive for 'x'"));
   assert(result.sourceFlow&&result.branchApplied&&result.selectedLine>0);
@@ -3061,14 +4240,14 @@ function testProgramInputPlugin(){
   const inputStyles=fs.readFileSync(path.join(ROOT,'plugins','program-input','styles.css'),'utf8');
   const ctx=context();installFakeDom(ctx);
   load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
-    'program-ir.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
+    'program-ir.js','language-core.js','expression-parser.js','expression-semantics.js','output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js','statement-parser.js','statement-semantics.js','program-parser.js','source-program-pipeline.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
     'assignment-statement-plugin.js','program-return.js','program-break.js','activity-core.js','source-library-registry.js']);
   loadRelative(ctx,['exercise-libraries/source-programs/library.js','plugins/program-output/manifest.js','plugins/program-output/statement.js',
     'plugins/program-input/manifest.js','plugins/program-input/parser.js','plugins/program-input/statement.js']);
   load(ctx,['program-item-builder.js']);
   loadRelative(ctx,['plugins/program-output/content.js','plugins/code-simulator/manifest.js',
     'plugins/code-simulator/statement.js','plugins/code-simulator/content.js']);
-  load(ctx,['state.js','dom-helpers.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
+  load(ctx,['state.js','dom-helpers.js','program-terminal.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
     'render-assignment.js','render-unary-update.js','render-session.js']);
   loadRelative(ctx,['plugins/program-output/renderer.js','plugins/program-input/renderer.js','plugins/code-simulator/renderer.js']);
   for(const language of ['c','java']){
@@ -3098,7 +4277,7 @@ function testProgramInputPlugin(){
       if(result.event)program.events.push(result.event);return result;};
     const start=apply({type:'start-input'});
     const earlyEnter=apply({type:'submit-input'});
-    const consoleBefore=renderProgramOutputPanel(item,program,{surface:'main'});
+    const consoleBefore=renderProgramTerminalPanel(item,program,{surface:'main'});
     isolated.runtime.playbackComplete=true;
     const submit=apply({type:'submit-input'});
     const postSubmitReads=isolated.runtime.reads.map(read=>({tokenRead:read.tokenRead,converted:read.converted,written:read.written}));
@@ -3110,11 +4289,11 @@ function testProgramInputPlugin(){
     for(let index=0;index<3;index++){
       apply({type:'write-input',readIndex:index});
     }
-    const consoleAfter=renderProgramOutputPanel(item,program,{surface:'main'});isolated.status='complete';
+    const consoleAfter=renderProgramTerminalPanel(item,program,{surface:'main'});isolated.status='complete';
     const timelineHost=h('div',{});renderInputStatement({container:timelineHost,item,program,statement:isolated,
       statementIndex:0,isActive:false});
     state.language='java';initializeSeededRandom(41);const javaItem=generateItemsForProfile(profile.id)[0];
-    return JSON.stringify({profileId:profile.id,categoryProfiles:category.profileIds,inputMode:profile.content.inputValueMode,
+    return JSON.stringify({profileId:profile.id,categoryProfiles:category.profileIds,inputMode:profileInputValueMode(profile),
       cKinds:seeded.program.statements.map(statement=>statement.kind),cReads:cInput.reads.length,cRaw:cInput.rawInput,
       sourceInputValues:seeded.sourceInputValues,repeatInputValues:repeated.sourceInputValues,changedInputValues:changed.sourceInputValues,
       start:start.applied,earlyEnter:earlyEnter.applied,keyboardKeys:countNodesWithClass(consoleBefore,'program-input-key'),
@@ -3153,7 +4332,8 @@ function testProgramInputPlugin(){
   assert.deepStrictEqual(result.javaInputs,['x','y','z']);
   assert(result.javaKinds.filter(kind=>kind==='input').length===3);
   assert(result.manifestCapabilities.includes('numeric-keyboard'));
-  assert(result.codeDependencies.includes('program-input:source-input-parsing'));
+  assert(result.codeDependencies.includes('language-core:input-statements'));
+  assert(result.codeDependencies.includes('program-input:timeline-presentation'));
   assert(inputRendererSource.includes('runVarFinalComet(sources[index].getBoundingClientRect()'));
   assert(inputRendererSource.includes('function programInputWriteToMemory(statement,index,button,attempt=0)'));
   assert(inputRendererSource.includes('runVarFinalComet(source.getBoundingClientRect(),destination.getBoundingClientRect()'));

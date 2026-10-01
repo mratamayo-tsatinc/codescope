@@ -97,8 +97,14 @@ registerStatementPlugin({
     if(action.type==='write-input'){
       if(!runtime.transferComplete||!readState.converted||readState.written) return {applied:false};
       readState.written=true;
-      program.memory[read.target]={name:read.target,kind:'variable',dataType:read.dataType,mutable:true,
-        initialized:true,value:read.expectedValue,lastStatementId:statement.id};
+      const semantics=programSemanticsForContext(ctx);
+      const semantic=semantics.execute(statement,program.memory,{language:program.language||statement.inputSyntax});
+      const writeEffect=semantic.effects.find(effect=>effect.kind==='write'&&effect.target===read.target);
+      if(!writeEffect) throw new Error(`Input semantics did not produce a write for '${read.target}'`);
+      const writtenValue=writeEffect.nextValue;
+      semantics.applyEffects(program.memory,[writeEffect],statement.id,'bindings');
+      if(program.memory[read.target]&&typeof program.memory[read.target]==='object')
+        program.memory[read.target].dataType=read.dataType;
       runtime.trace.push({action:'WRITE_INPUT',statementId:statement.id,readIndex:index,
         resultNodeId:programInputResultId(statement,index),target:read.target,result:read.expectedValue,wasCorrect:true});
       const completed=index===statement.reads.length-1;
@@ -106,7 +112,7 @@ registerStatementPlugin({
       else runtime.currentReadIndex++;
       programInputRemember(statement);
       return {applied:true,completed,event:{type:'INPUT_WRITE',action:'ASSIGN',statementId:statement.id,
-        target:read.target,value:read.expectedValue,readIndex:index,wasCorrect:true}};
+        target:read.target,value:writtenValue,readIndex:index,effects:semantic.effects,wasCorrect:true}};
     }
     return {applied:false};
   },

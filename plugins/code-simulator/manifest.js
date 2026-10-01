@@ -1,7 +1,10 @@
 const CODE_SIMULATOR_PLUGIN_MANIFEST=Object.freeze({
-  id:'code-simulator',version:'2.1.0',statementKind:'source-program',
+  id:'code-simulator',version:'3.0.0',statementKind:'source-program',
+  semanticOwner:'language-core',
+  responsibilities:Object.freeze(['content-adapter','interaction','presentation','feedback','scoring']),
   languages:Object.freeze(['c','java']),
-  dependencies:Object.freeze(['program-output:source-output-parsing','program-input:source-input-parsing']),
-  capabilities:Object.freeze(['declaration','assignment','unary-update','input','output','if','if-else','if-else-if',
-    'switch-case','break','switch-fall-through','return','source-flow','source-value-seeding','statement-trace-modal'])
+  dependencies:Object.freeze(['language-core:output-statements','program-output:timeline-presentation',
+    'language-core:input-statements','program-input:timeline-presentation','language-core:selection-statements']),
+  capabilities:Object.freeze(['selection-timeline-presentation','source-flow','source-value-seeding',
+    'statement-trace-modal','flow-highlighting','memory-console-presentation'])
 });

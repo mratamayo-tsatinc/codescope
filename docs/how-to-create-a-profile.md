@@ -66,7 +66,7 @@ up to full atomic control, with a working example at every step. Each
 level only adds ONE new idea on top of the last — skip ahead if you
 already know the basics.
 
-Every profile has six core parts and two optional capability blocks:
+Every profile has the generation fields plus optional declarative capability blocks:
 
 ```js
 {
@@ -77,7 +77,10 @@ Every profile has six core parts and two optional capability blocks:
   extras:    { unaryWrap },                     // ++/--/! behavior (optional, omit if unused)
   scoring:   { itemCount, pointsPerItem },       // how many items, how much each is worth
   template:  '...',                              // the shape of the generated expression
-  program:   { ... },                            // sequential statements (optional)
+  content:   { mode, source, values, selection },// where items come from (optional)
+  lesson:    { focus, variant, constructs },      // learning intent (optional)
+  interaction: { declarations },                 // learner interaction (optional)
+  presentation: { workspace, timeline },          // UI form (optional)
   manualResponses: { ... },                      // student-derived values (optional)
 }
 ```
@@ -433,11 +436,9 @@ Profiles remain single-expression activities unless they explicitly opt into
 interactive declarations:
 
 ```js
-program: {
-  declarations: 'interactive',
-  dependencyMode: 'previous',
-  scoreAssignments: true,
-}
+lesson: { focus:'declaration', variant:'dependency-chain' },
+interaction: { declarations:'interactive' },
+scoring: { itemCount:5, pointsPerItem:2, statementCommits:true }
 ```
 
 The generated variable and constant operands become executable declarations.
@@ -457,18 +458,16 @@ shape: {
 }
 ```
 
-Profiles that omit `program`, including the original profiles, keep their
+Profiles that omit these lesson and interaction fields, including the original profiles, keep their
 declarations preinitialized and retain the previous scoring behavior.
 
 To select one of the built-in progressive assignment generators, add
-`assignmentLesson` while retaining interactive declarations:
+an assignment lesson while retaining interactive declarations:
 
 ```js
-program: {
-  declarations: 'interactive',
-  assignmentLesson: 'add-sub',
-  scoreAssignments: true,
-}
+lesson: { focus:'assignment', variant:'add-sub' },
+interaction: { declarations:'interactive' },
+scoring: { itemCount:5, pointsPerItem:2, statementCommits:true }
 ```
 
 Available lesson keys are `basic-set`, `add-sub`, `multiply`,
@@ -486,11 +485,9 @@ IR builder or statement plugin behavior and corresponding tests.
 To place unary updates between declarations and the final expression, use:
 
 ```js
-program: {
-  declarations: 'interactive',
-  unaryUpdateLesson: 'standalone-sequence',
-  scoreAssignments: true,
-}
+lesson: { focus:'unary-update', variant:'standalone-sequence' },
+interaction: { declarations:'interactive' },
+scoring: { itemCount:2, pointsPerItem:5, statementCommits:true }
 ```
 
 This produces statements such as `x++;`, `--y;`, and `++x;`. Their memory
@@ -502,18 +499,16 @@ unary semantics used by legacy expressions.
 The built-in advanced mixed lesson is selected with:
 
 ```js
-program: {
-  declarations: 'interactive',
-  mixedUpdateLesson: 'advanced-assignment-unary',
-  scoreAssignments: true,
-}
+lesson: { focus:'assignment-unary', variant:'advanced-assignment-unary' },
+interaction: { declarations:'interactive' },
+scoring: { itemCount:2, pointsPerItem:5, statementCommits:true }
 ```
 
 It combines declarations, compound assignments, standalone unary updates,
 and a final expression that reads the resulting memory. Choose exactly one of
-`assignmentLesson`, `unaryUpdateLesson`, or `mixedUpdateLesson` in a profile.
-These options describe alternative statement-sequence builders, not features
-that should be stacked in one object.
+`lesson.focus` values `assignment`, `unary-update`, or `assignment-unary` in a
+profile. Their `variant` values describe alternative statement-sequence
+builders.
 
 ### C and Java output statements
 
@@ -527,20 +522,16 @@ recreating JavaScript data:
   shape:{operandSources:{variable:3},operandRange:{min:2,max:12},allowNegativeOperands:false},
   operators:{allowed:OPS.ADD_SUB},
   template:'operand op operand op operand',
-  scoring:{itemCount:'manifest',pointsPerItem:2},
   content:{
-    provider:'program-output',
     mode:'source-files',
-    library:'source-programs',
+    source:{library:'source-programs',exerciseSet:'formatted-output'},
     recipe:'formatted-values',
-    exerciseSet:'formatted-output',
     selection:{count:'all',shuffle:false},
   },
-  program:{
-    declarations:'interactive',
-    outputLesson:'formatted-values',
-    scoreAssignments:true,
-  },
+  lesson:{focus:'output',variant:'formatted-values'},
+  interaction:{declarations:'interactive'},
+  presentation:{workspace:'statement-flow',timeline:'inline'},
+  scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
 }
 ```
 
@@ -555,28 +546,27 @@ Use Code Simulator for a stable complete-source view:
 
 ```js
 content:{
-  provider:'code-simulator',
   mode:'source-files',
-  library:'source-programs',
-  exerciseSet:'formatted-output',
-  sourceValueMode:'authored',
-  presentation:'source-flow',
+  source:{library:'source-programs',exerciseSet:'formatted-output'},
+  values:{variables:'authored'},
   selection:{count:'all',shuffle:false},
-}
+},
+lesson:{focus:'output',variant:'formatted-values'},
+presentation:{workspace:'source-program',timeline:'statement-modal'}
 ```
 
 This is the current `program-output-source-flow` configuration. It reads the
 same Program Output exercise files while Code Simulator owns complete-program
 parsing and flow.
 
-`outputLesson` names a builder in `program-item-builder.js`; adding another
-lesson key requires a builder and tests. Output source syntax and interaction
-semantics remain in `plugins/program-output/`, not in the profile.
+`lesson.variant` names a builder in `program-item-builder.js`; adding another
+lesson variant requires a builder and tests. Output syntax and semantics remain
+in the language core, not in the profile or presentation plugin.
 
 See `docs/how-to-create-a-program-output-profile.md` for the source directory,
 manifest, metadata, supported syntax, selection, and language rules.
 
-`scoreAssignments: true` includes declaration/assignment commit checks in the
+`scoring.statementCommits:true` includes declaration/assignment commit checks in the
 item's existing point budget. Setting it to `false` leaves those writes
 instructional but does not award assignment-check credit.
 
@@ -590,15 +580,13 @@ file/manifest workflow, supported statements, and metadata rules.
 
 ```js
 content:{
-  provider:'code-simulator',
   mode:'source-files',
-  library:'source-programs',
-  exerciseSet:'selection-basics',
-  sourceValueMode:'seeded', // or 'authored'
-  inputValueMode:'seeded',  // or 'authored'
-  presentation:'source-flow',
+  source:{library:'source-programs',exerciseSet:'selection-basics'},
+  values:{variables:'seeded',input:'seeded'}, // either may be 'authored'
   selection:{count:'all',shuffle:false},
-}
+},
+lesson:{focus:'program-flow',constructs:['selection']},
+presentation:{workspace:'source-program',timeline:'statement-modal'}
 ```
 
 Each manifest-listed source file is parsed independently. It may contain any
@@ -618,14 +606,12 @@ For a complete source program, keep the source rows stable and open the active
 statement's evaluation in the shared trace modal:
 
 ```js
-program:{
-  declarations:'interactive',
-  scoreAssignments:true,
-  timelinePresentation:'statement-modal',
-}
+interaction:{declarations:'interactive'},
+presentation:{workspace:'source-program',timeline:'statement-modal'},
+scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true}
 ```
 
-Omit `timelinePresentation`, or set it to `'inline'`, to retain the established
+Omit `presentation.timeline`, or set it to `'inline'`, to retain the established
 inline timeline used by other profiles. This option changes presentation only;
 the same statement renderer, actions, scoring, Undo, persistence, memory, and
 Program Output behavior are reused.
@@ -643,11 +629,14 @@ The source file, rather than the profile, owns each allowed range:
 ```text
 @seed score min=60 max=100
 @seed absences min=0 max=10
+@seed balance min=1000 max=1400 step=100
 ```
 
 Only listed literal integer declarations are randomized. Variables and
 constants absent from `@seed` keep their authored values. Derived initializers
-keep their expressions and recalculate from any seeded dependencies.
+keep their expressions and recalculate from any seeded dependencies. An
+optional positive `step` restricts a numeric range to `min + n × step`; when it
+is omitted, integer ranges continue to use increments of `1`.
 
 ---
 
@@ -713,13 +702,10 @@ configured to use profile settings.
     constraints: { requireMultipleTiers: true },
   },
   template: 'operand op operand op operand op operand',
-  scoring: { itemCount: 5, pointsPerItem: 7 },
   manualResponses: { enabled: true, namedValueRate: 50, operatorRate: 50 },
-  program: {
-    declarations: 'interactive',
-    mixedUpdateLesson: 'advanced-assignment-unary',
-    scoreAssignments: true,
-  },
+  lesson: { focus:'assignment-unary', variant:'advanced-assignment-unary' },
+  interaction: { declarations:'interactive' },
+  scoring: { itemCount:5, pointsPerItem:7, statementCommits:true },
 }
 ```
 
@@ -829,6 +815,26 @@ assessment: {
 See the three `activity.kind: 'token-classification'` entries in
 `js/profiles.js` for complete configurations.
 
+## Control the correct-solution link
+
+Profiles inherit the global feedback policy: the **Show correct solution**
+link is available in practice mode and hidden in exam mode. Override either
+mode with a top-level `feedback` setting:
+
+```js
+feedback: {
+  showCorrectSolution: {
+    practice: false,
+    exam: true
+  }
+}
+```
+
+The setting only affects activities that provide a correct-solution view.
+An exam override still follows the exam feedback release policy, so the link
+cannot appear before feedback is released. A boolean can be used to apply the
+same value to both modes, for example `showCorrectSolution: false`.
+
 ## Checklist before shipping a new profile
 
 1. **Does `shape.operandSources` sum to exactly the template's unpinned
@@ -862,8 +868,8 @@ See the three `activity.kind: 'token-classification'` entries in
 5. **Every operator in `allowed` recognized?** Checked automatically —
    a typo like `'=+'` fails immediately at load, not 300 retries deep in
    generation.
-6. **Did you choose only one program lesson selector?** Use one of
-   `assignmentLesson`, `unaryUpdateLesson`, or `mixedUpdateLesson`.
+6. **Did you choose one valid lesson focus and variant?** Use `lesson.focus`
+   and `lesson.variant`; do not select a parser or content adapter by name.
 7. **Do manual-response rates match the learning goal?** Verify the exact
    seeded quota across the complete item set, not just one sample item.
 8. **Did you run the compatibility tests?** From the project directory:

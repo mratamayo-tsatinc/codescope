@@ -253,6 +253,13 @@ function currentProfile(){
 }
 function currentItem(){ return state.items[state.itemIndex]; }
 
+function correctSolutionAvailable(profile,item){
+  if(!profileShowsCorrectSolution(profile,state.mode))return false;
+  if(state.mode==='practice')return !!(item&&item.checked);
+  return !!(item&&item.checked&&state.examExpired
+    &&activeExamPolicy().feedbackRelease==='after-timeout');
+}
+
 function itemMaximumPoints(item,profile){
   if(!item)return 0;
   if(item.activityKind&&typeof activityItemMaxPoints==='function'){
@@ -419,7 +426,7 @@ function finalizeSourceProgramItem(item){
 function handleTokenClick(action){
   const item = currentItem();
   if(!item || item.checked || state.examExpired || item.practiceInvalidExecution
-    ||(typeof programOutputInteractionLocked==='function'&&programOutputInteractionLocked())) return;
+    ||(typeof programTerminalInteractionLocked==='function'&&programTerminalInteractionLocked())) return;
   const statement=currentProgramStatement(item);
   // A handler retained by an expanded/completing row or a queued DOM event
   // must never be reinterpreted as an action on the new current statement.
@@ -461,8 +468,8 @@ function handleTokenClick(action){
         manualWasCorrect:action.manualResponse&&action.manualResponse.wasCorrect,
         manualResponseKey:action.manualResponse&&action.manualResponse.key
       });
-      if(event&&event.type==='OUTPUT'&&typeof queueProgramOutputAnimation==='function'){
-        queueProgramOutputAnimation(item,event,()=>{
+      if(event&&event.type==='OUTPUT'&&typeof queueProgramTerminalAnimation==='function'){
+        queueProgramTerminalAnimation(item,event,()=>{
           if(!transition)return;
           transition.phase='waiting';
           if(typeof programStatementTraceOpenFor==='function'
@@ -686,9 +693,10 @@ function applyExpressionAction(item, action){
     if(!node || node.kind!=='unary' || !node.substituted || node.resolved) return false;
     const before = flatToString(item.workingFlat);
     const base=unaryBaseValue(node);
-    const expected=node.op==='!'?!base:base+(node.op==='++'?1:-1);
-    const writeValue=action.manualResponse?action.manualResponse.value:expected;
-    const expressionValue=node.op==='!'?writeValue:(node.form==='postfix'?base:writeValue);
+    const outcome=evaluateUnaryOperation(node.op,node.form,base,
+      action.manualResponse?action.manualResponse.value:undefined);
+    const writeValue=outcome.writeValue;
+    const expressionValue=outcome.expressionValue;
     item.workingFlat={operands:item.workingFlat.operands.map(operand=>operand.id===node.id
       ?Object.assign({},operand,{resolved:true,resultValue:expressionValue}):operand),operators:item.workingFlat.operators};
     const after = flatToString(item.workingFlat);
@@ -1102,7 +1110,7 @@ function handleRetrySameItem(){
 
 function toggleSolution(){
   const item = currentItem();
-  if(state.mode==='exam') return;
+  if(!correctSolutionAvailable(currentProfile(),item)) return;
   item.showSolution = !item.showSolution;
   if(item.showSolution){
     if(!item.playback) item.playback = {index:0, playing:false};

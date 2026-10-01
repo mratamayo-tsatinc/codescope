@@ -1,0 +1,1530 @@
+{
+  "schemaVersion": 2,
+  "generatedExpressionHash": "8a2a85b83925b9a726fbce6351d76c7cb59b96bb87779f66064422e74378f53b",
+  "profileCount": 42,
+  "categoryCount": 6,
+  "profiles": [
+    {
+      "id": "direct-ltr",
+      "enabled": false,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "mult-precedence",
+      "enabled": false,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "same-precedence-assoc",
+      "enabled": false,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "full-basic-precedence",
+      "enabled": true,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand op operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "modulus",
+      "enabled": false,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "parens-override",
+      "enabled": false,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "(operand low operand) high operand low operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "parens-override-multi",
+      "enabled": false,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "(operand high (operand low operand)) high operand high operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "parens-override-dual",
+      "enabled": true,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "(operand low operand) high (operand low operand) high operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "variables-arithmetic",
+      "enabled": false,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "mixed-variables-literals",
+      "enabled": false,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "variables-constants",
+      "enabled": false,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "literals-variables-constants",
+      "enabled": true,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand op operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "mixed-mastery",
+      "enabled": true,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "(operand low operand) high operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "unary-only",
+      "enabled": false,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand:unary op operand:unary op operand:unary",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "unary-mix",
+      "enabled": true,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand:unary op operand:unary op operand:unary op operand:unary op operand:unary",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2
+      }
+    },
+    {
+      "id": "relational-simple",
+      "enabled": true,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "relational-variables",
+      "enabled": true,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "id": "relational-boolean-mix",
+      "enabled": true,
+      "categoryId": "expressions",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "(operand:lit cmp operand:lit or operand:var:bool:unary) and operand:var:bool:unary",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2
+      }
+    },
+    {
+      "id": "declaration-chain",
+      "enabled": false,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": {
+        "focus": "declaration",
+        "variant": "dependency-chain"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": null,
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "program-output-basics",
+      "enabled": true,
+      "categoryId": "output-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": {
+        "mode": "source-files",
+        "recipe": null,
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "formatted-output"
+        },
+        "values": null,
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "output",
+        "variant": "formatted-values"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "statement-flow",
+        "timeline": "inline"
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "program-output-source-flow",
+      "enabled": true,
+      "categoryId": "output-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": {
+        "mode": "source-files",
+        "recipe": null,
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "formatted-output"
+        },
+        "values": {
+          "variables": "authored"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "output",
+        "variant": "formatted-values"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "program-input-source-flow",
+      "enabled": true,
+      "categoryId": "input-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": {
+        "mode": "source-files",
+        "recipe": null,
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "input-basics"
+        },
+        "values": {
+          "variables": "authored",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "input",
+        "variant": "numeric-console"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "selection-statements-source",
+      "enabled": true,
+      "categoryId": "output-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": {
+        "mode": "source-files",
+        "recipe": null,
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "selection-basics"
+        },
+        "values": {
+          "variables": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow",
+        "constructs": [
+          "selection"
+        ]
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "test-basic-output",
+      "enabled": true,
+      "categoryId": "output-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": {
+        "mode": "source-files",
+        "recipe": null,
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "output-basics"
+        },
+        "values": {
+          "variables": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "assignment-basic",
+      "enabled": false,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": {
+        "focus": "assignment",
+        "variant": "basic-set"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": null,
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "assignment-add-sub",
+      "enabled": false,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": {
+        "focus": "assignment",
+        "variant": "add-sub"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": null,
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "assignment-multiply",
+      "enabled": false,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": {
+        "focus": "assignment",
+        "variant": "multiply"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": null,
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "assignment-div-mod",
+      "enabled": false,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": {
+        "focus": "assignment",
+        "variant": "divide-remainder"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": null,
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "assignment-rhs-expression",
+      "enabled": false,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": {
+        "focus": "assignment",
+        "variant": "rhs-expression"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": null,
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 3,
+        "pointsPerItem": 5,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "assignment-sequential",
+      "enabled": true,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": {
+        "focus": "assignment",
+        "variant": "sequential"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": null,
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "assignment-dependent",
+      "enabled": true,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": {
+        "focus": "assignment",
+        "variant": "dependent"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": null,
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 2,
+        "pointsPerItem": 5,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "assignment-advanced-chain",
+      "enabled": true,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": {
+        "focus": "assignment",
+        "variant": "advanced"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": null,
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 2,
+        "pointsPerItem": 5,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "unary-update-sequence",
+      "enabled": true,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": {
+        "focus": "unary-update",
+        "variant": "standalone-sequence"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": null,
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 2,
+        "pointsPerItem": 5,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "assignment-unary-advanced-chain",
+      "enabled": true,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": {
+        "focus": "assignment-unary",
+        "variant": "advanced-assignment-unary"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": null,
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 2,
+        "pointsPerItem": 5,
+        "statementCommits": true
+      }
+    },
+    {
+      "id": "relational-logical-student-derived",
+      "enabled": true,
+      "categoryId": "program-statements",
+      "profileType": "program",
+      "activityKind": null,
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": "(operand:lit cmp operand:lit) and operand:var:bool:unary or operand:var:bool:unary",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 4
+      }
+    },
+    {
+      "id": "token-identifier-position",
+      "enabled": false,
+      "categoryId": "identifier-activities",
+      "profileType": "activity",
+      "activityKind": "token-classification",
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": null,
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 3
+      }
+    },
+    {
+      "id": "token-declaration-complete",
+      "enabled": false,
+      "categoryId": "identifier-activities",
+      "profileType": "activity",
+      "activityKind": "token-classification",
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": null,
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 6
+      }
+    },
+    {
+      "id": "token-program-chain",
+      "enabled": false,
+      "categoryId": "identifier-activities",
+      "profileType": "activity",
+      "activityKind": "token-classification",
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": null,
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 12
+      }
+    },
+    {
+      "id": "falling-identifier-sort",
+      "enabled": true,
+      "categoryId": "identifier-activities",
+      "profileType": "activity",
+      "activityKind": "falling-token-sort",
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": null,
+      "scoring": {
+        "itemCount": 1,
+        "pointsPerItem": 30
+      }
+    },
+    {
+      "id": "falling-operator-sort",
+      "enabled": true,
+      "categoryId": "identifier-activities",
+      "profileType": "activity",
+      "activityKind": "falling-token-sort",
+      "content": null,
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": null,
+      "scoring": {
+        "itemCount": 1,
+        "pointsPerItem": 30
+      }
+    },
+    {
+      "id": "simulate-basic-output",
+      "enabled": true,
+      "categoryId": "simulate-output-commands",
+      "profileType": "activity",
+      "activityKind": "simulate-output",
+      "content": {
+        "mode": null,
+        "recipe": null,
+        "source": {
+          "library": null,
+          "exerciseSet": null
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": null
+      },
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": null,
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      }
+    },
+    {
+      "id": "simulate-output-variables",
+      "enabled": true,
+      "categoryId": "simulate-output-commands",
+      "profileType": "activity",
+      "activityKind": "simulate-output",
+      "content": {
+        "mode": null,
+        "recipe": null,
+        "source": {
+          "library": null,
+          "exerciseSet": null
+        },
+        "values": {
+          "variables": "authored",
+          "input": "seeded"
+        },
+        "selection": null
+      },
+      "lesson": null,
+      "interaction": null,
+      "presentation": null,
+      "template": null,
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      }
+    }
+  ],
+  "categories": [
+    {
+      "id": "input-statements",
+      "name": "Input Statements",
+      "enabled": true,
+      "profileIds": [
+        "program-input-source-flow"
+      ]
+    },
+    {
+      "id": "output-statements",
+      "name": "Output Statements",
+      "enabled": true,
+      "profileIds": [
+        "program-output-basics",
+        "program-output-source-flow",
+        "selection-statements-source",
+        "test-basic-output"
+      ]
+    },
+    {
+      "id": "expressions",
+      "name": "Expressions",
+      "enabled": true,
+      "profileIds": [
+        "direct-ltr",
+        "mult-precedence",
+        "same-precedence-assoc",
+        "full-basic-precedence",
+        "modulus",
+        "parens-override",
+        "parens-override-multi",
+        "parens-override-dual",
+        "variables-arithmetic",
+        "mixed-variables-literals",
+        "variables-constants",
+        "literals-variables-constants",
+        "mixed-mastery",
+        "unary-only",
+        "unary-mix",
+        "relational-simple",
+        "relational-variables",
+        "relational-boolean-mix"
+      ]
+    },
+    {
+      "id": "program-statements",
+      "name": "Program Statements",
+      "enabled": true,
+      "profileIds": [
+        "declaration-chain",
+        "assignment-basic",
+        "assignment-add-sub",
+        "assignment-multiply",
+        "assignment-div-mod",
+        "assignment-rhs-expression",
+        "assignment-sequential",
+        "assignment-dependent",
+        "assignment-advanced-chain",
+        "unary-update-sequence",
+        "assignment-unary-advanced-chain",
+        "relational-logical-student-derived"
+      ]
+    },
+    {
+      "id": "identifier-activities",
+      "name": "Identifier Activities",
+      "enabled": true,
+      "profileIds": [
+        "token-identifier-position",
+        "token-declaration-complete",
+        "token-program-chain",
+        "falling-identifier-sort",
+        "falling-operator-sort"
+      ]
+    },
+    {
+      "id": "simulate-output-commands",
+      "name": "Simulate Output Commands",
+      "enabled": true,
+      "profileIds": [
+        "simulate-basic-output",
+        "simulate-output-variables"
+      ]
+    }
+  ],
+  "scriptOrder": [
+    "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
+    "js/engine.js",
+    "js/flat-model.js",
+    "js/template-engine.js",
+    "js/generator.js",
+    "js/profiles.js",
+    "js/language.js",
+    "js/program-ir.js",
+    "js/language-core.js",
+    "js/expression-parser.js",
+    "js/expression-semantics.js",
+    "js/output-statement-core.js",
+    "js/input-statement-core.js",
+    "js/selection-statement-core.js",
+    "js/loop-statement-core.js",
+    "js/statement-parser.js",
+    "js/statement-semantics.js",
+    "js/program-parser.js",
+    "js/source-program-pipeline.js",
+    "js/program-core.js",
+    "js/activity-core.js",
+    "js/source-library-registry.js",
+    "exercise-libraries/source-programs/library.js",
+    "js/legacy-expression-plugin.js",
+    "js/declaration-statement-plugin.js",
+    "js/assignment-statement-plugin.js",
+    "js/unary-update-statement-plugin.js",
+    "js/program-return.js",
+    "js/program-break.js",
+    "plugins/program-output/manifest.js",
+    "plugins/program-output/statement.js",
+    "plugins/program-input/manifest.js",
+    "plugins/program-input/parser.js",
+    "plugins/program-input/statement.js",
+    "js/program-item-builder.js",
+    "plugins/program-output/content.js",
+    "plugins/code-simulator/manifest.js",
+    "plugins/code-simulator/statement.js",
+    "plugins/code-simulator/content.js",
+    "plugins/token-classification/manifest.js",
+    "plugins/token-classification/languages/c.js",
+    "plugins/token-classification/languages/java.js",
+    "plugins/token-classification/identifier-generator.js",
+    "plugins/token-classification/classifier.js",
+    "plugins/token-classification/generator.js",
+    "plugins/token-classification/actions.js",
+    "plugins/token-classification/modal.js",
+    "plugins/token-classification/feedback.js",
+    "plugins/token-classification/renderer.js",
+    "plugins/token-classification/plugin.js",
+    "plugins/falling-token-sort/manifest.js",
+    "plugins/falling-token-sort/generator.js",
+    "plugins/falling-token-sort/actions.js",
+    "plugins/falling-token-sort/feedback.js",
+    "plugins/falling-token-sort/renderer.js",
+    "plugins/falling-token-sort/plugin.js",
+    "plugins/simulate-output/manifest.js",
+    "plugins/simulate-output/generator.js",
+    "plugins/simulate-output/actions.js",
+    "plugins/simulate-output/feedback.js",
+    "plugins/simulate-output/renderer.js",
+    "plugins/simulate-output/plugin.js",
+    "js/state.js",
+    "js/exam-persistence.js",
+    "js/settings-persistence.js",
+    "js/manual-response.js",
+    "js/live-clock.js",
+    "js/shell-ui.js",
+    "js/qr-share.js",
+    "js/score-summary.js",
+    "js/moment-feedback.js",
+    "js/juice.js",
+    "js/dom-helpers.js",
+    "js/program-terminal.js",
+    "js/console-drawer.js",
+    "js/console-drawer-content.js",
+    "js/feedback-drawer.js",
+    "js/connector-lines.js",
+    "js/var-final-state.js",
+    "js/var-final-float.js",
+    "js/live-step-autoscroll.js",
+    "js/render-tree.js",
+    "js/render-flat.js",
+    "js/render-declaration.js",
+    "js/render-assignment.js",
+    "js/render-unary-update.js",
+    "js/render-session.js",
+    "plugins/program-output/renderer.js",
+    "plugins/program-input/renderer.js",
+    "plugins/code-simulator/renderer.js",
+    "js/render-done.js",
+    "js/login.js",
+    "js/main.js"
+  ],
+  "plugins": [
+    {
+      "id": "code-simulator",
+      "files": [
+        "content.js",
+        "manifest.js",
+        "renderer.js",
+        "statement.js",
+        "styles.css"
+      ]
+    },
+    {
+      "id": "falling-token-sort",
+      "files": [
+        "actions.js",
+        "feedback.js",
+        "generator.js",
+        "manifest.js",
+        "plugin.js",
+        "renderer.js",
+        "styles.css"
+      ]
+    },
+    {
+      "id": "program-input",
+      "files": [
+        "manifest.js",
+        "parser.js",
+        "renderer.js",
+        "statement.js",
+        "styles.css"
+      ]
+    },
+    {
+      "id": "program-output",
+      "files": [
+        "content.js",
+        "manifest.js",
+        "renderer.js",
+        "statement.js",
+        "styles.css"
+      ]
+    },
+    {
+      "id": "simulate-output",
+      "files": [
+        "actions.js",
+        "feedback.js",
+        "generator.js",
+        "manifest.js",
+        "plugin.js",
+        "renderer.js",
+        "styles.css"
+      ]
+    },
+    {
+      "id": "token-classification",
+      "files": [
+        "actions.js",
+        "classifier.js",
+        "feedback.js",
+        "generator.js",
+        "identifier-generator.js",
+        "languages/c.js",
+        "languages/java.js",
+        "manifest.js",
+        "modal.js",
+        "plugin.js",
+        "renderer.js",
+        "styles.css"
+      ]
+    }
+  ],
+  "exerciseSets": [
+    {
+      "manifest": "exercise-libraries/source-programs/c/formatted-output/manifest.json",
+      "title": "C Formatted Output",
+      "exerciseCount": 6,
+      "exercises": [
+        {
+          "filename": "BasicValues.c",
+          "sha256": "908a3b2a88e874d6468abedddd42ecfdc01797804b858b6ecad0b4a6a19ffcee"
+        },
+        {
+          "filename": "MultipleValues.c",
+          "sha256": "5dd032358d2fccb9b9b5a2704fb92b58258bf6d08683b228d85955bdb4622452"
+        },
+        {
+          "filename": "EmbeddedLines.c",
+          "sha256": "941cd4de119c95ec042df262577db582b4a73628f104797f88f3e78dc3a96e46"
+        },
+        {
+          "filename": "NoTrailingNewline.c",
+          "sha256": "a2af72ca100d3cc1d38b4a23d5fdbcb25742952665e2045b5e67de565e6daf90"
+        },
+        {
+          "filename": "AssignmentThenOutput.c",
+          "sha256": "700b72679026d1177751bebc011b5af60f39ecf32f82e890bbd9c2670735b9f8"
+        },
+        {
+          "filename": "TypedValues.c",
+          "sha256": "d7c86520416e00ae39f3c309f4ab9e1efd57d6a74bfbefa32d96cc9210518535"
+        }
+      ]
+    },
+    {
+      "manifest": "exercise-libraries/source-programs/c/input-basics/manifest.json",
+      "title": "C Program Input",
+      "exerciseCount": 1,
+      "exercises": [
+        {
+          "filename": "MultipleIntegers.c",
+          "sha256": "d6ea2f80ecc79f188a675884f52b8534ff3090f9d129e2754c5ba00d627f8b50"
+        }
+      ]
+    },
+    {
+      "manifest": "exercise-libraries/source-programs/c/output-basics/manifest.json",
+      "title": "C Basic Output Statements",
+      "exerciseCount": 7,
+      "exercises": [
+        {
+          "filename": "TaskAlpha.c",
+          "sha256": "3f51bf94f71e4f24bda79f38e3117b6120d3fabca0f2f66551a0949301f6f35d"
+        },
+        {
+          "filename": "TaskBravo.c",
+          "sha256": "021172de2b4ee9a0798b0483802182671012f7f8e2bc0e15408a64667e48dd9b"
+        },
+        {
+          "filename": "TaskCharlie.c",
+          "sha256": "983a1ee4d23113fbe98164526878228ba135b9b2272a2fa31800b98e639d8bbe"
+        },
+        {
+          "filename": "TaskDelta.c",
+          "sha256": "d8cf58e908f3862a1cfe019e5042b5a5e50912e6b52a491d43064659b5b8dab0"
+        },
+        {
+          "filename": "TaskEcho.c",
+          "sha256": "e479e76ce530abace3437043b6e7c3cde45c27e147075ea18ada66ae1017c17c"
+        },
+        {
+          "filename": "TaskFoxtrot.c",
+          "sha256": "8f2419e1ed18e3e65af4556073ce8fb5d5d7b5f50e943e3d5a6c428617705acd"
+        },
+        {
+          "filename": "TaskGolph.c",
+          "sha256": "33df594b402dfd86b60eba2b4caa2adc4f7a526d9ca0da4286a1eb0c975ce2d5"
+        }
+      ]
+    },
+    {
+      "manifest": "exercise-libraries/source-programs/c/selection-basics/manifest.json",
+      "title": "C Selection Statements",
+      "exerciseCount": 4,
+      "exercises": [
+        {
+          "filename": "IfStatement.c",
+          "sha256": "1a4544fd15649a6ae2e65f038d0427a7c436aa02e9afc7c69d170e0f30c33a52"
+        },
+        {
+          "filename": "IfElse.c",
+          "sha256": "d617a7709f8440ba87dc6205918c4ef31246875cca69c775c5dc481b664bc1c5"
+        },
+        {
+          "filename": "ElseIfChain.c",
+          "sha256": "837445a7f6fb007802450cd79e2889c73910c22c9585b4b933d7c49ea50d16ef"
+        },
+        {
+          "filename": "SwitchCase.c",
+          "sha256": "e551fd02f303eac55c7ab2f1a3d5172ada1e33752f17da96ec91f881c9689752"
+        }
+      ]
+    },
+    {
+      "manifest": "exercise-libraries/source-programs/c/simulate-basic-output/manifest.json",
+      "title": "C - Basic Output",
+      "exerciseCount": 10,
+      "exercises": [
+        {
+          "filename": "TaskAlpha.c",
+          "sha256": "2111583b11b590767afad752a8d65f04a45f0f6eec42ff082ebef8ed34337fab"
+        },
+        {
+          "filename": "TaskBravo.c",
+          "sha256": "dcfaf5206cd72e40579bc8b3f72a134f9d0fa5c174003d67d9bee7a585364c6d"
+        },
+        {
+          "filename": "TaskCharlie.c",
+          "sha256": "7d00a763481e99b533f7e127b16d6251f909fb0a8359cd262a1f542597daae64"
+        },
+        {
+          "filename": "TaskDelta.c",
+          "sha256": "5d7f365df3695b89cfa9d6651370caec19adc401f1e61faf0f732cbe6c558732"
+        },
+        {
+          "filename": "TaskEcho.c",
+          "sha256": "4e988a5765ce7dcba1fe9ed549e9c8d4c7c56b14289e41adc8a3d112fb7a054a"
+        },
+        {
+          "filename": "TaskFoxtrot.c",
+          "sha256": "8059753889e0f2d1ac9689002370e61e2461c1b45636b176e0c733f4f8559c50"
+        },
+        {
+          "filename": "TaskGolf.c",
+          "sha256": "72b670b4fdbec05d74ffb1771b4f301e199b75ce800dd7016b3dd381a75889f9"
+        },
+        {
+          "filename": "TaskHotel.c",
+          "sha256": "bbda70dd67bf5b88c5ae20af7e47a25be604dd07c5510675f5f0e4a5f5a8d1b7"
+        },
+        {
+          "filename": "TaskOscar.c",
+          "sha256": "bc20aad1547bd6db0f81a021ae60f171fc4598995dce5da96dc456b5e08be8f3"
+        },
+        {
+          "filename": "TaskTango.c",
+          "sha256": "5216081bac77e1b95a269f74f24c4a737f162760ada69f6325c82d1e9b5ddef8"
+        }
+      ]
+    },
+    {
+      "manifest": "exercise-libraries/source-programs/c/simulate-output-variables/manifest.json",
+      "title": "C - Output + Variable",
+      "exerciseCount": 10,
+      "exercises": [
+        {
+          "filename": "TaskIndia.c",
+          "sha256": "090b61e5613d1d89026f9fce97c8030e0c5bce5feb38cc701d05dff1f798ad60"
+        },
+        {
+          "filename": "TaskJuliet.c",
+          "sha256": "1fed755291725d918567379ecc7a7a623823a7fc4c7b5357bac82e3493550190"
+        },
+        {
+          "filename": "TaskKilo.c",
+          "sha256": "395ca6dfab03226e25a90afd37e890c0705fc372ed6fa474787cd4ec0061e96a"
+        },
+        {
+          "filename": "TaskLima.c",
+          "sha256": "d5ade7a1c5c0ab7cc284c15c4cceb9efff72fae0af1d12aaf5ec61a72ea6a42d"
+        },
+        {
+          "filename": "TaskMike.c",
+          "sha256": "9e3a48b39e62ea9521429ee218ea9e2566966bac0749c9fca875af907d808ef6"
+        },
+        {
+          "filename": "TaskNovember.c",
+          "sha256": "2c5218e2a798a156860fd6a29dfb8af7116111a6a0af7c62496c17cb7b8bc9c3"
+        },
+        {
+          "filename": "TaskPapa.c",
+          "sha256": "4bda28ecb11c25d8a2daa17790623ecb9ab64d3e17bc3bf6c94e9d0ca26efe86"
+        },
+        {
+          "filename": "TaskQuebec.c",
+          "sha256": "e6ff28e2b0bdbb4f138640d8e6976ecea3c0c9bd78c35eae2712effac452cf43"
+        },
+        {
+          "filename": "TaskRomeo.c",
+          "sha256": "52148e91b159bbd30183c197e072ac72eba99e2c9f9672c84257feccf9d4da0f"
+        },
+        {
+          "filename": "TaskSierra.c",
+          "sha256": "faa92798a954b49b85b3ac4468a9c653537212cd0447d34dbba7d98266e2a5a5"
+        }
+      ]
+    },
+    {
+      "manifest": "exercise-libraries/source-programs/java/formatted-output/manifest.json",
+      "title": "Java Formatted Output",
+      "exerciseCount": 6,
+      "exercises": [
+        {
+          "filename": "BasicValues.java",
+          "sha256": "ec085cd78c634d747f5e8ed7efa6cde0281375d20ec6aaa94de0e1e9749a9771"
+        },
+        {
+          "filename": "MultipleValues.java",
+          "sha256": "64be296d9741956f2aa9a1c39d61fd8ceb93624fd353721c0e91997784533a07"
+        },
+        {
+          "filename": "EmbeddedLines.java",
+          "sha256": "54369bfb1fbe2d62dc6269ec07594cdb7e1d906a057f961127bb7aa30a1afdd9"
+        },
+        {
+          "filename": "NoTrailingNewline.java",
+          "sha256": "7a78b9c61236c3aa18d463cb20c0514239d6a9cc2918231601eb57635143cc8f"
+        },
+        {
+          "filename": "AssignmentThenOutput.java",
+          "sha256": "6e41242d80ce6074db0334cb8b31fed2a3a6bc27d0c875a9125bf53ff6d96fd2"
+        },
+        {
+          "filename": "TypedValues.java",
+          "sha256": "d1d2b69f53c094dd4d58df4bf3ad09bc2303f325ef12bf1e1a2082a66b836714"
+        }
+      ]
+    },
+    {
+      "manifest": "exercise-libraries/source-programs/java/input-basics/manifest.json",
+      "title": "Java Program Input",
+      "exerciseCount": 1,
+      "exercises": [
+        {
+          "filename": "MultipleIntegers.java",
+          "sha256": "5b7402c7c9fe0671a7bd79a82258f1a6b0d1e6ce044b987b17fc098fea9c7456"
+        }
+      ]
+    },
+    {
+      "manifest": "exercise-libraries/source-programs/java/output-basics/manifest.json",
+      "title": "Java Basic Output Statements",
+      "exerciseCount": 7,
+      "exercises": [
+        {
+          "filename": "TaskAlpha.java",
+          "sha256": "9264702f584f4fe8b1b2da802b7614c7c470fea4ea23c14b79e391d491600ff0"
+        },
+        {
+          "filename": "TaskBravo.java",
+          "sha256": "ddf219cd1b54fc1392e8b5bbf26a204357f6aac1eb49e43c60afafb9102a6908"
+        },
+        {
+          "filename": "TaskCharlie.java",
+          "sha256": "d4ab0339fbf72174a0627940f9f3a61cea5bdfca3d2f71775cd833395ef8d7a5"
+        },
+        {
+          "filename": "TaskDelta.java",
+          "sha256": "62cf5da5eeb495f3f843f2645736daaf5dadfd5039e59431d5f4b18b98da6e82"
+        },
+        {
+          "filename": "TaskEcho.java",
+          "sha256": "e61497d2ababf5e469ca69bc2e6f3f1e097c6bbd336a2e96bf7214356c9a6037"
+        },
+        {
+          "filename": "TaskFoxtrot.java",
+          "sha256": "928ca257d82084b0cb37a9190be81d33b1a49dfd3971fd0e9b1f5dacca4e82b2"
+        },
+        {
+          "filename": "TaskGolph.java",
+          "sha256": "ecea673e3898c3742735678f3a9e507c8a9d8392343e5661ee6d92c6fa0b3d8d"
+        }
+      ]
+    },
+    {
+      "manifest": "exercise-libraries/source-programs/java/selection-basics/manifest.json",
+      "title": "Java Selection Statements",
+      "exerciseCount": 4,
+      "exercises": [
+        {
+          "filename": "IfStatement.java",
+          "sha256": "65173a71fec7fd6f5c8e5979f40309267f2514bd9ec72acebb5442847981ebd8"
+        },
+        {
+          "filename": "IfElse.java",
+          "sha256": "8e7758a15737c4c5f76470803f2794e44cfb3feb00003ec315268a3094f4b21c"
+        },
+        {
+          "filename": "ElseIfChain.java",
+          "sha256": "dcbf90fe206be70a42003280730d7ec283e4cb9670469eaa455bf856bad34d6d"
+        },
+        {
+          "filename": "SwitchCase.java",
+          "sha256": "a40b91e40de6f20630795486e682fbbd98423469d4664aa53ab8db92b5580500"
+        }
+      ]
+    },
+    {
+      "manifest": "exercise-libraries/source-programs/java/simulate-basic-output/manifest.json",
+      "title": "Java - Basic Output",
+      "exerciseCount": 10,
+      "exercises": [
+        {
+          "filename": "TaskAlpha.java",
+          "sha256": "3ca301ade6185f3c6fb6e526d82681fed2b8700f529d0e2083e4b1fb49d29e4b"
+        },
+        {
+          "filename": "TaskBravo.java",
+          "sha256": "57cae122676067f76c72ecc01df4143271a14f6747046bf9c65ffb71bfdb1300"
+        },
+        {
+          "filename": "TaskCharlie.java",
+          "sha256": "26af9b783b85e4a5733b6ca128b53c772c244eecc139a82966f4486300f62e02"
+        },
+        {
+          "filename": "TaskDelta.java",
+          "sha256": "16de36a99f07e8ff0cacd3b7a7c9a078b237831b86a1ad82fb8ea78076ad4535"
+        },
+        {
+          "filename": "TaskEcho.java",
+          "sha256": "a67ff33a66567de0bd755135f00c95b6e29913bcd10a2fddeddc2dec0e884393"
+        },
+        {
+          "filename": "TaskFoxtrot.java",
+          "sha256": "59fb6f59eae9de8b4fc8bade915ce6c52ae6f51c19d54649e583d3ea4665929f"
+        },
+        {
+          "filename": "TaskGolf.java",
+          "sha256": "73234afb17a78bddf295135e408b6fd2cfe54e825aea15d7e28b86422b239c2c"
+        },
+        {
+          "filename": "TaskHotel.java",
+          "sha256": "d90c0180009a1b4dd6c28bf528ff81490ed3134284b8213995cb2640cc8de052"
+        },
+        {
+          "filename": "TaskOscar.java",
+          "sha256": "5f4dbd8ea755eee51d7743d7fc495c621f8145e9899dcee8d72008d9360b5efd"
+        },
+        {
+          "filename": "TaskTango.java",
+          "sha256": "5e0d3d84260f7097528daaf33d5ba63f95fecd2816c271c1a0dd7e84c7f7d94b"
+        }
+      ]
+    },
+    {
+      "manifest": "exercise-libraries/source-programs/java/simulate-output-variables/manifest.json",
+      "title": "Java - Output + Variable",
+      "exerciseCount": 10,
+      "exercises": [
+        {
+          "filename": "TaskIndia.java",
+          "sha256": "a4dd10d5905da535c814a53b70007527538de1e4d2b2dcb63a19fa7cac9563de"
+        },
+        {
+          "filename": "TaskJuliet.java",
+          "sha256": "faf892809f47c6bfaa2bc907f23995a48b93500c0fa5dc40d11fda145f21597c"
+        },
+        {
+          "filename": "TaskKilo.java",
+          "sha256": "e1144aa5a56d62124355a7a89970faf526e631f051a37ecf7c09006046f19a5f"
+        },
+        {
+          "filename": "TaskLima.java",
+          "sha256": "e4cef81b4eb2cabc181cb14e2d648ec4ff9dd198a32cdb238298496e73fc9679"
+        },
+        {
+          "filename": "TaskMike.java",
+          "sha256": "603698ec39ebd56f16788449a453bbb69f04ff3e6fc1a98139d6696c06a00469"
+        },
+        {
+          "filename": "TaskNovember.java",
+          "sha256": "c977505bf562bea64ae2012e2dc5e948035e71c26247229622cbd332a5556155"
+        },
+        {
+          "filename": "TaskPapa.java",
+          "sha256": "74b951cdaefb2a07bbe58fef02e0babe2150142b958893f7ccecc08f7cf05319"
+        },
+        {
+          "filename": "TaskQuebec.java",
+          "sha256": "540441b2bb8c91729255fcc1e568f12d34b29f60b822c39f60909b01c443fbfc"
+        },
+        {
+          "filename": "TaskRomeo.java",
+          "sha256": "08d89a499c7071a4fd2447e2c458f3512f94b17ecc62e7ceb34a4685d32a7d2d"
+        },
+        {
+          "filename": "TaskSierra.java",
+          "sha256": "03d87ca41b34d584920f022a33e90e35364e1aae13de131d462273f7fb60ad96"
+        }
+      ]
+    }
+  ]
+}

@@ -1,18 +1,7 @@
-const PROGRAM_OUTPUT_SETTINGS=DEFAULT_APP_SETTINGS.shell.outputPanel;
-let pendingProgramOutputAnimation=null;
-let programOutputAnimationActive=false;
-let programOutputAnimationTimer=null;
-
-function programOutputInteractionLocked(){return programOutputAnimationActive;}
-
-function queueProgramOutputAnimation(item,event,onComplete){
-  if(!item||!event||event.type!=='OUTPUT') return;
-  pendingProgramOutputAnimation={item,event,onComplete:typeof onComplete==='function'?onComplete:null};
-}
-
 function outputEscapeLiteral(value){
   return String(value).replace(/\\/g,'\\\\').replace(/"/g,'\\"')
-    .replace(/\n/g,'\\n').replace(/\t/g,'\\t');
+    .replace(/\n/g,'\\n').replace(/\t/g,'\\t').replace(/\r/g,'\\r')
+    .replace(/\u0008/g,'\\b');
 }
 
 function outputStatementSource(statement,item){
@@ -21,12 +10,12 @@ function outputStatementSource(statement,item){
   if(language==='c'){
     const format=statement.parts.map(part=>part.kind==='text'?outputEscapeLiteral(part.value):`%${part.format||'d'}`).join('')
       +(statement.newline?'\\n':'');
-    const args=dynamic.map(entry=>programOutputPartName(entry.part)).filter(Boolean);
+    const args=dynamic.map(entry=>programOutputPartSource(entry.part)).filter(Boolean);
     return `printf("${format}"${args.length?', '+args.join(', '):''});`;
   }
   const pieces=statement.parts.map(part=>part.kind==='text'
     ? `"${outputEscapeLiteral(part.value)}"`
-    : programOutputPartName(part)).filter(Boolean);
+    : programOutputPartSource(part)).filter(Boolean);
   const command=statement.newline?'System.out.println':'System.out.print';
   return `${command}(${pieces.join(' + ')});`;
 }
@@ -43,7 +32,9 @@ function programOutputVisualTrace(statement){
 }
 
 function programOutputPartStates(statement,traceCount){
-  const states=statement.parts.map(() =>({stagedValue:null,resolvedValue:null}));
+  const states=statement.parts.map((part,index)=>({
+    stagedValue:part.kind==='expression'&&statement.runtime.parts[index].initialStagedValue!=null
+      ?statement.runtime.parts[index].initialStagedValue:null,resolvedValue:null}));
   programOutputVisualTrace(statement).slice(0,traceCount).forEach(step=>{
     const part=states[step.partIndex];
     if(!part) return;
@@ -82,6 +73,11 @@ function programOutputResolveActionable(interactive,partState){
 function renderProgramOutputConsumedIdentifier(statement,entry,partState,showDerived){
   const name=programOutputPartName(entry.part);
   const dataType=entry.part.expression&&entry.part.expression.dataType;
+  if(!name)return h('span',{class:'program-output-consumed-source'},
+    h('span',{class:'program-output-token tok-static'},programOutputPartSource(entry.part)),
+    ...(showDerived?[h('span',{class:'program-output-derived-value',
+      'data-token-id':programOutputResultTokenId(statement,entry.index)},
+    `→ ${formatValue(partState.resolvedValue,dataType)}`)]:[]));
   const nodes=[renderValueCard({id:programOutputReadTokenId(statement,entry.index),name,
     value:partState.stagedValue,kind:'variable',dataType,color:bindingIdentityColor(name,'variable'),
     isFlash:false})];
@@ -104,7 +100,7 @@ function renderProgramOutputState(statement,item,program,options){
   if(options.sourceIndent) code.appendChild(h('span',{class:'program-source-indent'},options.sourceIndent));
   code.appendChild(outputActionToken(command,{
     class:'program-output-token output-command tok '+(readyToPrint?'tok-op-active':'tok-static'),
-    'data-output-command-source':options.commandAnchor?statement.id:null,
+    'data-terminal-emitter':options.commandAnchor?statement.id:null,
     title:readyToPrint?'Send the evaluated text to Program Output':null,
     'aria-label':readyToPrint?`Execute ${command}`:null,
     onclick:readyToPrint?()=>handleTokenClick({type:'emit-output',statementId:statement.id}):null
@@ -145,10 +141,11 @@ function renderProgramOutputState(statement,item,program,options){
       if(partState.resolvedValue!==null){
         code.appendChild(renderProgramOutputConsumedIdentifier(statement,entry,partState,false));
       }else if(partState.stagedValue!==null){
-        code.appendChild(renderValueCard({id:programOutputReadTokenId(statement,entry.index),name,
+        code.appendChild(name?renderValueCard({id:programOutputReadTokenId(statement,entry.index),name,
           value:partState.stagedValue,kind:'variable',dataType:entry.part.expression&&entry.part.expression.dataType,
           color:bindingIdentityColor(name,'variable'),
-          isFlash:!!options.flashRead&&options.flashPartIndex===entry.index}));
+          isFlash:!!options.flashRead&&options.flashPartIndex===entry.index})
+          :h('span',{class:'program-output-token tok-static'},programOutputPartSource(entry.part)));
       }else{
         code.appendChild(outputActionToken(name,{
           class:'program-output-token output-identifier binding-identity tok '+(actionable?'tok-var':'tok-static'),
@@ -182,10 +179,11 @@ function renderProgramOutputState(statement,item,program,options){
         if(partState.resolvedValue!==null){
           code.appendChild(renderProgramOutputConsumedIdentifier(statement,{part,index},partState,true));
         }else if(partState.stagedValue!==null){
-          code.appendChild(renderValueCard({id:programOutputReadTokenId(statement,index),name,
+          code.appendChild(name?renderValueCard({id:programOutputReadTokenId(statement,index),name,
             value:partState.stagedValue,kind:'variable',dataType:part.expression&&part.expression.dataType,
             color:bindingIdentityColor(name,'variable'),
-            isFlash:!!options.flashRead&&options.flashPartIndex===index}));
+            isFlash:!!options.flashRead&&options.flashPartIndex===index})
+            :h('span',{class:'program-output-token tok-static'},programOutputPartSource(part)));
         }else{
           code.appendChild(outputActionToken(name,{
             class:'program-output-token output-identifier binding-identity tok '+(actionable?'tok-var':'tok-static'),style:bindingIdentityStyle(name,'variable'),
@@ -263,99 +261,6 @@ function renderOutputStatement(ctx){
   }
   card.appendChild(panel);
   container.appendChild(card);
-}
-
-function programOutputAnimationSurface(item,pending){
-  return pending&&typeof programStatementTraceOpenFor==='function'
-    &&programStatementTraceOpenFor(item,pending.event&&pending.event.statementId)?'modal':'main';
-}
-
-function appendProgramConsoleEvents(pre,events,program){
-  events.forEach(event=>{
-    if(event.type!=='INPUT'||!Array.isArray(event.tokens)||!event.tokens.length){
-      pre.appendChild(h('span',{},event.text||''));return;
-    }
-    const statement=program.statements.find(entry=>entry.id===event.statementId);
-    const raw=String(event.rawText==null?'':event.rawText);
-    let offset=0;
-    event.tokens.forEach((token,index)=>{
-      const value=String(token),position=raw.indexOf(value,offset);
-      if(position<0) return;
-      if(position>offset) pre.appendChild(h('span',{},raw.slice(offset,position)));
-      const target=statement&&statement.reads[index]&&statement.reads[index].target;
-      pre.appendChild(h('span',{class:'program-input-console-token binding-identity',
-        style:target?bindingIdentityStyle(target,'variable'):'',
-        'data-input-console-token':`${event.statementId}-${index}`},value));
-      offset=position+value.length;
-    });
-    pre.appendChild(h('span',{},raw.slice(offset)+'\n'));
-  });
-}
-
-function renderProgramOutputPanel(item,program,options){
-  options=options||{};
-  const surface=options.surface==='modal'?'modal':'main';
-  const events=(program.events||[]).filter(event=>event&&(event.type==='OUTPUT'||event.type==='INPUT'));
-  const pending=pendingProgramOutputAnimation&&pendingProgramOutputAnimation.item===item
-    ? pendingProgramOutputAnimation:null;
-  const ownsPending=!!(pending&&programOutputAnimationSurface(item,pending)===surface);
-  let visibleEvents=events;
-  if(ownsPending){
-    const index=events.lastIndexOf(pending.event);
-    if(index>=0) visibleEvents=events.slice(0,index);
-  }
-  const pre=h('pre',{class:'program-output-screen-text'});
-  appendProgramConsoleEvents(pre,visibleEvents,program);
-  const escape=h('span',{class:'program-output-escape-cue','aria-hidden':'true',
-    title:'newline (\\n)'},'↵');
-  const hasInput=program.statements.some(statement=>statement.kind==='input');
-  const title=hasInput?'Program Console':'Program Output';
-  const panel=h('aside',{class:'program-output-screen','aria-label':title,'data-output-surface':surface},
-    h('div',{class:'program-output-screen-title'},
-      h('i',{class:'fa-solid fa-display','aria-hidden':'true'}),h('span',{},title)),
-    h('div',{class:'program-output-screen-body','aria-live':'polite'},pre,escape,
-      h('span',{class:'program-output-cursor','aria-hidden':'true'},'▌')));
-  if(hasInput&&typeof renderProgramInputConsoleControls==='function')
-    renderProgramInputConsoleControls(item,program,panel,pre,surface);
-  if(ownsPending) requestAnimationFrame(()=>startProgramOutputAnimation(panel,pre,escape,pending));
-  return panel;
-}
-
-function startProgramOutputAnimation(panel,pre,escape,pending){
-  if(!panel||!panel.isConnected||pendingProgramOutputAnimation!==pending) return;
-  pendingProgramOutputAnimation=null;
-  if(typeof setProgramContextTab==='function') setProgramContextTab('output');
-  const text=pending.event.text||'';
-  const reduced=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let finished=false;
-  const finish=()=>{if(finished)return;finished=true;programOutputAnimationActive=false;programOutputAnimationTimer=null;
-    escape.classList.remove('is-visible');panel.classList.remove('is-printing');
-    if(pending.onComplete)pending.onComplete();};
-  if(reduced||!PROGRAM_OUTPUT_SETTINGS.characterAnimation){pre.textContent+=text;finish();return;}
-  programOutputAnimationActive=true;panel.classList.add('is-printing');
-  const source=document.querySelector(`[data-output-command-source="${pending.event.statementId}"]`)
-    ||document.querySelector(`.program-source-file-line[data-statement-id="${pending.event.statementId}"]`);
-  const begin=()=>{
-    let index=0;
-    const step=()=>{
-      if(!panel.isConnected){finish();return;}
-      if(index>=text.length){finish();return;}
-      const character=text[index++];
-      if(character==='\n'){
-        escape.classList.add('is-visible');
-        programOutputAnimationTimer=setTimeout(()=>{
-          pre.textContent+='\n';escape.classList.remove('is-visible');step();
-        },PROGRAM_OUTPUT_SETTINGS.escapeDelayMs);
-      }else{
-        pre.textContent+=character;
-        programOutputAnimationTimer=setTimeout(step,PROGRAM_OUTPUT_SETTINGS.characterDelayMs);
-      }
-    };
-    step();
-  };
-  if(source&&typeof runVarFinalComet==='function'){
-    runVarFinalComet(source.getBoundingClientRect(),panel.getBoundingClientRect(),'#67e8c1',begin);
-  }else begin();
 }
 
 registerStatementRenderer('output',renderOutputStatement);

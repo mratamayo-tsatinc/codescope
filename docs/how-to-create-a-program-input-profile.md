@@ -57,23 +57,20 @@ Declare the profile in `js/profiles.js`:
   shape:{operandSources:{variable:2},operandRange:{min:1,max:20},allowNegativeOperands:false},
   operators:{allowed:OPS.ADD_SUB},
   template:'operand op operand',
-  scoring:{itemCount:'manifest',pointsPerItem:2},
   content:{
-    provider:'code-simulator',
     mode:'source-files',
-    library:'source-programs',
-    exerciseSet:'my-input-set',
-    sourceValueMode:'authored',
-    inputValueMode:'seeded',
-    presentation:'source-flow',
+    source:{library:'source-programs',exerciseSet:'my-input-set'},
+    values:{variables:'authored',input:'seeded'},
     selection:{count:'all',shuffle:false}
   },
-  program:{declarations:'interactive',scoreAssignments:true,
-    timelinePresentation:'statement-modal'}
+  lesson:{focus:'input',variant:'numeric-console'},
+  interaction:{declarations:'interactive'},
+  presentation:{workspace:'source-program',timeline:'statement-modal'},
+  scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true}
 }
 ```
 
-Use `inputValueMode:'authored'` to preserve each `value`. Use `'seeded'` to
+Use `content.values.input:'authored'` to preserve each `value`. Use `'seeded'` to
 choose a value from its source-local range whenever the item is regenerated.
 
 ## Learner flow

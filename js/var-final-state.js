@@ -113,11 +113,11 @@ function buildBindingsForItem(item){
           unaryNodeId:null, op:null, form:null, _flashed:false
         });
       } else {
-        const delta = op.op==='++' ? 1 : -1;
+        const finalValue=evaluateUnaryOperation(op.op,op.form,base).writeValue;
         bindings.push({
           name:op.inner.name,kind:'declared',dataType:op.inner.dataType,
           trigger: op.form==='prefix' ? 'per-step' : 'statement-complete',
-          declaredValue: base, finalValue: base+delta,
+          declaredValue: base, finalValue,
           unaryNodeId: op.id, op: op.op, form: op.form, _flashed:false
         });
       }

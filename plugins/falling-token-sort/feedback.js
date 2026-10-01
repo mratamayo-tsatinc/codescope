@@ -109,7 +109,8 @@ function ftsRenderSolution(item,profile){
 
 function ftsToggleSolution(){
   const item=currentItem();
-  if(!item||item.activityKind!==FALLING_TOKEN_SORT_MANIFEST.id||state.mode==='exam')return;
+  if(!item||item.activityKind!==FALLING_TOKEN_SORT_MANIFEST.id
+    ||!correctSolutionAvailable(currentProfile(),item))return;
   item.showSolution=!item.showSolution;render();
 }
 
@@ -124,9 +125,10 @@ function ftsBuildFeedback(item,profile){
   card.appendChild(h('div',{class:'feedback-stats'},
     h('div',{class:'stat'},h('div',{class:'sv'},`${item.correctSteps}/${item.totalOpSteps}`),h('div',{class:'sl'},'correct sorts')),
     h('div',{class:'stat'},h('div',{class:'sv'},`${Math.round(item.itemScore*100)}%`),h('div',{class:'sl'},'item score'))));
-  if(state.mode==='practice')card.appendChild(h('button',{class:'solution-toggle',type:'button',onclick:ftsToggleSolution},
+  const solutionAvailable=correctSolutionAvailable(profile,item);
+  if(solutionAvailable)card.appendChild(h('button',{class:'solution-toggle',type:'button',onclick:ftsToggleSolution},
     item.showSolution?'Hide correct solution':'Show correct solution'));
-  root.appendChild(card);if(item.showSolution&&state.mode==='practice')root.appendChild(ftsRenderSolution(item,profile));
+  root.appendChild(card);if(item.showSolution&&solutionAvailable)root.appendChild(ftsRenderSolution(item,profile));
   return root;
 }
 

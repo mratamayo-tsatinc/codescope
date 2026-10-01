@@ -16,11 +16,12 @@ function soBuildConsoleContent(){
 
 function soToggleSolution(){
   const item=currentItem();
-  if(!item||item.activityKind!==SIMULATE_OUTPUT_MANIFEST.id||state.mode!=='practice'||!item.checked)return;
+  if(!item||item.activityKind!==SIMULATE_OUTPUT_MANIFEST.id
+    ||!correctSolutionAvailable(currentProfile(),item))return;
   item.showSolution=!item.showSolution;render();
 }
 
-function soBuildFeedback(item){
+function soBuildFeedback(item,profile){
   const result=item.result,root=h('div',{class:'so-feedback'});
   const summary=h('div',{class:`feedback ${item.wasCorrectFinal?'correct':'incorrect'}`},
     h('div',{class:'feedback-head'},h('i',{class:`fa-solid ${item.wasCorrectFinal?'fa-circle-check':'fa-circle-xmark'}`,
@@ -33,7 +34,8 @@ function soBuildFeedback(item){
         h('div',{class:'sl'},'checks correct')),
       h('div',{class:'stat'},h('div',{class:'sv'},`${Math.round(item.itemScore*100)}%`),
         h('div',{class:'sl'},'item score'))));
-  if(state.mode==='practice')summary.appendChild(h('button',{class:'solution-toggle',type:'button',
+  const solutionAvailable=correctSolutionAvailable(profile,item);
+  if(solutionAvailable)summary.appendChild(h('button',{class:'solution-toggle',type:'button',
     onclick:soToggleSolution},item.showSolution?'Hide correct solution':'Show correct solution'));
   root.appendChild(summary);
   const output=h('section',{class:'so-result-section'},h('h3',{},'Your output'));
@@ -62,7 +64,7 @@ function soBuildFeedback(item){
     });
     root.appendChild(values);
   }
-  if(item.showSolution&&state.mode==='practice'){
+  if(item.showSolution&&solutionAvailable){
     const solution=h('section',{class:'so-solution','aria-label':'Correct output and variable values'},
       h('h3',{},'Correct output'),
       h('pre',{class:'so-solution-output'},item.expectedLines.join('\n')),
@@ -98,7 +100,7 @@ function soSyncDrawers(item){
   }
   const firstShow=!item._feedbackAnimated;item._feedbackAnimated=true;
   if(typeof setFeedbackDrawerTitle==='function')setFeedbackDrawerTitle('Feedback');
-  if(typeof setFeedbackDrawerContent==='function')setFeedbackDrawerContent(soBuildFeedback(item));
+  if(typeof setFeedbackDrawerContent==='function')setFeedbackDrawerContent(soBuildFeedback(item,currentProfile()));
   if(typeof showFeedbackDrawerTab==='function')showFeedbackDrawerTab();
   if(typeof setFeedbackDrawerStatus==='function')setFeedbackDrawerStatus(item.wasCorrectFinal);
   if(firstShow&&typeof openFeedbackDrawer==='function')openFeedbackDrawer();

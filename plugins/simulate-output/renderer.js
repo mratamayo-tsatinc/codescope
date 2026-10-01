@@ -62,6 +62,16 @@ function soSourcePanel(item){
       h('span',{class:'so-source-text'},...soSourceFragments(line,item.language))))));
 }
 
+function soInputPanel(item){
+  if(!Array.isArray(item.inputs)||!item.inputs.length)return null;
+  return h('section',{class:'so-input-panel','aria-label':'Program input'},
+    h('div',{class:'so-panel-heading'},h('i',{class:'fa-solid fa-keyboard','aria-hidden':'true'}),
+      h('span',{},'Program input')),
+    h('div',{class:'so-input-values'},...item.inputs.map(input=>
+      h('div',{class:'so-input-value'},h('code',{},input.target),h('span',{'aria-hidden':'true'},'←'),
+        h('code',{},String(input.value))))));
+}
+
 function soOutputPanel(item){
   const input=h('textarea',{class:'so-output-input',rows:Math.max(4,Math.min(10,item.expectedLines.length+1)),
     wrap:'off',spellcheck:'false','aria-label':'Predicted console output',
@@ -77,12 +87,14 @@ function soVariableInput(item,variable,index,part){
   const array=Array.isArray(variable.expected);
   const value=array?item.response.variables[index][part]:item.response.variables[index];
   const label=array?`${variable.name}[${part}]`:variable.name;
-  return h('label',{class:'so-variable-row'},h('span',{class:'so-variable-name'},label),
-    h('span',{class:'so-variable-equals','aria-hidden':'true'},'='),
-    h('input',{class:'so-variable-input',type:'text',value,spellcheck:'false',
-      autocomplete:'off','aria-label':`Final value of ${label}`,disabled:item.checked||state.examExpired,
-      oninput:event=>soEdit(item,{type:'SET_VARIABLE',index,element:array?part:undefined,
-        value:event.currentTarget.value})}));
+  return h('label',{class:'so-variable-card tok-card binding-identity tok-card-var',
+    style:bindingIdentityStyle(variable.name,'variable'),title:`Final value of ${label}`},
+    h('span',{class:'tok-card-head so-variable-name'},label),
+    h('span',{class:'tok-card-body so-variable-value'},
+      h('input',{class:'so-variable-input',type:'text',value,spellcheck:'false',
+        autocomplete:'off','aria-label':`Final value of ${label}`,disabled:item.checked||state.examExpired,
+        oninput:event=>soEdit(item,{type:'SET_VARIABLE',index,element:array?part:undefined,
+          value:event.currentTarget.value})})));
 }
 
 function soVariablesPanel(item){
@@ -105,6 +117,7 @@ function soRender({container,item,profile}){
     h('i',{class:'fa-solid fa-circle-info','aria-hidden':'true'}),
     h('span',{},profile.activity.instructions)));
   flow.appendChild(soSourcePanel(item));
+  const inputPanel=soInputPanel(item);if(inputPanel)flow.appendChild(inputPanel);
   flow.appendChild(h('div',{class:'so-answer-grid'},soOutputPanel(item),soVariablesPanel(item)));
   if(item.checked&&state.mode==='exam'&&!state.examExpired){
     flow.appendChild(h('div',{class:'so-recorded',role:'status'},

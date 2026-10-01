@@ -5,17 +5,17 @@
 Run from the project root:
 
 ```bash
-node tests/run-tests.js
+node tests/release-gate.js
 ```
 
 The implementation is not complete unless the command exits successfully with:
 
 ```text
-All CodeScope compatibility and extension tests passed.
+Phase 10 release gate passed: ...
 ```
 
-Do not replace full-suite validation with a targeted test. Add targeted
-coverage, then run the full suite.
+The gate also runs the Phase 0 baseline and compatibility suite. Do not replace
+it with a targeted test. Add targeted coverage, then run the release gate.
 
 ## General regression checks
 
@@ -64,10 +64,16 @@ coverage, then run the full suite.
       reconstruct the cumulative Program Output text.
 - [ ] Character playback applies `\\n` as one newline and respects reduced
       motion; it never changes scoring.
+- [ ] Program Output, Code Simulator, Program Input, and modal mirrors use the
+      shell-owned Program Terminal. No presentation plugin contains a terminal
+      buffer, cursor-position algorithm, or control-character interpreter.
+- [ ] `TaskGolph.c` in Test Basic Output processes `\\r` through the shared
+      terminal state: the visible cursor moves immediately to column zero of
+      the active row, and `Loading Done!` overwrites `Loading......`.
 - [ ] Program Output is beside the flow on desktop and above it near 390 px.
 - [ ] The Input Statements category contains one source-backed Program Input
       profile and loads only the active language's `input-basics` manifest.
-- [ ] `inputValueMode:'authored'` preserves each `@input value`; `'seeded'`
+- [ ] `content.values.input:'authored'` preserves each `@input value`; `'seeded'`
       remains inside its source-local inclusive range, repeats with the same
       seed, and can change with a different seed.
 - [ ] Activating an input command highlights simulated numeric keys and Space
@@ -87,6 +93,19 @@ coverage, then run the full suite.
 - [ ] Source-file mode loads only manifest-listed exercises from the active
       C/Java language folder and preserves manifest order unless seeded shuffle
       is configured.
+- [ ] Simulate Output resolves its bank from
+      `exercise-libraries/source-programs/<language>/<exercise-set>/`; the
+      plugin contains no authored exercise directory.
+- [ ] Simulate Output exercise source contains no `@output` or `@variables`
+      blocks. Expected terminal output and final initialized mutable memory are
+      generated from canonical effects, and constants are excluded from the
+      mutable-memory answer.
+- [ ] Terminal answer generation applies newline, carriage-return overwrite, and
+      backspace behavior. A source diagnostic rejects the exercise rather than
+      accepting an incomplete key.
+- [ ] Editing or adding a source file and updating only its `manifest.json`
+      changes the next generated Simulate Output session without a JavaScript
+      catalog edit.
 - [ ] A Program Output statement with three identifiers creates three memory
       reads, three value-resolution steps, and one `PRINT` event.
 - [ ] Guided permits output identifiers in any order and unlocks only the
@@ -105,12 +124,12 @@ coverage, then run the full suite.
       remain in their source positions as muted read-only lines.
 - [ ] Source Program Output adds no synthetic final assignment and finalizes
       scoring after the last authored executable statement.
-- [ ] Source Program Output uses the Code Simulator provider with the
+- [ ] Source Program Output uses Code Simulator presentation with the
       registered `source-programs` exercise library, preserves the formatted-output manifest
       order in C and Java, uses authored values, and opens multistep statements
       through statement-modal presentation.
-- [ ] Program Output and Code Simulator resolve `content.library` through the
-      shared registry; neither provider contains the other plugin's directory
+- [ ] Program Output and Code Simulator resolve `content.source.library` through the
+      shared registry; neither adapter contains the other plugin's directory
       path. Unknown libraries and unsupported languages fail validation.
 - [ ] Complete source exercise sets live under
       `exercise-libraries/source-programs/<language>/<exercise-set>/`; the
@@ -223,7 +242,7 @@ coverage, then run the full suite.
       it is clicked the program remains running; clicking it completes the item
       and triggers the configured completion celebration. Java receives no
       synthesized return statement.
-- [ ] A program profile without `timelinePresentation:'statement-modal'`
+- [ ] A program profile without `presentation.timeline:'statement-modal'`
       continues to render its timeline inline.
 
 ## Token Classification scenarios

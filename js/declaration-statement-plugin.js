@@ -23,12 +23,15 @@ function declarationInitializerResolved(statement){
     && isFlatOperandReady(runtime.workingFlat.operands[0]));
 }
 
-function syncDeclarationOperandsFromMemory(statement, program){
+function syncDeclarationOperandsFromMemory(statement, program, semantics){
   const runtime = statement.runtime;
   if(!runtime || runtime.trace.length>0) return;
   if(runtime.originalTree&&typeof applyProgramMemoryToTree==='function'){
     applyProgramMemoryToTree(runtime.originalTree,program.memory);
-    runtime.expectedValue=evalTree(runtime.originalTree);
+    const evaluation=semantics.execute(statement,program.memory);
+    runtime.expectedValue=evaluation.value;
+    runtime.expectedEffects=evaluation.effects.filter(effect=>effect.scope==='expression');
+    runtime.semanticTrace=evaluation.trace;
     runtime.canonicalTrace=buildCanonicalTrace(runtime.originalTree);
   }
   function syncOperand(operand){
@@ -71,24 +74,19 @@ registerStatementPlugin({
     const {statement, program, action} = ctx;
     const runtime = statement.runtime;
     if(!runtime || runtime.checked || !declarationDependenciesReady(statement, program)) return {applied:false};
+    const semantics=programSemanticsForContext(ctx);
     if(action.type==='declare-binding'&&!declarationHasInitializer(statement)){
+      const semantic=semantics.execute(statement,program.memory);
       runtime.checked=true;
       runtime.wasCorrectAssignment=true;
-      program.memory[statement.binding.name]={
-        name:statement.binding.name,
-        kind:statement.binding.kind,
-        dataType:statement.binding.dataType,
-        mutable:statement.binding.mutable,
-        initialized:false,
-        value:null,
-        lastStatementId:statement.id
-      };
+      semantics.applyEffects(program.memory,semantic.effects,statement.id,'bindings');
       return {applied:true,completed:true,event:{
         type:'DECLARE',action:'DECLARE',statementId:statement.id,
-        target:statement.binding.name,dataType:statement.binding.dataType,wasCorrect:true
+        target:statement.binding.name,dataType:statement.binding.dataType,
+        effects:semantic.effects,wasCorrect:true
       }};
     }
-    syncDeclarationOperandsFromMemory(statement, program);
+    syncDeclarationOperandsFromMemory(statement, program, semantics);
 
     if(action.type === 'commit-assignment'){
       if(!declarationInitializerResolved(statement)) return {applied:false};
@@ -101,21 +99,22 @@ registerStatementPlugin({
       runtime.correctSteps = evalSteps.filter(step=>step.wasCorrect).length;
       runtime.totalOpSteps = evalSteps.length;
       runtime.wasCorrectAssignment = value === runtime.expectedValue;
-      program.memory[statement.binding.name] = {
-        name:statement.binding.name,
-        kind:statement.binding.kind,
-        dataType:statement.binding.dataType,
-        mutable:statement.binding.mutable,
-        initialized:true,
-        value,
-        lastStatementId:statement.id
-      };
+      const effects=typeof coreExpressionWriteEffectsFromTrace==='function'
+        ?coreExpressionWriteEffectsFromTrace(runtime.trace,runtime.expectedEffects):[];
+      runtime.beforeEffectMemory=typeof captureCoreMemoryTargets==='function'
+        ?captureCoreMemoryTargets(program.memory,[...effects.map(effect=>effect.target),statement.binding.name]):null;
+      runtime.expressionEffects=effects;
+      if(typeof applyCoreExpressionEffects==='function') applyCoreExpressionEffects(program.memory,effects,statement.id);
+      const declarationEffect=semantics.declarationEffect(statement,value,true);
+      semantics.applyEffects(program.memory,[declarationEffect],
+        statement.id,'bindings');
       return {
         applied:true,
         completed:true,
         event:{
           type:'ASSIGN', action:'ASSIGN', statementId:statement.id,
           target:statement.binding.name, value,
+          effects,
           expectedValue:runtime.expectedValue,
           wasCorrect:runtime.wasCorrectAssignment
         }
@@ -144,6 +143,7 @@ registerStatementPlugin({
   rollbackCompletion(ctx){
     const runtime = ctx.statement.runtime;
     if(!runtime || !runtime.checked) return {applied:false};
+    if(typeof restoreCoreMemoryTargets==='function') restoreCoreMemoryTargets(ctx.program.memory,runtime.beforeEffectMemory);
     delete ctx.program.memory[ctx.statement.binding.name];
     runtime.checked = false;
     runtime.assignedValue = null;
@@ -151,6 +151,8 @@ registerStatementPlugin({
     runtime.wasCorrectAssignment = null;
     runtime.correctSteps = 0;
     runtime.totalOpSteps = 0;
+    runtime.beforeEffectMemory=null;
+    runtime.expressionEffects=[];
     if(Array.isArray(ctx.item._bindings)){
       const binding = ctx.item._bindings.find(b=>b.statementId===ctx.statement.id);
       if(binding) binding._flashed = false;
@@ -177,6 +179,8 @@ registerStatementPlugin({
     runtime.wasCorrectAssignment = null;
     runtime.correctSteps = 0;
     runtime.totalOpSteps = 0;
+    runtime.beforeEffectMemory=null;
+    runtime.expressionEffects=[];
     return {applied:changed};
   },
 

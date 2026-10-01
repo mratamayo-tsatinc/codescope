@@ -19,9 +19,11 @@ embed profile configuration in their own directory. Plugins register only
 their capabilities; the shell activates matching global profiles through each
 profile's `activity.kind` value.
 
-Each plugin owns its manifest, generation, canonical domain rules, actions,
-scoring checks, solution trace, renderer, feedback content, styles, language
-catalogs, and tests. Plugin CSS must be namespaced. The app-shell `js/` and
+Each activity plugin owns its manifest, activity-domain generation and rules,
+actions, scoring checks, solution trace, renderer, feedback, styles, and tests.
+Program-language syntax and semantics remain in the shell language core so a
+new construct propagates to every compatible activity. Plugin CSS must be
+namespaced. The app-shell `js/` and
 `css/` directories contain only shared orchestration and reusable services;
 profile data in `js/profiles.js` is configuration, not plugin behavior.
 
@@ -69,19 +71,27 @@ directory boundaries for activity plugins. Their profiles are declared
 globally in `js/profiles.js`; their plugin directories contain only the
 behavior and presentation needed to execute those configurations.
 
-Program Output is a statement capability rather than a standalone activity.
-It registers language-neutral output semantics and a renderer inside its plugin
-directory, then composes with declarations, assignments, and the expression
-engine through Program Core. Its profile content provider can parse a
-manifest-selected C or Java source bank at runtime or delegate to the seeded
-generator. Both inputs converge on the same serializable Program IR.
+Program Output is a statement interaction and presentation capability. It
+consumes canonical Output IR and shell-produced effects, then renders the
+read, format, and print workflow. Its content adapter can consume a
+manifest-selected C or Java bank or seeded generated content. Both converge on
+the same serializable Program IR through the shared source pipeline.
 
-Program Input follows the same composition boundary. Its plugin owns parsing
-and execution for `scanf` and `Scanner.nextInt()`, the submitted-input event,
-numeric keyboard playback, conversion steps, destination writes, and rendering.
-Code Simulator discovers those statements while parsing a complete source file
-and routes their Program IR through Program Core. Input and Output share a
-Program Console, while their semantic event types remain separate. See
+Program Output does not own the terminal emulator. Canonical text-to-screen
+state, including newline, carriage return, backspace, overwrite behavior, and
+cursor coordinates, lives in `js/output-statement-core.js`. The shared
+`js/program-terminal.js` service owns the Program Terminal DOM, playback, and
+cursor presentation. Plugins emit semantic input/output events and may render
+their statement-specific interaction; they must not duplicate the terminal
+buffer or special-case escape characters locally.
+
+Program Input follows the same composition boundary. The core parses and
+executes `scanf` and `Scanner.nextInt()`. The plugin hydrates their interaction
+runtime and owns the submitted-input workflow, numeric keyboard playback,
+conversion visualization, destination-write interaction, and rendering. Code
+Simulator receives those statements from the shared program parser and routes
+their IR through Program Core. Input and Output share a
+shell-owned Program Terminal surface, while their semantic event types remain separate. See
 `docs/how-to-create-a-program-input-profile.md`.
 
 `js/activity-core.js` owns the generic profile content-provider registry. The
@@ -90,27 +100,29 @@ and construct items. It does not know source formats or exercise-set layouts.
 See `docs/how-to-create-a-program-output-profile.md` for the Program Output
 provider contract.
 
-`js/source-library-registry.js` owns logical exercise-library registration,
-compatibility aliases, and manifest URL resolution. The independent
+`js/source-library-registry.js` owns logical exercise-library registration and
+manifest URL resolution. The independent
 `exercise-libraries/source-programs/library.js` registration owns its relative
-root and supported languages. Source-backed providers consume
-`content.library` and `content.exerciseSet`; they must not hardcode another
-plugin's directory. Current profiles use the canonical `source-programs` ID.
-The former `program-output` and `code-simulator` IDs and the older
-`content.sourceLibrary` field remain temporary read aliases.
+root and supported languages. Source-backed adapters consume
+`content.source.library` and `content.source.exerciseSet`; they must not
+hardcode another plugin's directory. Current profiles use the canonical
+`source-programs` ID and nested `content.source` fields.
 
-Simulate Output owns runtime-loaded exercise manifests, source files with
-embedded answer metadata, answer comparison, and its response UI. Exercise
-banks use `exercises/<global-language>/<profile-exercise-set>/`; the profile
-selects the set while CodeScope's global language selects the language folder.
-The shell waits for plugin content loading before it generates a session. Each
-set manifest is the only exercise membership and ordering source; files absent
-from the manifest remain inactive. It uses the shell's login, navigation,
-Practice/Exam policy, persistence, scoring summary, and drawers. See
-`docs/how-to-create-a-simulate-output-profile.md`.
+Simulate Output owns answer entry, comparison, feedback, and response UI over
+canonical program results. Its exercises live in the registered
+`source-programs` library, use the same language and exercise-set directory
+contract as other source-backed activities, and contain ordinary source code
+without embedded answer metadata. The shared source pipeline parses each
+manifest-listed file and generates expected terminal output and final mutable
+memory from language-core effects. Any core diagnostic rejects the exercise so
+an incomplete answer key is never accepted. The shell waits for plugin content
+loading before it generates a session. Each set manifest is the only exercise
+membership and ordering source; files absent from the manifest remain inactive.
+See `docs/how-to-create-a-simulate-output-profile.md`.
 
-The four existing statement plugins in `js/` are intentionally unchanged.
-Their migration will be handled by a separate refactoring plan.
+Statement adapters may live in `js/` or a presentation plugin, but they must
+consume Program Core semantics and must not carry fallback language parsers or
+evaluators.
 
 ## Configuration rule
 

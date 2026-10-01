@@ -7,6 +7,9 @@
 // changing this file.
 // ============================================================================
 
+const EXPRESSION_IR_SCHEMA_VERSION=1;
+const STATEMENT_IR_SCHEMA_VERSION=1;
+const PROGRAM_IR_SCHEMA_VERSION=1;
 const ASSIGNMENT_OPERATORS = Object.freeze(['=','+=','-=','*=','/=','%=']);
 
 function literalExpression(value, opts){
@@ -92,7 +95,7 @@ function outputStatement(spec){
     if(!part||typeof part!=='object') throw new Error(`Output part ${index+1} must be an object`);
     if(part.kind==='text') return {kind:'text',value:String(part.value==null?'':part.value)};
     if(part.kind==='expression'&&part.expression){
-      return {kind:'expression',expression:part.expression,format:part.format||'d'};
+      return {kind:'expression',expression:part.expression,format:part.format||'d',source:part.source||null};
     }
     throw new Error(`Unsupported output part '${part.kind}'`);
   }):[];
@@ -104,6 +107,43 @@ function outputStatement(spec){
     parts,
     sourceSpan:spec.sourceSpan||null
   };
+}
+
+function inputStatement(spec){
+  spec=spec||{};
+  if(!Array.isArray(spec.reads)||!spec.reads.length) throw new Error('Input statement requires at least one read');
+  const reads=spec.reads.map((read,index)=>{
+    if(!read||typeof read.target!=='string'||!read.target) throw new Error(`Input read ${index+1} requires a target`);
+    return Object.assign({},read);
+  });
+  return {id:spec.id||null,kind:'input',inputSyntax:spec.inputSyntax||'c',readerName:spec.readerName||'input',
+    format:spec.format||null,reads,rawInput:spec.rawInput==null?'':String(spec.rawInput),sourceSpan:spec.sourceSpan||null};
+}
+
+function selectionStatement(spec){
+  spec=spec||{};
+  if(!['if','else-if','switch'].includes(spec.selectionKind))
+    throw new Error(`Unsupported selection kind '${spec.selectionKind}'`);
+  if(!spec.condition) throw new Error('Selection statement requires a condition');
+  return {id:spec.id||null,kind:'selection',selectionKind:spec.selectionKind,
+    keyword:spec.selectionKind==='else-if'?'else if':spec.selectionKind,
+    condition:spec.condition,conditionSource:spec.conditionSource||null,
+    branches:Array.isArray(spec.branches)?spec.branches.map(branch=>Object.assign({},branch)):[],
+    sourceSpan:spec.sourceSpan||null};
+}
+
+function loopStatement(spec){
+  spec=spec||{};
+  if(!['while','do','do-while','for'].includes(spec.loopKind))
+    throw new Error(`Unsupported loop kind '${spec.loopKind}'`);
+  if(spec.loopKind!=='do'&&!spec.condition) throw new Error('Loop statement requires a condition');
+  return {id:spec.id||null,kind:'loop',loopKind:spec.loopKind,
+    keyword:spec.loopKind==='do-while'?'while':spec.loopKind,
+    condition:spec.condition||null,conditionSource:spec.conditionSource==null?null:spec.conditionSource,
+    initializer:spec.initializer||null,initializerSource:spec.initializerSource==null?null:spec.initializerSource,
+    update:spec.update||null,updateSource:spec.updateSource==null?null:spec.updateSource,
+    branches:Array.isArray(spec.branches)?spec.branches.map(branch=>Object.assign({},branch)):[],
+    sourceSpan:spec.sourceSpan||null};
 }
 
 function programReturnStatement(spec){

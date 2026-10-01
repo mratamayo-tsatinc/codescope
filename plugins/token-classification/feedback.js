@@ -37,7 +37,7 @@ function tcRenderSolution(item){
   });
   playback.appendChild(groups);return playback;
 }
-function tcBuildFeedback(item){
+function tcBuildFeedback(item,profile){
   const correct=item.wasCorrectFinal;
   const root=h('div',{class:'tc-feedback-stack'});
   const fb=h('div',{class:`feedback ${correct?'correct':'incorrect'}${item._feedbackAnimated?'':' feedback-enter'}`});
@@ -52,7 +52,8 @@ function tcBuildFeedback(item){
     h('div',{class:'stat'},h('div',{class:'sv'},`${item.correctSteps}/${item.totalOpSteps}`),h('div',{class:'sl'},'correct checks')),
     bonus.length?h('div',{class:'stat'},h('div',{class:'sv'},`${bonusCorrect}/${bonus.length}`),h('div',{class:'sl'},'bonus checks')):null,
     h('div',{class:'stat'},h('div',{class:'sv'},`${Math.round(item.itemScore*100)}%`),h('div',{class:'sl'},'item score'))));
-  if(state.mode==='practice'&&!terminal){
+  const solutionAvailable=correctSolutionAvailable(profile,item);
+  if(solutionAvailable&&!terminal){
     fb.appendChild(h('button',{class:'solution-toggle',onclick:tcToggleSolution},item.showSolution?'Hide correct solution':'Show correct solution'));
     root.appendChild(fb);
     if(item.showSolution)root.appendChild(tcRenderSolution(item));
@@ -72,7 +73,7 @@ function tcSyncDrawers(item,profile){
     if(typeof closeFeedbackDrawer==='function')closeFeedbackDrawer();
     return;
   }
-  const firstShow=!item._feedbackAnimated,fb=tcBuildFeedback(item);item._feedbackAnimated=true;
+  const firstShow=!item._feedbackAnimated,fb=tcBuildFeedback(item,profile);item._feedbackAnimated=true;
   let placed=false;
   if(typeof setFeedbackDrawerContent==='function')try{setFeedbackDrawerTitle('Feedback');setFeedbackDrawerContent(fb);placed=true;}catch(e){placed=false;}
   if(!placed)return;

@@ -1,146 +1,128 @@
 # Simulate Output profiles
 
-The `simulate-output` plugin presents source programs and asks students to predict
-printed output and final variable values. CodeScope owns login, mode, timer,
-navigation, exam persistence, and score summary. The plugin owns the exercises,
-answer parsing, response editing, scoring, source display, and feedback.
+Simulate Output asks students to predict a program's terminal output and final
+variable values. Authored source lives in the shared `source-programs` exercise
+library. The shell parses and executes the source to generate the answer key;
+the plugin owns response editing, comparison, scoring, source display, and
+feedback.
 
-## Current profile
+## Profile configuration
 
-`c-simulate-output` is defined in `js/profiles.js`:
+Declare the activity in `js/profiles.js`:
 
 ```js
 {
   enabled:true,
-  meta:{id:'c-simulate-output',name:'Simulate Output',
-    description:'Read source programs, predict their printed output, and give final variable values.'},
-  scoring:{itemCount:'manifest',pointsPerItem:'exercise-metadata'},
+  meta:{id:'c-simulate-output',name:'Simulate Output',description:'...'},
+  scoring:{itemCount:'manifest',pointsPerItem:'generated-answer'},
   activity:{
     kind:'simulate-output',
-    instructions:'Read the source program, then predict its console output and final variable values. Check when ready.',
-    generator:{exerciseSet:'it3-midterm-a',shuffle:false}
+    instructions:'Read the source program, then predict its console output and final variable values.',
+    generator:{library:'source-programs',exerciseSet:'it3-midterm-a',shuffle:false}
   }
 }
 ```
 
-`exerciseSet` selects a named exercise folder. CodeScope combines it with the
-global `state.language` value. With `state.language:'c'`, the example resolves
-to:
-
-`plugins/simulate-output/exercises/c/it3-midterm-a/manifest.json`
-
-`itemCount:'manifest'` means every filename listed in that set's manifest is
-one CodeScope item. `pointsPerItem:'exercise-metadata'` means the item maximum
-is the number of expected output lines plus the number of final variable
-values declared by that exercise. Nothing in `profiles.js` needs to change when
-the exercise set changes.
-
-`shuffle:false` preserves manifest order. Set it to `true` only when a seeded
-random order is intentionally required. The generated order is saved in a
-persisted session snapshot.
-
-## Directory structure
-
-Organize banks by language, then by named exercise set:
+The global app language and the registered library resolve this example to:
 
 ```text
-plugins/simulate-output/exercises/
-├── c/
-│   ├── printing/
-│   │   ├── manifest.json
-│   │   ├── PrintLine.c
-│   │   └── PrintFormat.c
-│   ├── selection/
-│   │   ├── manifest.json
-│   │   └── IfElse.c
-│   └── looping/
-│       ├── manifest.json
-│       └── ForLoop.c
-└── java/
-    ├── printing/
-    │   ├── manifest.json
-    │   └── PrintLine.java
-    └── selection/
-        ├── manifest.json
-        └── IfElse.java
+exercise-libraries/source-programs/c/it3-midterm-a/manifest.json
 ```
 
-Language and set directory names must be lowercase slugs such as `c`, `java`,
-`printing`, or `nested-loops`. The app's language is global; profiles select
-exercise sets and never override that language.
+`itemCount:'manifest'` loads every listed file. `pointsPerItem:'generated-answer'`
+means the maximum is derived from the generated output lines and initialized
+mutable variables. `shuffle:false` preserves manifest order; `true` produces a
+seeded order that is retained in persisted sessions.
 
-## Change one exercise set
+## Authoring workflow
 
-The authoring workflow has exactly two manual steps:
+Changing an activity requires exactly two manual steps:
 
-1. Add, edit, or remove source files in the chosen language and set directory.
-2. Update the `exercises` array in that same directory's `manifest.json`.
+1. Add or edit a source file in
+   `exercise-libraries/source-programs/<language>/<exercise-set>/`.
+2. Add, remove, or reorder its filename in that folder's `manifest.json`.
 
-The browser fetches the manifest and then fetches only the files listed in it,
-in the listed order, when CodeScope starts. A source file that exists in the
-directory but is absent from the manifest is not rendered. A manifest entry
-whose file is missing stops initialization with a clear loading error. There
-is no generated catalog, duplicated `raw` string, importer command, or build
-step.
-
-The manifest controls only the set title, membership, and order:
+The manifest owns the title, membership, and order:
 
 ```json
 {
-  "title": "Printing Practice",
-  "exercises": ["TaskAlpha.java", "TaskBravo.java"]
+  "title": "C - Simulate Output",
+  "exercises": ["TaskAlpha.c", "TaskBravo.c"]
 }
 ```
 
-To add another activity bank, create the same set folder under each language
-that deployment supports, then point a profile to the shared set name:
+Files absent from the manifest are inactive. A missing listed file stops
+loading. There is no generated catalog, copied `raw` field, importer, or build
+step.
 
-```js
-generator:{exerciseSet:'printing',shuffle:false}
-```
+### Seed values at an authored scale
 
-When the global language is `c`, this profile loads `exercises/c/printing/`.
-When it is `java`, it loads `exercises/java/printing/`. A missing language/set
-manifest or a missing listed source file stops initialization with a clear
-error instead of silently loading another language.
-
-## Exercise source and answer format
-
-Each source file begins with a metadata comment followed by its source code:
+An exercise that enables seeded variable values may constrain a numeric range
+to meaningful increments with the optional `step` field:
 
 ```c
 /*
-@output
-Printed line one
-Printed line two
-@variables
-count = 2
+@codescope
+@seed balance min=1000 max=1400 step=100
+@seed serviceFee min=15 max=35 step=5
 */
-#include <stdio.h>
-/* C program follows */
 ```
 
-Only the source below the metadata is shown to students. `@output` has one expected line per
-printed line. `@variables` contains `name = value` entries; a placeholder
-`(this program does not declare any variables)` means no variable answers.
-An array value may use `{value1, value2}` and receives one check per element.
+`balance` can become `1000`, `1100`, `1200`, `1300`, or `1400`. The range is
+inclusive when `max` lies on the step sequence; otherwise the largest generated
+value is the last step below `max`. Omitting `step` preserves the existing
+smallest-unit behavior, so `@seed x min=3 max=7` still produces every integer
+from `3` through `7`. A step must be positive and must be a whole number for an
+`int` declaration. Floating point steps use the directive's `decimals` value,
+or the precision inferred from the range, step, and authored initializer.
+Each name in a comma separated declaration is matched independently, so
+`int balance = 1200, deposit = 350;` may provide separate `@seed balance` and
+`@seed deposit` directives while preserving the authored source line.
 
-The metadata is parsed directly from the fetched source file at runtime. Keep
-the answer metadata in the source file; the profile and manifest contain no
-answer strings.
+## Exercise source
 
-## Scoring and mode behavior
+Exercise files contain ordinary source code. Do not add `@output` or
+`@variables` answer blocks:
 
-Each expected output line and final variable value is one point. Trailing
-whitespace on output lines is ignored, but leading spaces, punctuation, and
-line order matter. One accidental final Enter is ignored; extra printed lines
-reduce output credit, down to zero. Variable responses are trimmed and compared
-as text. Therefore different exercise files can have different maximum scores,
-matching the original standalone app.
+```c
+#include <stdio.h>
 
-Students may edit responses until Check. Practice can reset an unchecked item
-or use Try again after checking; the Feedback drawer offers the correct
-solution. Exam responses are saved as they are typed and lock on Check.
-Correctness remains withheld until the Exam timer expires if the exam policy permits
-release. The static client includes its answer bank, so browser source inspection
-can expose answers; server-side answer secrecy would require a backend.
+int main() {
+    int score = 75;
+    score += 5;
+    printf("Score: %d\n", score);
+    return 0;
+}
+```
+
+For each new session, CodeScope:
+
+1. fetches the manifest-listed file without using a cache;
+2. sends it through the shared source pipeline and canonical program parser;
+3. executes supported statements through the language core;
+4. derives the final terminal screen, including newline and carriage-return
+   behavior; and
+5. derives initialized mutable variable values from final program memory.
+
+Constants are not requested as final variable state. Arrays are represented by
+one response per element when the core returns an array value. Any parser or
+execution diagnostic rejects the exercise instead of producing a partial or
+incorrect answer key. Add support for a missing construct to the language core;
+do not add answer parsing or fallback evaluation to Simulate Output.
+
+The current `it3-midterm-a` bank is C-only. A Java deployment must add the same
+exercise-set directory and manifest beneath `source-programs/java/` before this
+profile can be used with Java.
+
+## Scoring and persistence
+
+Each generated output line and final variable value is one point. Trailing
+output whitespace is ignored, while leading spaces, punctuation, and line order
+remain significant. One accidental final Enter is ignored; extra output lines
+reduce output credit. Variable responses are trimmed and compared with their
+generated values.
+
+Students may revise responses until Check. Practice supports Reset, Try again,
+and solution disclosure through Feedback. Exam snapshots retain the generated
+answer with the item, so editing a source file cannot change an active saved
+attempt. Newly generated sessions always use the current manifest and source.

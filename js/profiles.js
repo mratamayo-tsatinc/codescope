@@ -264,12 +264,9 @@ const PROFILES_RAW = [
     shape: { operandSources:{variable:3,constant:1}, operandRange:{min:2,max:15}, allowNegativeOperands:false },
     operators: { allowed: OPS.ARITH_BASIC, constraints:{requireMultipleTiers:true} },
     template: 'operand op operand op operand op operand',
-    scoring: { itemCount:5, pointsPerItem:2 },
-    program: {
-      declarations: 'interactive',
-      dependencyMode: 'previous',
-      scoreAssignments: true,
-    },
+    scoring: { itemCount:5, pointsPerItem:2, statementCommits:true },
+    lesson:{focus:'declaration',variant:'dependency-chain'},
+    interaction:{declarations:'interactive'},
   },
   {
     enabled:true,
@@ -278,10 +275,12 @@ const PROFILES_RAW = [
     shape:{operandSources:{variable:3},operandRange:{min:2,max:12},allowNegativeOperands:false},
 
     template:'operand op operand op operand',
-    scoring:{itemCount:'manifest',pointsPerItem:2},
-    content:{provider:'program-output',mode:'source-files',library:'source-programs',recipe:'formatted-values',
-      exerciseSet:'formatted-output',selection:{count:'all',shuffle:false}},
-    program:{declarations:'interactive',outputLesson:'formatted-values',scoreAssignments:true},
+    scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
+    content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'formatted-output'},
+      selection:{count:'all',shuffle:false}},
+    lesson:{focus:'output',variant:'formatted-values'},
+    interaction:{declarations:'interactive'},
+    presentation:{workspace:'statement-flow',timeline:'inline'},
   },
   {
     enabled:true,
@@ -290,12 +289,12 @@ const PROFILES_RAW = [
     shape:{operandSources:{variable:3},operandRange:{min:2,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ADD_SUB},
     template:'operand op operand op operand',
-    scoring:{itemCount:'manifest',pointsPerItem:2},
-    content:{provider:'code-simulator',mode:'source-files',library:'source-programs',
-      exerciseSet:'formatted-output',sourceValueMode:'authored',presentation:'source-flow',
-      selection:{count:'all',shuffle:false}},
-    program:{declarations:'interactive',outputLesson:'formatted-values',scoreAssignments:true,
-      timelinePresentation:'statement-modal'},
+    scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
+    content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'formatted-output'},
+      values:{variables:'authored'},selection:{count:'all',shuffle:false}},
+    lesson:{focus:'output',variant:'formatted-values'},
+    interaction:{declarations:'interactive'},
+    presentation:{workspace:'source-program',timeline:'statement-modal'},
   },
   {
     enabled:true,
@@ -303,12 +302,12 @@ const PROFILES_RAW = [
       description:'Trace simulated console input, press Enter to submit it, convert each token, and write its value to memory.'},
     shape:{operandSources:{variable:3},operandRange:{min:1,max:20},allowNegativeOperands:false},
     operators:{allowed:OPS.ADD_SUB},template:'operand op operand op operand',
-    scoring:{itemCount:'manifest',pointsPerItem:2},
-    content:{provider:'code-simulator',mode:'source-files',library:'source-programs',exerciseSet:'input-basics',
-      sourceValueMode:'authored',inputValueMode:'seeded',presentation:'source-flow',
-      selection:{count:'all',shuffle:false}},
-    program:{declarations:'interactive',inputLesson:'numeric-console',scoreAssignments:true,
-      timelinePresentation:'statement-modal'},
+    scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
+    content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'input-basics'},
+      values:{variables:'authored',input:'seeded'},selection:{count:'all',shuffle:false}},
+    lesson:{focus:'input',variant:'numeric-console'},
+    interaction:{declarations:'interactive'},
+    presentation:{workspace:'source-program',timeline:'statement-modal'},
   },
   {
     enabled:true,
@@ -316,10 +315,12 @@ const PROFILES_RAW = [
       description:'Trigger each supported statement and trace the actual flow through a complete C or Java source program.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:1,max:100},allowNegativeOperands:false},
     operators:{allowed:[...OPS.COMPARISON,...OPS.LOGICAL]},template:'operand cmp operand',
-    scoring:{itemCount:'manifest',pointsPerItem:2},
-    content:{provider:'code-simulator',mode:'source-files',library:'source-programs',exerciseSet:'selection-basics',sourceValueMode:'seeded',
-      presentation:'source-flow',selection:{count:'all',shuffle:false}},
-    program:{declarations:'interactive',scoreAssignments:true,timelinePresentation:'statement-modal'},
+    scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
+    content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'selection-basics'},
+      values:{variables:'seeded'},selection:{count:'all',shuffle:false}},
+    lesson:{focus:'program-flow',constructs:['selection']},
+    interaction:{declarations:'interactive'},
+    presentation:{workspace:'source-program',timeline:'statement-modal'},
   },
   {
     enabled:true,
@@ -327,10 +328,12 @@ const PROFILES_RAW = [
       description:'Trigger each supported statement and trace the actual flow through a complete C source program.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:1,max:100},allowNegativeOperands:false},
     operators:{allowed:[...OPS.COMPARISON,...OPS.LOGICAL]},template:'operand cmp operand',
-    scoring:{itemCount:'manifest',pointsPerItem:2},
-    content:{provider:'code-simulator',mode:'source-files',library:'source-programs',exerciseSet:'output-basics',sourceValueMode:'seeded',
-      presentation:'source-flow',selection:{count:'all',shuffle:false}},
-    program:{declarations:'interactive',scoreAssignments:true,timelinePresentation:'statement-modal'},
+    scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
+    content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'output-basics'},
+      values:{variables:'seeded'},selection:{count:'all',shuffle:false}},
+    lesson:{focus:'program-flow'},
+    interaction:{declarations:'interactive'},
+    presentation:{workspace:'source-program',timeline:'statement-modal'},
   },
   {
     enabled:false,
@@ -338,8 +341,8 @@ const PROFILES_RAW = [
       description:'Initialize a variable, replace its value with =, then use the updated value.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:2,max:15},allowNegativeOperands:false},
     operators:{allowed:OPS.ADD_SUB}, template:'operand op operand',
-    scoring:{itemCount:5,pointsPerItem:2},
-    program:{declarations:'interactive',assignmentLesson:'basic-set',scoreAssignments:true},
+    scoring:{itemCount:5,pointsPerItem:2,statementCommits:true},
+    lesson:{focus:'assignment',variant:'basic-set'},interaction:{declarations:'interactive'},
   },
   {
     enabled:false,
@@ -347,8 +350,8 @@ const PROFILES_RAW = [
       description:'Trace consecutive addition and subtraction assignments on one variable.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:2,max:15},allowNegativeOperands:false},
     operators:{allowed:OPS.ADD_SUB}, template:'operand op operand',
-    scoring:{itemCount:5,pointsPerItem:2},
-    program:{declarations:'interactive',assignmentLesson:'add-sub',scoreAssignments:true},
+    scoring:{itemCount:5,pointsPerItem:2,statementCommits:true},
+    lesson:{focus:'assignment',variant:'add-sub'},interaction:{declarations:'interactive'},
   },
   {
     enabled:false,
@@ -356,8 +359,8 @@ const PROFILES_RAW = [
       description:'Apply multiplication assignment and observe the variable change in memory.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:2,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ADD_SUB}, template:'operand op operand',
-    scoring:{itemCount:5,pointsPerItem:2},
-    program:{declarations:'interactive',assignmentLesson:'multiply',scoreAssignments:true},
+    scoring:{itemCount:5,pointsPerItem:2,statementCommits:true},
+    lesson:{focus:'assignment',variant:'multiply'},interaction:{declarations:'interactive'},
   },
   {
     enabled:false,
@@ -365,8 +368,8 @@ const PROFILES_RAW = [
       description:'Compare integer quotient assignment with remainder assignment.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:6,max:30},allowNegativeOperands:false},
     operators:{allowed:OPS.ADD_SUB}, template:'operand op operand',
-    scoring:{itemCount:5,pointsPerItem:2},
-    program:{declarations:'interactive',assignmentLesson:'divide-remainder',scoreAssignments:true},
+    scoring:{itemCount:5,pointsPerItem:2,statementCommits:true},
+    lesson:{focus:'assignment',variant:'divide-remainder'},interaction:{declarations:'interactive'},
   },
   {
     enabled:false,
@@ -374,8 +377,8 @@ const PROFILES_RAW = [
       description:'Resolve a multi-step right-hand expression before applying a compound assignment.'},
     shape:{operandSources:{variable:2,literal:1},operandRange:{min:2,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ARITH_BASIC}, template:'operand op operand op operand',
-    scoring:{itemCount:3,pointsPerItem:5},
-    program:{declarations:'interactive',assignmentLesson:'rhs-expression',scoreAssignments:true},
+    scoring:{itemCount:3,pointsPerItem:5,statementCommits:true},
+    lesson:{focus:'assignment',variant:'rhs-expression'},interaction:{declarations:'interactive'},
   },
   {
     enabled:true,
@@ -383,8 +386,8 @@ const PROFILES_RAW = [
       description:'Follow several compound assignments that repeatedly update the same variable.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:2,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ADD_SUB}, template:'operand op operand',
-    scoring:{itemCount:5,pointsPerItem:1},
-    program:{declarations:'interactive',assignmentLesson:'sequential',scoreAssignments:true},
+    scoring:{itemCount:5,pointsPerItem:1,statementCommits:true},
+    lesson:{focus:'assignment',variant:'sequential'},interaction:{declarations:'interactive'},
   },
   {
     enabled:true,
@@ -392,8 +395,8 @@ const PROFILES_RAW = [
       description:'Use an updated variable and an immutable constant in a later assignment.'},
     shape:{operandSources:{variable:2,constant:1},operandRange:{min:2,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ARITH_BASIC}, template:'operand op operand op operand',
-    scoring:{itemCount:2,pointsPerItem:5},
-    program:{declarations:'interactive',assignmentLesson:'dependent',scoreAssignments:true},
+    scoring:{itemCount:2,pointsPerItem:5,statementCommits:true},
+    lesson:{focus:'assignment',variant:'dependent'},interaction:{declarations:'interactive'},
   },
   {
     enabled:true,
@@ -401,8 +404,8 @@ const PROFILES_RAW = [
       description:'Combine precedence, multiple variables, and dependent compound assignments.'},
     shape:{operandSources:{variable:3},operandRange:{min:2,max:10},allowNegativeOperands:false},
     operators:{allowed:OPS.ARITH_BASIC}, template:'operand op operand op operand',
-    scoring:{itemCount:2,pointsPerItem:5},
-    program:{declarations:'interactive',assignmentLesson:'advanced',scoreAssignments:true},
+    scoring:{itemCount:2,pointsPerItem:5,statementCommits:true},
+    lesson:{focus:'assignment',variant:'advanced'},interaction:{declarations:'interactive'},
   },
   {
     enabled:true,
@@ -411,8 +414,8 @@ const PROFILES_RAW = [
     shape:{operandSources:{variable:2,literal:1},operandRange:{min:3,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ARITH_BASIC,constraints:{requireMultipleTiers:true}},
     template:'operand op operand op operand',
-    scoring:{itemCount:2,pointsPerItem:5},
-    program:{declarations:'interactive',unaryUpdateLesson:'standalone-sequence',scoreAssignments:true},
+    scoring:{itemCount:2,pointsPerItem:5,statementCommits:true},
+    lesson:{focus:'unary-update',variant:'standalone-sequence'},interaction:{declarations:'interactive'},
     manualResponses:{enabled:true,namedValueRate:50,operatorRate:50},
   },
   {
@@ -422,9 +425,9 @@ const PROFILES_RAW = [
     shape:{operandSources:{variable:3,constant:1},operandRange:{min:3,max:12},allowNegativeOperands:false},
     operators:{allowed:OPS.ARITH_BASIC,constraints:{requireMultipleTiers:true}},
     template:'operand op operand op operand op operand',
-    scoring:{itemCount:2,pointsPerItem:5},
+    scoring:{itemCount:2,pointsPerItem:5,statementCommits:true},
     manualResponses:{enabled:true,namedValueRate:50,operatorRate:50},
-    program:{declarations:'interactive',mixedUpdateLesson:'advanced-assignment-unary',scoreAssignments:true},
+    lesson:{focus:'assignment-unary',variant:'advanced-assignment-unary'},interaction:{declarations:'interactive'},
     manualResponses:{enabled:true,namedValueRate:50,operatorRate:50},
   },
   {
@@ -635,13 +638,50 @@ const PROFILES_RAW = [
   },
   {
     enabled:true,
-    meta:{id:'c-simulate-output',name:'Simulate Output',
-      description:'Read source programs, predict their printed output, and give final variable values.'},
-    scoring:{itemCount:'manifest',pointsPerItem:'exercise-metadata'},
+    meta:{id:'simulate-basic-output',name:'Basic Output',
+      description:'Predict the terminal output of programs that use direct print commands without program variables.'},
+    scoring:{itemCount:'manifest',pointsPerItem:'generated-answer'},
+    content:{values:{variables:'seeded',input:'seeded'}},
     activity:{
       kind:'simulate-output',
-      instructions:'Read the source program, then predict its console output and final variable values. Check when ready.',
-      generator:{exerciseSet:'it3-midterm-a',shuffle:false}
+      instructions:'Read each source program and predict its terminal output. Check when ready.',
+      generator:{library:'source-programs',exerciseSet:'simulate-basic-output',shuffle:false}
+    }
+  },
+  {
+    enabled:true,
+    meta:{id:'simulate-output-variables',name:'Output + Variable',
+      description:'Predict printed output and final variable values for programs whose output depends on program state.'},
+    scoring:{itemCount:'manifest',pointsPerItem:'generated-answer'},
+    content:{values:{variables:'seeded',input:'seeded'}},
+    activity:{
+      kind:'simulate-output',
+      instructions:'Read each source program, predict its terminal output, and give its final variable values. Check when ready.',
+      generator:{library:'source-programs',exerciseSet:'simulate-output-variables',shuffle:false}
+    }
+  },
+  {
+    enabled:true,
+    meta:{id:'simulate-basic-selection',name:'Simulate Basic Selection',
+      description:'Predict printed output and final variable values for programs whose output depends on program state.'},
+    scoring:{itemCount:'manifest',pointsPerItem:'generated-answer'},
+    content:{values:{variables:'seeded',input:'seeded'}},
+    activity:{
+      kind:'simulate-output',
+      instructions:'Read each source program, predict its terminal output, and give its final variable values. Check when ready.',
+      generator:{library:'source-programs',exerciseSet:'simulate-basic-selection',shuffle:false}
+    }
+  },
+  {
+    enabled:true,
+    meta:{id:'simulate-compound-selection',name:'Simulate Compound Selection',
+      description:'Predict printed output and final variable values for programs whose output depends on program state.'},
+    scoring:{itemCount:'manifest',pointsPerItem:'generated-answer'},
+    content:{values:{variables:'seeded',input:'seeded'}},
+    activity:{
+      kind:'simulate-output',
+      instructions:'Read each source program, predict its terminal output, and give its final variable values. Check when ready.',
+      generator:{library:'source-programs',exerciseSet:'simulate-compound-selection',shuffle:false}
     }
   },
 ];
@@ -677,7 +717,10 @@ const PROFILE_CATEGORIES = [
     'token-identifier-position','token-declaration-complete','token-program-chain',
     'falling-identifier-sort','falling-operator-sort'
   ]},
-  {id:'c-program-output',name:'Program Output',enabled:true,profileIds:['c-simulate-output']}
+  {id:'simulate-output-commands',name:'Simulate Output Commands',enabled:true,
+    profileIds:['simulate-basic-output','simulate-output-variables']},
+  {id:'simulate-selection-commands',name:'Simulate Selection Commands',enabled:true,
+    profileIds:['simulate-basic-selection','simulate-compound-selection']}
 ];
 
 const FINALIZED_PROFILES = PROFILES_RAW.map(finalizeProfile);
@@ -720,4 +763,37 @@ function enabledProfiles(){return PROFILES.filter(profileIsEnabled);}
 function enabledCategories(){
   return PROFILE_CATEGORIES.filter(category=>category.enabled!==false&&profilesForCategory(category.id).length>0);
 }
+
+// Declarative profile accessors. Phase 8 intentionally accepts only the
+// current schema so profiles have one configuration vocabulary.
+function profileContentSource(profile){
+  const content=profile&&profile.content||{},source=content.source||{};
+  return {library:source.library||null,exerciseSet:source.exerciseSet||null};
+}
+
+function profileVariableValueMode(profile){
+  const content=profile&&profile.content||{},values=content.values||{};
+  return values.variables||'authored';
+}
+
+function profileInputValueMode(profile){
+  const content=profile&&profile.content||{},values=content.values||{};
+  return values.input||'authored';
+}
+
+function profileWorkspacePresentation(profile){
+  const presentation=profile&&profile.presentation||{};
+  return presentation.workspace||'statement-flow';
+}
+
+function profileTimelineMode(profile){
+  return profile&&profile.presentation&&profile.presentation.timeline||'inline';
+}
+
+function profileScoresStatementCommits(profile){
+  if(profile&&profile.scoring&&profile.scoring.statementCommits!==undefined)
+    return profile.scoring.statementCommits!==false;
+  return false;
+}
+
 validateProfiles(FINALIZED_PROFILES);

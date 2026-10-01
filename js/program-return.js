@@ -8,11 +8,13 @@ registerStatementPlugin({
   },
 
   applyAction(ctx){
-    const {statement,action}=ctx;
+    const {statement,action,program}=ctx;
     if(action.type!=='return-program'||statement.runtime.checked) return {applied:false};
+    const semantic=programSemanticsForContext(ctx).execute(statement,program.memory);
     statement.runtime.checked=true;
     return {applied:true,completed:true,nextStatementId:'$end',
-      event:{type:'RETURN',action:'RETURN',statementId:statement.id,value:statement.value,wasCorrect:true}};
+      event:{type:'RETURN',action:'RETURN',statementId:statement.id,value:statement.value,
+        effects:semantic.effects,wasCorrect:true}};
   },
 
   rollbackCompletion(ctx){

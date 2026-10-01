@@ -10,6 +10,22 @@ function programOutputPartName(part){
   return part&&part.expression&&part.expression.kind==='identifier'?part.expression.name:null;
 }
 
+function programOutputPartSource(part){
+  if(!part||part.kind!=='expression')return '';
+  if(part.source)return part.source;
+  const render=expression=>{
+    if(expression.kind==='identifier')return expression.name;
+    if(expression.kind==='literal'){
+      if(expression.dataType==='string')return `"${String(expression.value).replace(/\\/g,'\\\\').replace(/"/g,'\\"')}"`;
+      return formatValue(expression.value,expression.dataType);
+    }
+    if(expression.kind==='unary')return expression.form==='postfix'
+      ?`${render(expression.operand)}${expression.operator}`:`${expression.operator}${render(expression.operand)}`;
+    return `(${render(expression.left)} ${expression.operator} ${render(expression.right)})`;
+  };
+  return render(part.expression);
+}
+
 function programOutputReadTokenId(statement,index){return `output-read-${statement.id}-${index}`;}
 function programOutputResultTokenId(statement,index){return `output-result-${statement.id}-${index}`;}
 
@@ -19,21 +35,7 @@ function programOutputResolved(statement){
 }
 
 function programOutputFormatValue(value,format){
-  const spec=String(format||'d');
-  if(spec==='c'){
-    return typeof value==='number'?String.fromCodePoint(value):String(value==null?'':value);
-  }
-  const float=/^(?:\.(\d+))?f$/.exec(spec);
-  if(float){
-    const numeric=Number(value);
-    if(!Number.isFinite(numeric)) return String(value);
-    return numeric.toFixed(float[1]===undefined?6:Number(float[1]));
-  }
-  if(spec==='d'||spec==='i'){
-    const numeric=Number(value);
-    return Number.isFinite(numeric)?String(Math.trunc(numeric)):String(value);
-  }
-  return String(value==null?'':value);
+  return coreFormatOutputValue(value,format);
 }
 
 function programOutputStatementText(statement,expected){
@@ -140,7 +142,8 @@ registerStatementPlugin({
     if(action.type==='emit-output'){
       if(!programOutputResolved(statement)) return {applied:false};
       const text=programOutputStatementText(statement,false);
-      const expectedText=programOutputStatementText(statement,true);
+      const semantic=programSemanticsForContext(ctx).execute(statement,program.memory);
+      const expectedText=semantic.value;
       runtime.checked=true;
       runtime.assignedValue=text;
       runtime.wasCorrectAssignment=text===expectedText;
@@ -148,7 +151,7 @@ registerStatementPlugin({
       runtime.correctSteps=evaluations.filter(step=>step.wasCorrect).length;
       runtime.totalOpSteps=evaluations.length;
       const event={type:'OUTPUT',action:'PRINT',statementId:statement.id,text,
-        expectedText,wasCorrect:runtime.wasCorrectAssignment};
+        expectedText,effects:semantic.effects,wasCorrect:runtime.wasCorrectAssignment};
       runtime.trace.push(event);
       return {applied:true,completed:true,event};
     }
@@ -190,7 +193,8 @@ registerStatementPlugin({
     const runtime=ctx.statement.runtime;
     if(!runtime) return {applied:false};
     const changed=runtime.trace.length>0||runtime.checked;
-    runtime.parts.forEach(part=>{part.stagedValue=null;part.resolvedValue=null;});
+    runtime.parts.forEach(part=>{part.stagedValue=part.initialStagedValue==null?null:part.initialStagedValue;
+      part.resolvedValue=null;});
     runtime.trace=[];runtime.checked=false;runtime.assignedValue=null;
     runtime.wasCorrectAssignment=null;runtime.correctSteps=0;runtime.totalOpSteps=0;
     return {applied:changed};

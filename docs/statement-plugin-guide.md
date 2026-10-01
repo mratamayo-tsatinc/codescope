@@ -2,15 +2,16 @@
 
 ## Architectural rule
 
-An activity item is a program. A program contains statements. Program Core
-coordinates statement order but never implements the meaning or appearance of
-a statement.
+An activity item is a program. A program contains statements. The language core
+owns their meaning; Program Core coordinates order and exposes semantic
+services; adapters and renderers own learner interaction and appearance.
 
-Three responsibilities stay separate:
+Four responsibilities stay separate:
 
-1. A source adapter or generator produces Program IR.
-2. A statement plugin validates and applies semantic actions.
-3. A statement renderer displays state and emits semantic commands.
+1. The shared source pipeline or a generator produces Program IR.
+2. The language core evaluates it and produces effects, diagnostics, and traces.
+3. A statement adapter maps learner actions onto those semantics.
+4. A statement renderer displays state and emits semantic commands.
 
 Canonical solving and scoring consume semantic events, never DOM clicks.
 
@@ -80,8 +81,9 @@ registerStatementRenderer('declaration', ({container, statement, program}) => {
 });
 ```
 
-CSS and animation remain renderer concerns. Assignment semantics remain plugin
-concerns. The program runner owns only sequencing.
+CSS and animation remain renderer concerns. Assignment semantics live in the
+shared statement core. The adapter controls when the learner requests those
+semantics, and Program Core owns sequencing.
 
 `renderExpressionEvaluationPanel` also owns row-local actions. Its trailing
 action hook places an icon-only Undo control on the latest active line for
@@ -115,10 +117,10 @@ A literal initializer such as `int x = 10;` begins at step 3.
 =  +=  -=  *=  /=  %=
 ```
 
-The assignment plugin normalizes compound assignment semantically. For
-example, `x += y` reads the current `x`, evaluates `x + y`, then commits the
-result back to `x`. The parser and renderer preserve `+=` for source fidelity;
-the evaluator may use the existing binary-operation service internally.
+The shared statement semantics normalize compound assignment. The assignment
+adapter exposes that work as learner actions. For example, `x += y` reads the
+current `x`, evaluates `x + y`, then commits the result back to `x`. The parser
+and renderer preserve `+=` for source fidelity.
 
 The learner performs that read–modify–write sequence explicitly. A compound
 target starts as a clickable name; `reveal-assignment-target` reads its current
@@ -157,11 +159,11 @@ those parts as `printf` with format placeholders in C or as
 `System.out.print`/`System.out.println` concatenation in Java.
 
 Items may come from the seeded `formatted-values` builder or from C/Java source
-files selected by an exercise-set manifest. The runtime parser converts the
-supported beginner source subset into the same declaration, assignment, unary,
-and output IR. Source loading and parsing belong to
-`plugins/program-output/content.js`; statement execution remains independent of
-where the item came from.
+files selected by an exercise-set manifest. The shared program parser converts
+supported source into the same declaration, assignment, unary, and output IR.
+Source loading and parsing pass through `js/source-program-pipeline.js`;
+`plugins/program-output/content.js` adapts canonical IR for the lesson without
+reparsing it.
 
 The built-in `formatted-values` lesson follows this dependency model:
 
@@ -191,8 +193,8 @@ derivations never remove consumed source identifiers; they remain visible in a
 muted state while the derived value stays associated with its placeholder or
 concatenation step.
 
-The dedicated `program-output-source-flow` profile uses the Code Simulator
-provider with `library:'source-programs'`. The independently registered library resolves the
+The dedicated `program-output-source-flow` profile uses Code Simulator
+presentation with `content.source.library:'source-programs'`. The independently registered library resolves the
 formatted-output bank and renders one stable, metadata-free source file with
 statement-modal detail views. Supported lines retain their semantic renderers
 and authored line numbers. Headers/imports, wrappers, braces, blank lines, and
@@ -203,8 +205,8 @@ authored executable statement. Neither path appends a synthetic assignment.
 
 ## Input statements
 
-`plugins/program-input/` registers the `input` statement kind and exposes its
-source parser to Code Simulator. The initial subset supports C `scanf` with
+`plugins/program-input/` registers input interaction and rendering over
+canonical Input IR. The shared core supports C `scanf` with
 `%d` or `%i` and Java `Scanner.nextInt()` assignments to declared mutable
 integers. Each source destination has an `@input` metadata directive with an
 authored value and inclusive seeded range.
@@ -227,13 +229,14 @@ to memory in source order. Program Input and
 Program Output render into the shared Program Console, while only output events
 count as printed program output. Keyboard playback and key highlighting are
 presentation, as are the colored console-to-placeholder trails. The Enter
-gate, batch conversion, writes, history, scoring, and canonical trace are
-plugin semantics.
+gate and learner-controlled writes are interaction state; conversion, memory
+effects, and canonical semantic traces come from the core.
 
 ## Code Simulator source programs
 
-`plugins/code-simulator/` is the source-backed complete-program provider. It
-parses each manifest-listed live file into Program IR and delegates statements
+`plugins/code-simulator/` is the source-backed complete-program interaction and
+presentation adapter. The shared source pipeline parses each manifest-listed
+live file into Program IR, and Code Simulator delegates statements
 to the existing declaration, assignment, unary update, output, selection, and
 return handlers. A source file needs at least one supported executable
 statement; it does not need to contain a declaration or selection. Unsupported
@@ -262,7 +265,7 @@ authored, and declarations such as `int total = x + y;` retain their expression
 and recalculate normally. Duplicate directives, unknown names, reversed ranges,
 and annotated nonliteral initializers are load errors.
 
-The profile chooses `content.sourceValueMode:'seeded'` to apply these ranges or
+The profile chooses `content.values.variables:'seeded'` to apply these ranges or
 `'authored'` to preserve all source initializers. The profile does not carry the
 ranges. Seeded generation rewrites the displayed declaration before parsing so
 the visible source, Program IR, memory, conditions, output, scoring, and saved
@@ -277,14 +280,14 @@ centered, unboxed text below the condition. Selection code disables font
 ligatures so multi-character operators remain literal source characters. No
 connector is drawn to the selected statement.
 
-The provider parses supported branch bodies into existing Program IR kinds.
+The shared program parser converts supported branch bodies into Program IR.
 The initial C and Java lessons therefore run authored `printf` and
 `System.out.print/println` lines through the Program Output plugin. Unsupported
 branch statements remain visible source context until a matching statement
 plugin is registered.
 
-For each new session, the provider parses the current files listed by the
-active language manifest. It derives sequential edges, branch entry targets,
+For each new session, the source pipeline parses the current files listed by
+the active language manifest. The program parser derives sequential edges, branch entry targets,
 clause exits, and the statement after each decision from source structure. A
 source edit may add another supported decision or statement without changing a
 JavaScript catalog or expected graph. Files absent from `manifest.json` remain
@@ -294,14 +297,12 @@ Complete-source profiles can keep that program view stable while the learner
 examines one active statement in a close-view modal:
 
 ```js
-program:{
-  declarations:'interactive',
-  scoreAssignments:true,
-  timelinePresentation:'statement-modal',
-}
+interaction:{declarations:'interactive'},
+presentation:{workspace:'source-program',timeline:'statement-modal'},
+scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true}
 ```
 
-`timelinePresentation` is optional. Omit it, or use `'inline'`, for the
+`presentation.timeline` is optional. Omit it, or use `'inline'`, for the
 established statement-by-statement layout. The modal mounts the same registered
 renderer, so semantic actions, scoring, Undo, persistence, memory reads, and
 Program Output events remain unchanged. A statement plugin must not add a
