@@ -696,6 +696,19 @@ const PROFILES_RAW = [
       }
     },
   },
+  {
+    enabled:true,
+    meta:{id:'flow-basic-selection',name:'Basic Selection',
+      description:'Trigger each supported statement and trace the actual flow through a complete C or Java source program.'},
+    shape:{operandSources:{variable:1,literal:1},operandRange:{min:1,max:100},allowNegativeOperands:false},
+    operators:{allowed:[...OPS.COMPARISON,...OPS.LOGICAL]},template:'operand cmp operand',
+    scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
+    content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'simulate-basic-selection'},
+      values:{variables:'seeded'},selection:{count:'all',shuffle:false}},
+    lesson:{focus:'program-flow',constructs:['selection']},
+    interaction:{declarations:'interactive'},
+    presentation:{workspace:'source-program',timeline:'statement-modal'},
+  },
 ];
 
 // Categories are authored here alongside the profiles. A profile belongs to
@@ -732,7 +745,9 @@ const PROFILE_CATEGORIES = [
   {id:'simulate-output-commands',name:'Simulate Output Commands',enabled:true,
     profileIds:['simulate-basic-output','simulate-output-variables']},
   {id:'simulate-selection-commands',name:'Simulate Selection Commands',enabled:true,
-    profileIds:['simulate-basic-selection','simulate-compound-selection']}
+    profileIds:['simulate-basic-selection','simulate-compound-selection']},
+  {id:'flow-selection-commands',name:'Flow Selection Commands',enabled:true,
+    profileIds:['flow-basic-selection']}
 ];
 
 const FINALIZED_PROFILES = PROFILES_RAW.map(finalizeProfile);

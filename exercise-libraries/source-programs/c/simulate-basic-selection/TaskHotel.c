@@ -15,12 +15,9 @@ int main(void)
 
     result = a * 2 + b;
 
-    if (result > 20)
-    {
+    if (result > 20) {
         choice = 2;
-    }
-    else
-    {
+    } else {
         choice = 1;
     }
 
