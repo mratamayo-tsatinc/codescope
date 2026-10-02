@@ -1,0 +1,15 @@
+{
+  "title": "C Program Input: Multiple Values per scanf",
+  "exercises": [
+    "B01_TwoIntegersOneScanf.c",
+    "B02_SumOfThreeOneScanf.c",
+    "B03_AverageOfTwoFloats.c",
+    "B04_MixedTypesOneScanf.c",
+    "B05_RectangleOneScanf.c",
+    "B06_TimeToSeconds.c",
+    "B07_DateWithSlashes.c",
+    "B08_ExamAverageWithSection.c",
+    "B09_SquaredDistance.c",
+    "B10_SimpleInterest.c"
+  ]
+}

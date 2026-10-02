@@ -1,13 +1,12 @@
 /*
 @codescope
 @title Integer and Simple If
-@seed a min=6 max=10
-@seed b min=3 max=7
+@seed a min=6 max=9
+@seed b min=3 max=6
 */
 #include <stdio.h>
 
-int main(void)
-{
+int main(void) {
     int a = 8;
     int b = 5;
     int c;
@@ -16,8 +15,7 @@ int main(void)
     c = a + b * 2;
     total = c - a;
 
-    if (total > 10)
-    {
+    if (total > 10) {
         total = total + 3;
         c = c - 2;
     }

@@ -216,7 +216,25 @@ const PROFILES_RAW = [
   },
   {
     enabled:true,
-    meta: { id:'relational-simple', name:'Relational Operators (Simple)',
+    meta: { id:'relational-simple-literals', name:'Relational Operators (Literals)',
+      description:'A comparison produces a boolean result.' },
+    shape: { operandSources:{literal:2}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
+    operators: { allowed: [...OPS.COMPARISON], constraints:{maxComparisons:1} },
+    template: 'operand op operand',
+    scoring: { itemCount:10, pointsPerItem:1 },
+  },
+  {
+    enabled:true,
+    meta: { id:'relational-simple-variables', name:'Relational Operators (Variables)',
+      description:'A comparison produces a boolean result.' },
+    shape: { operandSources:{variable:2}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
+    operators: { allowed: [...OPS.COMPARISON], constraints:{maxComparisons:1} },
+    template: 'operand op operand',
+    scoring: { itemCount:10, pointsPerItem:1 },
+  },
+  {
+    enabled:true,
+    meta: { id:'relational-arithmetic', name:'Relational Operators (Arithmetic)',
       description:'A comparison produces a boolean result — the arithmetic on either side still resolves first.' },
     shape: { operandSources:{literal:3}, operandRange:{min:1,max:20}, allowNegativeOperands:false },
     operators: { allowed: [...OPS.ADD_SUB, ...OPS.COMPARISON], constraints:{requireMultipleTiers:true, maxComparisons:1} },
@@ -298,12 +316,25 @@ const PROFILES_RAW = [
   },
   {
     enabled:true,
-    meta:{id:'program-input-source-flow',name:'Program Input Flow',
+    meta:{id:'program-input-source-flow',name:'Input Basic',
       description:'Trace simulated console input, press Enter to submit it, convert each token, and write its value to memory.'},
     shape:{operandSources:{variable:3},operandRange:{min:1,max:20},allowNegativeOperands:false},
     operators:{allowed:OPS.ADD_SUB},template:'operand op operand op operand',
     scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
     content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'input-basics'},
+      values:{variables:'authored',input:'seeded'},selection:{count:'all',shuffle:false}},
+    lesson:{focus:'input',variant:'numeric-console'},
+    interaction:{declarations:'interactive'},
+    presentation:{workspace:'source-program',timeline:'statement-modal'},
+  },
+  {
+    enabled:true,
+    meta:{id:'trace-multiple-inputs',name:'Multiple Inputs',
+      description:'Trace simulated console input, press Enter to submit it, convert each token, and write its value to memory.'},
+    shape:{operandSources:{variable:3},operandRange:{min:1,max:20},allowNegativeOperands:false},
+    operators:{allowed:OPS.ADD_SUB},template:'operand op operand op operand',
+    scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
+    content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'input-advance'},
       values:{variables:'authored',input:'seeded'},selection:{count:'all',shuffle:false}},
     lesson:{focus:'input',variant:'numeric-console'},
     interaction:{declarations:'interactive'},
@@ -330,6 +361,19 @@ const PROFILES_RAW = [
     operators:{allowed:[...OPS.COMPARISON,...OPS.LOGICAL]},template:'operand cmp operand',
     scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
     content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'output-basics'},
+      values:{variables:'seeded'},selection:{count:'all',shuffle:false}},
+    lesson:{focus:'program-flow'},
+    interaction:{declarations:'interactive'},
+    presentation:{workspace:'source-program',timeline:'statement-modal'},
+  },
+  {
+    enabled:true,
+    meta:{id:'trace-basic-output',name:'Trace Basic Output',
+      description:'Trigger each supported statement and trace the actual flow through a complete C source program.'},
+    shape:{operandSources:{variable:1,literal:1},operandRange:{min:1,max:100},allowNegativeOperands:false},
+    operators:{allowed:[...OPS.COMPARISON,...OPS.LOGICAL]},template:'operand cmp operand',
+    scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
+    content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'simulate-basic-output'},
       values:{variables:'seeded'},selection:{count:'all',shuffle:false}},
     lesson:{focus:'program-flow'},
     interaction:{declarations:'interactive'},
@@ -559,11 +603,11 @@ const PROFILES_RAW = [
       kind:'falling-token-sort',
       instructions:'Drag a token into its matching bucket. Keyboard: select a token, then choose a bucket.',
       buckets:[
-        {id:'valid',category:'valid-identifier',region:'left',order:1},
-        {id:'invalid',category:'invalid-identifier',region:'left',order:2},
-        {id:'reserved',category:'reserved-word',region:'left',order:3},
+        {id:'valid',category:'valid-identifier',region:'bottom',order:1},
+        {id:'invalid',category:'invalid-identifier',region:'bottom',order:2},
+        {id:'reserved',category:'reserved-word',region:'bottom',order:3},
       ],
-      dropArea:{visibleTokens:10,landingBehavior:'pass-through'},
+      dropArea:{visibleTokens:20,landingBehavior:'pass-through'},
       generator:{capability:'analyzed-token-generation',identifierGeneration:{
         templates:['modifier-measurement','entity-measurement','entity-technical'],
         styles:['camel-case','snake-case','constant-case','pascal-case','underscore-prefix','digit-suffix','dollar-prefix','case-mutated-reserved'],
@@ -604,13 +648,13 @@ const PROFILES_RAW = [
       kind:'falling-token-sort',
       instructions:'Drag each token into its operator family, or into Not an Operator. Keyboard: select a token, then choose a bucket.',
       buckets:[
-        {id:'arithmetic',category:'arithmetic-operator',region:'left',order:1},
-        {id:'relational',category:'relational-operator',region:'left',order:2},
-        {id:'boolean',category:'boolean-operator',region:'right',order:1},
-        {id:'assignment',category:'assignment-operator',region:'right',order:2},
-        {id:'distractor',category:'operator-distractor',region:'bottom',order:1},
+        {id:'arithmetic',category:'arithmetic-operator',region:'bottom',order:1},
+        {id:'relational',category:'relational-operator',region:'bottom',order:2},
+        {id:'boolean',category:'boolean-operator',region:'bottom',order:3},
+        {id:'assignment',category:'assignment-operator',region:'bottom',order:4},
+        {id:'distractor',category:'operator-distractor',region:'bottom',order:5},
       ],
-      dropArea:{visibleTokens:10,landingBehavior:'pass-through'},
+      dropArea:{visibleTokens:20,landingBehavior:'pass-through'},
       generator:{capability:'canonical-token-pools',tokenPools:{
         'arithmetic-operator':['+','-','*','/','%'],
         'relational-operator':['<','>','<=','>=','==','!='],
@@ -662,7 +706,7 @@ const PROFILES_RAW = [
   },
   {
     enabled:true,
-    meta:{id:'simulate-basic-selection',name:'Simulate Basic Selection',
+    meta:{id:'simulate-basic-selection',name:'Basic Selection',
       description:'Predict printed output and final variable values for programs whose output depends on program state.'},
     scoring:{itemCount:'manifest',pointsPerItem:'generated-answer'},
     content:{values:{variables:'seeded',input:'seeded'}},
@@ -680,7 +724,7 @@ const PROFILES_RAW = [
   },
   {
     enabled:true,
-    meta:{id:'simulate-compound-selection',name:'Simulate Compound Selection',
+    meta:{id:'simulate-compound-selection',name:'Compound Selection',
       description:'Predict printed output and final variable values for programs whose output depends on program state.'},
     scoring:{itemCount:'manifest',pointsPerItem:'generated-answer'},
     content:{values:{variables:'seeded',input:'seeded'}},
@@ -698,7 +742,7 @@ const PROFILES_RAW = [
   },
   {
     enabled:true,
-    meta:{id:'flow-basic-selection',name:'Basic Selection',
+    meta:{id:'trace-basic-selection',name:'Basic Selection',
       description:'Trigger each supported statement and trace the actual flow through a complete C or Java source program.'},
     shape:{operandSources:{variable:1,literal:1},operandRange:{min:1,max:100},allowNegativeOperands:false},
     operators:{allowed:[...OPS.COMPARISON,...OPS.LOGICAL]},template:'operand cmp operand',
@@ -709,12 +753,37 @@ const PROFILES_RAW = [
     interaction:{declarations:'interactive'},
     presentation:{workspace:'source-program',timeline:'statement-modal'},
   },
+  {
+    enabled:true,
+    meta:{id:'trace-output-variables',name:'Trace Output + Variables',
+      description:'Trigger each supported statement and trace the actual flow through a complete C or Java source program.'},
+    scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
+    content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'simulate-output-variables'},
+      values:{variables:'seeded'},selection:{count:'all',shuffle:false}},
+    interaction:{declarations:'interactive'},
+    presentation:{workspace:'source-program',timeline:'statement-modal'},
+  },
 ];
 
 // Categories are authored here alongside the profiles. A profile belongs to
 // exactly one category; removing a category or profile ID is validated at load.
 const PROFILE_CATEGORIES = [
-  {id:'input-statements',name:'Input Statements',enabled:true,profileIds:['program-input-source-flow']},
+  // The three Token Classification profiles are currently dormant in
+  // PROFILES_RAW; keep their membership for deployments that enable them.
+  {id:'identifier-activities',name:'Identifier Activities',enabled:true,profileIds:[
+    'token-identifier-position','token-declaration-complete','token-program-chain',
+    'falling-identifier-sort','falling-operator-sort'
+  ]},
+  {
+    id:'trace-output-statements',name:'Trace Output Statements',enabled:true,
+    profileIds:[
+      'trace-basic-output',
+      'trace-output-variables',
+  ]},
+  {id:'input-statements',name:'Trace Input Statements',enabled:true,
+    profileIds:[
+      'program-input-source-flow', 
+      'trace-multiple-inputs']},
   {
     id:'output-statements',name:'Output Statements',enabled:true,
     profileIds:[
@@ -723,12 +792,14 @@ const PROFILE_CATEGORIES = [
       'selection-statements-source',
       'test-basic-output',
   ]},
-  {id:'expressions',name:'Expressions',enabled:true,profileIds:[
+  {id:'expressions-arithmetic',name:'Arithmetic Expressions',enabled:true,profileIds:[
     'direct-ltr','mult-precedence','same-precedence-assoc','full-basic-precedence','modulus',
     'parens-override','parens-override-multi','parens-override-dual','variables-arithmetic',
     'mixed-variables-literals','variables-constants','literals-variables-constants',
-    'mixed-mastery','unary-only','unary-mix','relational-simple','relational-variables',
-    'relational-boolean-mix'
+    'mixed-mastery','unary-only','unary-mix',
+  ]},
+  {id:'expressions-boolean',name:'Boolean Expressions',enabled:true,profileIds:[
+    'relational-simple-literals','relational-simple-variables','relational-arithmetic','relational-variables','relational-boolean-mix',
   ]},
   {id:'program-statements',name:'Program Statements',enabled:true,profileIds:[
     'declaration-chain','assignment-basic','assignment-add-sub','assignment-multiply',
@@ -736,18 +807,13 @@ const PROFILE_CATEGORIES = [
     'assignment-dependent','assignment-advanced-chain','unary-update-sequence',
     'assignment-unary-advanced-chain','relational-logical-student-derived'
   ]},
-  // The three Token Classification profiles are currently dormant in
-  // PROFILES_RAW; keep their membership for deployments that enable them.
-  {id:'identifier-activities',name:'Identifier Activities',enabled:true,profileIds:[
-    'token-identifier-position','token-declaration-complete','token-program-chain',
-    'falling-identifier-sort','falling-operator-sort'
-  ]},
   {id:'simulate-output-commands',name:'Simulate Output Commands',enabled:true,
     profileIds:['simulate-basic-output','simulate-output-variables']},
+  {id:'trace-selection-commands',name:'Trace Selection Commands',enabled:true,
+    profileIds:['trace-basic-selection']},
   {id:'simulate-selection-commands',name:'Simulate Selection Commands',enabled:true,
     profileIds:['simulate-basic-selection','simulate-compound-selection']},
-  {id:'flow-selection-commands',name:'Flow Selection Commands',enabled:true,
-    profileIds:['flow-basic-selection']}
+
 ];
 
 const FINALIZED_PROFILES = PROFILES_RAW.map(finalizeProfile);

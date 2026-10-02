@@ -1,6 +1,15 @@
 {
-  "title": "C Program Input",
+  "title": "C Program Input: One scanf per Input",
   "exercises": [
-    "MultipleIntegers.c"
+    "A01_SingleInteger.c",
+    "A02_FloatInput.c",
+    "A03_CharInput.c",
+    "A04_SumOfTwo.c",
+    "A05_ArithmeticOfTwo.c",
+    "A06_QuotientAndRemainder.c",
+    "A07_AverageOfThree.c",
+    "A08_RectangleAreaPerimeter.c",
+    "A09_CircleAreaWithConstant.c",
+    "A10_ReceiptWithTax.c"
   ]
 }
