@@ -82,7 +82,8 @@ function soParseExercise(exercise,language,sourceValueMode='authored',inputValue
     throw new Error(`${exercise.filename}: embedded answer metadata is no longer supported`);
   const details=sourceProgramMetadataAndSource(raw,exercise.filename);
   const inputDefinitions=sourceProgramInputDirectives(details.metadata,exercise.filename,inputValueMode);
-  const inputValues=Object.fromEntries(inputDefinitions.map(definition=>[definition.target,definition.materializedValue]));
+  const inputValues=Object.fromEntries(inputDefinitions.map(definition=>[definition.target,
+    {value:definition.materializedValue,raw:definition.materializedRaw}]));
   const parsedSource=sourceProgramParseExercise({details,filename:exercise.filename,language:language||'c',
     sourceValueMode,inputValues});
   (parsedSource.coreProgramResult.ir.statements||[]).filter(statement=>statement.kind==='input').forEach(statement=>

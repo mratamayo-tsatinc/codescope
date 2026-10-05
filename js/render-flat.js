@@ -45,13 +45,16 @@ function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
       // produced once it eventually fires.
       const cardColor = colorMap.get(op.id);
       const isFlash = flashId!=null && op.id===flashId;
-      const card = renderValueCard({id:op.id,name:op.inner.name,value:unaryBaseValue(op),kind:op.inner.kind,
-        dataType:op.inner.dataType,color:cardColor,isFlash});
+      const card=op.inner.kind==='literal'
+        ?h('span',{class:'tok tok-lit'+(cardColor?' tok-colored':''),'data-token-id':op.id,
+          style:cardColor?`color:${cardColor};`:null},formatValue(op.inner.value,op.inner.dataType))
+        :renderValueCard({id:op.id,name:op.inner.name,value:unaryBaseValue(op),kind:op.inner.kind,
+          dataType:op.inner.dataType,color:cardColor,isFlash});
       const opAttrs = {class:'tok tok-op-active'+(cardColor?' tok-colored':'')};
       if(cardColor) opAttrs.style = `color:${cardColor};`;
       const opSpan = h('span',opAttrs, op.op);
       const parts = (op.op==='!' || op.form==='prefix') ? [opSpan, card] : [card, opSpan];
-      return h('span',{class:'unary-token-group tok-unary-pending', tabindex:'0', role:'button', 'aria-label':`apply ${op.op} to ${op.inner.name}`,
+      return h('span',{class:'unary-token-group tok-unary-pending', tabindex:'0', role:'button', 'aria-label':`apply ${op.op}`,
         onclick:()=>handleTokenClick({type:'apply-unary', id:op.id}),
         onkeydown:(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handleTokenClick({type:'apply-unary', id:op.id}); } }
       }, ...parts);
@@ -109,11 +112,15 @@ function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
 function renderInteractiveFlatExpr(flat, colorMap, activeColor, flashId, unresolvedAny){
   const runs = computeParenRuns(flat);
   const openAt = new Set(runs.map(r=>r.start)), closeAt = new Set(runs.map(r=>r.end));
+  const unaryRuns=computeUnaryRuns(flat),unaryOpen=new Map(unaryRuns.map(run=>[run.start,run])),
+    unaryClose=new Set(unaryRuns.map(run=>run.end));
   const parts = [];
   for(let i=0;i<flat.operands.length;i++){
-    if(openAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, '('));
+    if(unaryOpen.has(i))parts.push(h('span',{class:'tok tok-op-muted'},unaryOpen.get(i).operator+'('));
+    else if(openAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, '('));
     parts.push(renderInteractiveFlatOperand(flat.operands[i], colorMap, activeColor, flashId));
-    if(closeAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, ')'));
+    if(unaryClose.has(i))parts.push(h('span',{class:'tok tok-op-muted'},')'));
+    else if(closeAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, ')'));
     if(i<flat.operators.length){
       const L = flat.operands[i], R = flat.operands[i+1], opStr = flat.operators[i];
       const strictSequence=typeof strictSequenceEnabled==='function'&&strictSequenceEnabled();
@@ -161,8 +168,11 @@ function renderStaticFlatOperand(op, colorMap, flashId, pending){
     if(op.substituted){
       const cardColor = colorMap.get(op.id);
       const isFlash = flashId!=null && op.id===flashId;
-      const card = renderValueCard({id:op.id,name:op.inner.name,value:unaryBaseValue(op),kind:op.inner.kind,
-        dataType:op.inner.dataType,color:cardColor,isFlash});
+      const card=op.inner.kind==='literal'
+        ?h('span',{class:'tok tok-lit'+(cardColor?' tok-colored':''),'data-token-id':op.id,
+          style:cardColor?`color:${cardColor};`:null},formatValue(op.inner.value,op.inner.dataType))
+        :renderValueCard({id:op.id,name:op.inner.name,value:unaryBaseValue(op),kind:op.inner.kind,
+          dataType:op.inner.dataType,color:cardColor,isFlash});
       const opAttrs = {class:'tok tok-op-muted'+(cardColor?' tok-colored':'')};
       if(cardColor) opAttrs.style = `color:${cardColor};`;
       const opSpan = h('span',opAttrs, op.op);
@@ -194,11 +204,15 @@ function renderStaticFlatOperand(op, colorMap, flashId, pending){
 function renderStaticFlatExpr(flat, colorMap, flashId, pending){
   const runs = computeParenRuns(flat);
   const openAt = new Set(runs.map(r=>r.start)), closeAt = new Set(runs.map(r=>r.end));
+  const unaryRuns=computeUnaryRuns(flat),unaryOpen=new Map(unaryRuns.map(run=>[run.start,run])),
+    unaryClose=new Set(unaryRuns.map(run=>run.end));
   const parts = [];
   for(let i=0;i<flat.operands.length;i++){
-    if(openAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, '('));
+    if(unaryOpen.has(i))parts.push(h('span',{class:'tok tok-op-muted'},unaryOpen.get(i).operator+'('));
+    else if(openAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, '('));
     parts.push(renderStaticFlatOperand(flat.operands[i], colorMap, flashId, pending));
-    if(closeAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, ')'));
+    if(unaryClose.has(i))parts.push(h('span',{class:'tok tok-op-muted'},')'));
+    else if(closeAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, ')'));
     if(i<flat.operators.length){
       const L = flat.operands[i], R = flat.operands[i+1];
       const isPending = pending && pending.type==='evaluate' && pending.leftId===L.id && pending.rightId===R.id;

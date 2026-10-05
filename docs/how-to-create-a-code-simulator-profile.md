@@ -54,7 +54,7 @@ A file may contain any combination of currently registered simulator behavior:
 - `=`, `+=`, `-=`, `*=`, `/=`, and `%=` assignments;
 - standalone prefix or postfix `++` and `--`;
 - C `printf` or Java `System.out.print`/`System.out.println`;
-- C `scanf` with `%d`/`%i` or Java `Scanner.nextInt()` when matching
+- typed C `scanf` or Java Scanner reads when matching
   source-owned `@input` metadata is present;
 - `if`, `if/else`, ordered `else if`, and `switch` conditions;
 - explicit `break;` inside switch cases;
@@ -87,9 +87,10 @@ Bindings absent from `@seed` remain authored. With `'authored'`, every source
 initializer remains unchanged. Malformed, duplicate, unknown, and nonliteral
 seed targets are load errors.
 
-Input values use separate `@input target=<name> value=<integer> min=<integer>
-max=<integer>` directives. `content.values.input` selects the authored value or its
-inclusive source-local range. See
+Input values use separate `@input` directives. Numeric inputs support
+`value`, inclusive `min`/`max`, optional `step`, and optional `decimals`.
+Character and string inputs use quoted `value` plus `choices` (or `values`).
+`content.values.input` selects the authored value or a source-local seeded value. See
 `docs/how-to-create-a-program-input-profile.md` for the interaction contract.
 
 ## Saved progress

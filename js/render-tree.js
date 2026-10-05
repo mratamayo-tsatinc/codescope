@@ -43,6 +43,13 @@ function renderStaticExpr(node, ctxPrec, colorMap, flashId, pendingId, pendingCo
       if(col) attrs.style = `color:${col};`;
       return h('span',attrs, formatValue(node.resultValue));
     }
+    if(node.inner.kind==='binop'){
+      const isPending=pendingId!=null&&node.id===pendingId;
+      const opAttrs={class:'tok tok-op-muted'+(isPending?' tok-colored':'')};
+      if(isPending&&pendingColor)opAttrs.style=`color:${pendingColor};`;
+      return h('span',{class:'unary-token-group'},h('span',opAttrs,node.op),'(',
+        renderStaticExpr(node.inner,0,colorMap,flashId,pendingId,pendingColor),')');
+    }
     if(node.substituted){
       const cardColor = colorMap.get(node.id);
       const isFlash = flashId!=null && node.id===flashId;

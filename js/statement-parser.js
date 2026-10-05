@@ -113,17 +113,21 @@ function parseCoreStatement(request){
       statement.binding.kind='constant';statement.declarationSyntax='define';
       return {ir:statement,dependencies:parsed.dependencies,diagnostics:[],effects:[],trace:[]};
     }
-    const characterArray=/^(const\s+)?char\s+([A-Za-z_][A-Za-z0-9_]*)\s*\[\s*\]\s*=\s*([\s\S]+)$/.exec(source);
+    const characterArray=/^(const\s+)?char\s+([A-Za-z_][A-Za-z0-9_]*)\s*\[\s*(\d*)\s*\](?:\s*=\s*([\s\S]+))?$/.exec(source);
     if(characterArray){
       const name=characterArray[2];
       if(Object.prototype.hasOwnProperty.call(symbols,name))
         throw new Error(`${location.filename||'source'}:${location.start.line}: duplicate declaration '${name}'`);
-      const parsed=coreStatementParseExpression({language,source:characterArray[3],symbols,location},source,location);
-      if(!parsed||parsed.ir.kind!=='literal'||typeof parsed.ir.value!=='string')
+      const initialized=characterArray[4]!==undefined;
+      if(characterArray[1]&&!initialized)
+        throw new Error(`${location.filename||'source'}:${location.start.line}: constant '${name}' requires an initializer`);
+      const parsed=initialized?coreStatementParseExpression({language,source:characterArray[4],symbols,location},source,location):null;
+      if(initialized&&(!parsed||parsed.ir.kind!=='literal'||typeof parsed.ir.value!=='string'))
         throw new Error(`${location.filename||'source'}:${location.start.line}: char[] initializer must be a string literal`);
       const statement=declarationStatement({name,dataType:'string',mutable:!characterArray[1],
-        initializer:parsed.ir,sourceSpan:location});
+        initialized,initializer:parsed&&parsed.ir,sourceSpan:location});
       statement.binding.kind=characterArray[1]?'constant':'variable';statement.declarationSyntax='char-array';
+      statement.arrayCapacity=characterArray[3]?Number(characterArray[3]):null;
       return {ir:statement,dependencies:[],diagnostics:[],effects:[],trace:[]};
     }
   }

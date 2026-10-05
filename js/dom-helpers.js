@@ -40,15 +40,45 @@ function h(tag, attrs, ...children){
 // assignment and expression views. Step colors remain a separate timeline/
 // connector channel and are exposed as --step-color for the arrival pulse.
 const VARIABLE_BINDING_PALETTE = Object.freeze([
-  '#6fb7ff','#4fd9b0','#f6c85f','#ff8fb8','#5eead4','#fb923c','#93c5fd','#a3e635'
+  '#6fb7ff','#4fd9b0','#f6c85f','#ff8fb8','#5eead4','#fb923c','#c39bff','#a3e635',
+  '#ff6b6b','#818cf8','#fbbf24','#34d399','#f472b6','#38bdf8','#a78bfa','#fde047'
 ]);
 const CONSTANT_BINDING_PALETTE = Object.freeze([
-  '#c39bff','#a78bfa','#e879f9','#f0abfc','#818cf8','#d8b4fe','#f472b6','#c4b5fd'
+  '#c39bff','#f0abfc','#818cf8','#f472b6','#d8b4fe','#e879f9','#c4b5fd','#a78bfa',
+  '#fb7185','#60a5fa','#2dd4bf','#f59e0b','#22d3ee','#84cc16','#fda4af','#67e8f9'
 ]);
+
+function bindingIdentityScopeNames(kind){
+  let item=null;
+  try{item=typeof currentItem==='function'?currentItem():null;}catch(_error){item=null;}
+  if(!item)return [];
+  const names=[];
+  const add=name=>{if(name!=null&&!names.includes(String(name)))names.push(String(name));};
+  if(item.program&&Array.isArray(item.program.statements)){
+    item.program.statements.forEach(statement=>{
+      if(statement.kind!=='declaration'||!statement.binding)return;
+      const bindingKind=statement.binding.mutable===false||statement.binding.kind==='constant'
+        ?'constant':'variable';
+      if(bindingKind===kind)add(statement.binding.name);
+    });
+    if(kind==='variable')Object.keys(item.program.memory||{}).forEach(add);
+  }
+  if(item.originalFlat&&Array.isArray(item.originalFlat.operands)){
+    item.originalFlat.operands.forEach(operand=>{
+      const inner=operand&&operand.kind==='unary'?operand.inner:operand;
+      if(inner&&inner.kind===kind)add(inner.name);
+    });
+  }
+  if(kind==='variable'&&item.resultName)add(item.resultName);
+  return names;
+}
 
 function bindingIdentityColor(name,kind){
   const palette = kind==='constant' ? CONSTANT_BINDING_PALETTE : VARIABLE_BINDING_PALETTE;
   const text = String(name==null ? '' : name);
+  const scopedNames=bindingIdentityScopeNames(kind==='constant'?'constant':'variable');
+  const scopedIndex=scopedNames.indexOf(text);
+  if(scopedIndex>=0)return palette[scopedIndex%palette.length];
   let hash = 2166136261;
   for(let i=0;i<text.length;i++){
     hash ^= text.charCodeAt(i);

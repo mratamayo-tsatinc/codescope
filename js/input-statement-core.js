@@ -1,28 +1,76 @@
 // ============================================================================
 // SHARED INPUT STATEMENT CORE
 // ----------------------------------------------------------------------------
-// Parses C scanf and Java Scanner nextInt statements and describes their
+// Parses C scanf and Java Scanner statements and describes their
 // console-read and memory-write semantics without presentation state.
 // ============================================================================
 
 function coreInputLooksLikeSource(source,language){
   const text=String(source||'').trim().replace(/;\s*$/,'').trim();
   return language==='c'?/^scanf\s*\(/.test(text)
-    :/^[A-Za-z_][A-Za-z0-9_]*\s*=\s*[A-Za-z_][A-Za-z0-9_]*\.nextInt\s*\(\s*\)$/.test(text);
+    :/^[A-Za-z_][A-Za-z0-9_]*\s*=\s*[A-Za-z_][A-Za-z0-9_]*\.(?:nextInt|nextFloat|nextDouble|next|nextLine)\s*\(\s*\)(?:\.charAt\s*\(\s*0\s*\))?$/.test(text);
 }
 
-function coreInputValue(inputValues,target){
+function coreInputValueEntry(inputValues,target){
   if(!inputValues||!Object.prototype.hasOwnProperty.call(inputValues,target))return null;
   const entry=inputValues[target];
-  return entry&&typeof entry==='object'&&Object.prototype.hasOwnProperty.call(entry,'value')?entry.value:entry;
+  return entry&&typeof entry==='object'&&Object.prototype.hasOwnProperty.call(entry,'value')
+    ?entry:{value:entry,raw:entry==null?'':String(entry)};
+}
+
+function coreInputTypeForConversion(conversion){
+  return ({d:'int',i:'int',f:'float',lf:'double',c:'char',s:'string',nextInt:'int',nextFloat:'float',
+    nextDouble:'double',next:'string',nextLine:'string',nextChar:'char'})[conversion]||null;
+}
+
+function coreInputFormatParts(format,label){
+  const parts=[];let text='',index=0;
+  const flush=()=>{if(text){parts.push({kind:'text',value:text});text='';}};
+  while(index<format.length){
+    if(format[index]!=='%'){text+=format[index++];continue;}
+    if(format[index+1]==='%'){text+='%';index+=2;continue;}
+    const conversion=/^(lf|[difcs])/.exec(format.slice(index+1));
+    if(!conversion)throw new Error(`${label}: unsupported scanf conversion near '${format.slice(index)}'`);
+    flush();parts.push({kind:'conversion',conversion:conversion[1]});index+=1+conversion[1].length;
+  }
+  flush();
+  if(!parts.some(part=>part.kind==='conversion'))throw new Error(`${label}: scanf requires a supported conversion`);
+  return parts;
+}
+
+function coreInputRawText(format,reads,label='scanf'){
+  const parts=coreInputFormatParts(format,label);let readIndex=0;
+  return parts.map((part,index)=>{
+    if(part.kind==='conversion')return reads[readIndex++].expectedRaw;
+    let value=part.value.replace(/\s+/g,' ');
+    if(!parts.slice(0,index).some(candidate=>candidate.kind==='conversion'))value=value.replace(/^\s+/, '');
+    if(!parts.slice(index+1).some(candidate=>candidate.kind==='conversion'))value=value.replace(/\s+$/, '');
+    return value;
+  }).join('');
 }
 
 function coreInputRead(target,conversion,symbols,inputValues,label){
   const binding=symbols[target];
-  if(!binding||binding.mutable===false||binding.kind==='constant'||binding.dataType!=='int')
-    throw new Error(`${label}: integer input requires mutable int target '${target}'`);
-  const value=coreInputValue(inputValues,target);
-  return {target,dataType:'int',conversion,expectedRaw:value==null?'':String(value),expectedValue:value};
+  const dataType=coreInputTypeForConversion(conversion);
+  if(!binding||binding.mutable===false||binding.kind==='constant'||binding.dataType!==dataType)
+    throw new Error(`${label}: ${conversion} input requires mutable ${dataType} target '${target}'`);
+  const entry=coreInputValueEntry(inputValues,target),value=entry&&entry.value;
+  const raw=value==null?'':String(entry.raw==null?value:entry.raw);
+  if(value!=null){
+    if(dataType==='int'&&!Number.isSafeInteger(value))throw new Error(`${label}: input for '${target}' must be an integer`);
+    if(dataType==='int'&&!/^[+-]?\d+$/.test(raw))throw new Error(`${label}: input text for '${target}' must be an integer`);
+    if((dataType==='float'||dataType==='double')&&(typeof value!=='number'||!Number.isFinite(value)))
+      throw new Error(`${label}: input for '${target}' must be a finite number`);
+    if((dataType==='float'||dataType==='double')&&!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(raw))
+      throw new Error(`${label}: input text for '${target}' must be numeric`);
+    if(dataType==='char'&&(typeof value!=='string'||[...value].length!==1))
+      throw new Error(`${label}: input for '${target}' must be one character`);
+    if(dataType==='string'&&typeof value!=='string')throw new Error(`${label}: input for '${target}' must be a string`);
+    if((conversion==='s'||conversion==='next')&&/\s/.test(value))
+      throw new Error(`${label}: ${conversion} input for '${target}' must be one whitespace-free token`);
+  }
+  return {target,dataType,conversion,addressRequired:dataType!=='string',
+    expectedRaw:raw,expectedValue:value};
 }
 
 function parseCoreInputStatement(request,symbols,location){
@@ -31,23 +79,24 @@ function parseCoreInputStatement(request,symbols,location){
   const label=`${location.filename||'source'}:${location.start.line}`;
   if(language==='c'){
     const match=/^scanf\s*\(\s*"([^"]*)"\s*,\s*(.+)\)$/.exec(source);if(!match)return null;
-    const format=match[1],formats=[...format.matchAll(/%([di])/g)];
-    if(!formats.length)throw new Error(`${label}: scanf requires a supported integer conversion`);
-    if(!/^%[di](?:\s+%[di])*$/.test(format))
-      throw new Error(`${label}: numeric scanf supports integer conversions separated by whitespace`);
+    const format=match[1],formatParts=coreInputFormatParts(format,label),
+      formats=formatParts.filter(part=>part.kind==='conversion');
     const args=coreSplitDelimited(match[2],',',label);
     if(args.length!==formats.length)throw new Error(`${label}: scanf conversion and destination counts differ`);
     const reads=args.map((argument,index)=>{
-      const target=/^&([A-Za-z_][A-Za-z0-9_]*)$/.exec(argument);
-      if(!target)throw new Error(`${label}: scanf integer destinations must use &identifier`);
-      return coreInputRead(target[1],formats[index][1],symbols,request.inputValues,label);
+      const conversion=formats[index].conversion,stringInput=conversion==='s';
+      const target=(stringInput?/^([A-Za-z_][A-Za-z0-9_]*)$/:/^&([A-Za-z_][A-Za-z0-9_]*)$/).exec(argument);
+      if(!target)throw new Error(`${label}: scanf ${conversion} destination must use ${stringInput?'identifier':'&identifier'}`);
+      return coreInputRead(target[1],conversion,symbols,request.inputValues,label);
     });
-    let readIndex=0;const rawInput=format.replace(/%[di]/g,()=>reads[readIndex++].expectedRaw);
+    const rawInput=coreInputRawText(format,reads,label);
     return inputStatement({inputSyntax:'c',readerName:'scanf',format,reads,rawInput,sourceSpan:location});
   }
-  const match=/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\.nextInt\s*\(\s*\)$/.exec(source);
+  const match=/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Za-z_][A-Za-z0-9_]*)\.(nextInt|nextFloat|nextDouble|next|nextLine)\s*\(\s*\)(\.charAt\s*\(\s*0\s*\))?$/.exec(source);
   if(!match)return null;
-  const read=coreInputRead(match[1],'nextInt',symbols,request.inputValues,label);
+  const conversion=match[4]?'nextChar':match[3];
+  if(match[4]&&match[3]!=='next')throw new Error(`${label}: character input must use next().charAt(0)`);
+  const read=coreInputRead(match[1],conversion,symbols,request.inputValues,label);
   return inputStatement({inputSyntax:'java',readerName:match[2],reads:[read],rawInput:read.expectedRaw,sourceSpan:location});
 }
 

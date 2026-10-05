@@ -41,10 +41,9 @@ function programInputHydrateStatement(statement,context){
   if(!statement||statement.kind!=='input')return null;
   const reads=statement.reads.map(read=>{
     const definition=programInputClaimDefinition(context.definitions,read.target,context.filename,context.line);
-    return Object.assign({},read,{expectedRaw:String(definition.materializedValue),expectedValue:definition.materializedValue});
+    return Object.assign({},read,{expectedRaw:String(definition.materializedRaw),expectedValue:definition.materializedValue});
   });
-  let readIndex=0;
   const rawInput=statement.inputSyntax==='c'
-    ?statement.format.replace(/%[di]/g,()=>reads[readIndex++].expectedRaw):reads[0].expectedRaw;
+    ?coreInputRawText(statement.format,reads,`${context.filename}:${context.line}`):reads[0].expectedRaw;
   return programInputStatement(Object.assign({},statement,{id:`input-${context.statementIndex}`,reads,rawInput}));
 }

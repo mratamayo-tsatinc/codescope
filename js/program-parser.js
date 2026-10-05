@@ -103,94 +103,156 @@ function coreProgramFollowingClauseLine(lines,blockEnd){
 
 function coreProgramElseHeader(line){return /^\s*(?:}\s*)?else\s*{/.test(String(line||''));}
 
-// Execute parsed statements by authored control flow. Parsing and execution
-// are deliberately separate: the parser may discover every statement in the
-// file, while answer generation must apply only statements on the selected
-// branch. This executor is shared by every sourced activity.
-function coreExecuteParsedProgram(spec){
-  const lines=String(spec.source||'').split(/\r?\n/),language=spec.language||'c';
-  const filename=spec.filename||null,memory=coreExpressionMemory(spec.symbols||{});
-  const effects=[],trace=[],diagnostics=[],byLine=new Map();
-  (spec.statements||[]).forEach(statement=>{
-    const line=statement.sourceLine||(statement.sourceSpan&&statement.sourceSpan.start.line);
-    if(!byLine.has(line))byLine.set(line,[]);byLine.get(line).push(statement);
+// Build the canonical statement graph used by both answer generation and
+// interactive trace presentations. Plugins may decorate this graph, but they
+// must not independently decide which statement executes next.
+function coreBuildProgramControlFlow(spec){
+  const lines=Array.isArray(spec.lines)?spec.lines:String(spec.source||'').split(/\r?\n/);
+  const language=spec.language||'c',filename=spec.filename||null,symbols=spec.symbols||{};
+  const statements=(spec.statements||[]).slice().sort((left,right)=>left.sourceLine-right.sourceLine);
+  const diagnostics=[],byLine=new Map();
+  statements.forEach(statement=>{
+    if(!byLine.has(statement.sourceLine))byLine.set(statement.sourceLine,[]);
+    byLine.get(statement.sourceLine).push(statement);
   });
-  const rowFor=statement=>({text:statement.sourceText||'',startLine:statement.sourceLine||1,
-    endLine:statement.sourceEndLine||statement.sourceLine||1});
-  const executeStatement=statement=>{
-    try{
-      const executed=evaluateAndApplyCoreStatement(statement,memory,language,statement.id,'bindings');
-      effects.push(...executed.effects.map(effect=>Object.assign({statementId:statement.id},effect)));
-      trace.push(...executed.trace.map(step=>Object.assign({statementId:statement.id},step)));
-      const flow=executed.effects.find(effect=>effect.kind==='flow');
-      return {value:executed.value,signal:flow&&flow.flow||null};
-    }catch(error){
-      diagnostics.push(coreProgramDiagnostic(error,rowFor(statement),filename,'PROGRAM_STATE_UNAVAILABLE'));
-      return {value:undefined,signal:'error'};
-    }
-  };
-  const statementAt=(line,kind)=>((byLine.get(line+1)||[]).find(statement=>!kind||statement.kind===kind));
-  const ifChainAt=start=>{
-    const clauses=[];let current=start,elseClause=null,end=start;
-    while(current>=0){
-      const header=coreSelectionHeader(lines[current]);
-      if(!header||!['if','else-if'].includes(header.selectionKind))break;
-      const blockEnd=coreProgramBlockEnd(lines,current);
-      clauses.push({index:current,end:blockEnd,kind:header.selectionKind});end=blockEnd;
-      const following=coreProgramFollowingClauseLine(lines,blockEnd);
+  const selectionAt=(index,kind)=>(byLine.get(index+1)||[])
+    .find(statement=>statement.kind==='selection'&&(!kind||statement.selectionKind===kind))||null;
+  const firstStatementIn=(start,end)=>statements.find(statement=>statement.sourceLine>=start&&statement.sourceLine<=end)||null;
+  const firstStatementAfter=end=>statements.find(statement=>statement.sourceLine>end)||null;
+  const statementsIn=(start,end)=>statements.filter(statement=>statement.sourceLine>=start&&statement.sourceLine<=end);
+  const targetDetails=statement=>statement
+    ?{line:statement.sourceLine,text:lines[statement.sourceLine-1],id:statement.id}
+    :{line:lines.length,text:lines[lines.length-1]||'',id:'$end'};
+  const structures=[],attachedElseIf=new Set();
+
+  lines.forEach((line,index)=>{
+    const header=coreSelectionHeader(line);
+    if(!header||header.selectionKind!=='if'||attachedElseIf.has(index))return;
+    const clauses=[];let current={index,kind:'if'},end=index,elseClause=null;
+    while(current){
+      current.end=coreProgramBlockEnd(lines,current.index);
+      current.statement=selectionAt(current.index,current.kind);
+      if(current.statement)clauses.push(current);
+      end=current.end;
+      const following=coreProgramFollowingClauseLine(lines,current.end);
       const nextHeader=following>=0?coreSelectionHeader(lines[following]):null;
-      if(nextHeader&&nextHeader.selectionKind==='else-if'){current=following;continue;}
+      if(nextHeader&&nextHeader.selectionKind==='else-if'){
+        attachedElseIf.add(following);current={index:following,kind:'else-if'};continue;
+      }
       if(following>=0&&coreProgramElseHeader(lines[following])){
         elseClause={index:following,end:coreProgramBlockEnd(lines,following)};end=elseClause.end;
       }
+      current=null;
+    }
+    if(clauses.length)structures.push({type:'if-chain',clauses,elseClause,end});
+  });
+
+  lines.forEach((line,index)=>{
+    const header=coreSelectionHeader(line);if(!header||header.selectionKind!=='switch')return;
+    const statement=selectionAt(index,'switch');if(!statement)return;
+    const end=coreProgramBlockEnd(lines,index),cases=[];
+    for(let row=index+1;row<end;row++){
+      const location={filename,start:{line:row+1,column:1},end:{line:row+1,column:Math.max(1,lines[row].length+1)}};
+      try{const label=coreSwitchLabel(lines[row],{language},symbols,location);if(label)cases.push(Object.assign({index:row},label));}
+      catch(error){diagnostics.push(coreProgramDiagnostic(error,{text:lines[row],startLine:row+1,endLine:row+1},filename));}
+    }
+    cases.forEach((entry,position)=>{entry.end=(cases[position+1]?cases[position+1].index:end)-1;});
+    structures.push({type:'switch',statement,cases,end});
+  });
+
+  statements.forEach((statement,index)=>{
+    statement.nextStatementId=statement.kind==='program-return'?'$end'
+      :(statements[index+1]?statements[index+1].id:'$end');
+    if(statement.kind==='selection')statement.branches=[];
+  });
+  const structureStart=structure=>structure.type==='if-chain'
+    ?structure.clauses[0].index:structure.statement.sourceLine-1;
+  const regions=[];
+  structures.forEach(owner=>{
+    if(owner.type==='if-chain'){
+      owner.clauses.forEach(clause=>regions.push({owner,start:clause.index+1,end:clause.end-1}));
+      if(owner.elseClause)regions.push({owner,start:owner.elseClause.index+1,end:owner.elseClause.end-1});
+    }else owner.cases.forEach(entry=>regions.push({owner,start:entry.index+1,end:entry.end}));
+  });
+  const containingRegion=structure=>regions
+    .filter(region=>region.owner!==structure&&structureStart(structure)>=region.start&&structure.end<=region.end)
+    .sort((left,right)=>(left.end-left.start)-(right.end-right.start))[0]||null;
+  const continuationAfter=structure=>{
+    const candidate=firstStatementAfter(structure.end),region=containingRegion(structure);
+    if(!region||!candidate||candidate.sourceLine-1<=region.end)return candidate;
+    return region.owner.type==='if-chain'?continuationAfter(region.owner):candidate;
+  };
+
+  structures.forEach(structure=>{
+    const after=continuationAfter(structure),afterTarget=targetDetails(after);
+    if(structure.type==='if-chain'){
+      structure.clauses.forEach((clause,position)=>{
+        const body=statementsIn(clause.index+2,clause.end),trueTarget=targetDetails(body[0]||after);
+        const nextClause=structure.clauses[position+1];
+        const falseStatement=nextClause?nextClause.statement
+          :(structure.elseClause?firstStatementIn(structure.elseClause.index+2,structure.elseClause.end):after);
+        const falseTarget=targetDetails(falseStatement);
+        clause.statement.branches=[
+          {when:true,label:'TRUE',targetLine:trueTarget.line,targetText:trueTarget.text,
+            nextStatementId:trueTarget.id,targetStatementId:trueTarget.id},
+          {when:false,label:'FALSE',targetLine:falseTarget.line,targetText:falseTarget.text,
+            nextStatementId:falseTarget.id,targetStatementId:falseTarget.id}
+        ];
+        if(body.length)body[body.length-1].nextStatementId=afterTarget.id;
+      });
+      if(structure.elseClause){
+        const body=statementsIn(structure.elseClause.index+2,structure.elseClause.end);
+        if(body.length)body[body.length-1].nextStatementId=afterTarget.id;
+      }
+      return;
+    }
+    const caseBodies=structure.cases.map(entry=>statementsIn(entry.index+2,entry.end+1));
+    const nextCaseTarget=start=>{
+      for(let position=start;position<caseBodies.length;position++)if(caseBodies[position].length)return caseBodies[position][0];
+      return after;
+    };
+    structure.cases.forEach((entry,position)=>{
+      const body=caseBodies[position],target=targetDetails(body[0]||nextCaseTarget(position+1));
+      structure.statement.branches.push({value:entry.value,default:entry.default,label:entry.label,
+        targetLine:target.line,targetText:target.text,nextStatementId:target.id,targetStatementId:target.id});
+      body.filter(statement=>statement.kind==='program-break').forEach(statement=>{
+        statement.switchStatementId=structure.statement.id;statement.nextStatementId=afterTarget.id;
+      });
+      if(body.length&&body[body.length-1].kind!=='program-break')
+        body[body.length-1].nextStatementId=targetDetails(nextCaseTarget(position+1)).id;
+    });
+    if(!structure.cases.some(entry=>entry.default))structure.statement.branches.push({noMatch:true,label:'NO MATCH',
+      targetLine:afterTarget.line,targetText:afterTarget.text,nextStatementId:afterTarget.id,targetStatementId:afterTarget.id});
+  });
+  return {statements,structures,diagnostics};
+}
+
+// Execute the same canonical graph consumed by Trace activities. Simulate
+// activities derive their answer key from the resulting effects and memory.
+function coreExecuteParsedProgram(spec){
+  const language=spec.language||'c',filename=spec.filename||null;
+  const memory=coreExpressionMemory(spec.symbols||{}),effects=[],trace=[],diagnostics=[];
+  const statements=spec.statements||[],byId=new Map(statements.map(statement=>[statement.id,statement]));
+  const rowFor=statement=>({text:statement.sourceText||'',startLine:statement.sourceLine||1,
+    endLine:statement.sourceEndLine||statement.sourceLine||1});
+  let current=statements[0]||null,steps=0;
+  while(current&&current.id!=='$end'){
+    if(++steps>10000){
+      diagnostics.push(coreProgramDiagnostic('Program execution exceeded the supported step limit',rowFor(current),filename,'PROGRAM_STEP_LIMIT'));
       break;
     }
-    return {clauses,elseClause,end};
-  };
-  const executeRange=(start,end)=>{
-    for(let index=start;index<=end;index++){
-      const header=coreSelectionHeader(lines[index]);
-      if(header&&header.selectionKind==='if'){
-        const chain=ifChainAt(index);let selected=false;
-        for(const clause of chain.clauses){
-          const selection=statementAt(clause.index,'selection');
-          const outcome=selection?executeStatement(selection):{value:false};
-          if(outcome.signal==='error')return outcome.signal;
-          if(Boolean(outcome.value)){
-            const signal=executeRange(clause.index+1,clause.end-1);selected=true;
-            if(signal)return signal;
-            break;
-          }
-        }
-        if(!selected&&chain.elseClause){
-          const signal=executeRange(chain.elseClause.index+1,chain.elseClause.end-1);
-          if(signal)return signal;
-        }
-        index=chain.end;continue;
-      }
-      if(header&&header.selectionKind==='switch'){
-        const selection=statementAt(index,'selection'),outcome=selection?executeStatement(selection):{value:undefined};
-        if(outcome.signal==='error')return outcome.signal;
-        const blockEnd=coreProgramBlockEnd(lines,index),cases=[];
-        for(let row=index+1;row<blockEnd;row++){
-          const location={filename,start:{line:row+1,column:1},end:{line:row+1,column:Math.max(1,lines[row].length+1)}};
-          try{const label=coreSwitchLabel(lines[row],{language},memory,location);if(label)cases.push(Object.assign({index:row},label));}
-          catch(error){diagnostics.push(coreProgramDiagnostic(error,{text:lines[row],startLine:row+1,endLine:row+1},filename));return 'error';}
-        }
-        const chosen=cases.find(entry=>!entry.default&&entry.value===outcome.value)||cases.find(entry=>entry.default);
-        if(chosen){const signal=executeRange(chosen.index+1,blockEnd-1);if(signal&&signal!=='break')return signal;}
-        index=blockEnd;continue;
-      }
-      const statements=byLine.get(index+1)||[];
-      for(const statement of statements){
-        if(statement.kind==='selection')continue;
-        const outcome=executeStatement(statement);
-        if(outcome.signal)return outcome.signal;
-      }
+    try{
+      const executed=evaluateAndApplyCoreStatement(current,memory,language,current.id,'bindings');
+      effects.push(...executed.effects.map(effect=>Object.assign({statementId:current.id},effect)));
+      trace.push(...executed.trace.map(step=>Object.assign({statementId:current.id},step)));
+      const flow=executed.effects.find(effect=>effect.kind==='flow');
+      const nextId=flow&&flow.nextStatementId!==undefined?flow.nextStatementId:current.nextStatementId;
+      current=nextId==='$end'?null:(byId.get(nextId)||null);
+    }catch(error){
+      diagnostics.push(coreProgramDiagnostic(error,rowFor(current),filename,'PROGRAM_STATE_UNAVAILABLE'));
+      break;
     }
-    return null;
-  };
-  executeRange(0,lines.length-1);
+  }
   return {memory,effects,trace,diagnostics};
 }
 
@@ -234,11 +296,13 @@ function parseCoreProgram(request){
     }catch(error){/* Runtime diagnostics are produced by the control-flow executor below. */}
   });
   if(!statements.length) return {ir:null,diagnostics,dependencies:[],effects,trace};
+  const controlFlow=coreBuildProgramControlFlow({source,language,filename,statements,symbols:memory});
   const executed=coreExecuteParsedProgram({source,language,filename,statements,symbols:request.symbols});
   const dependencies=[...new Set(statements.flatMap(statement=>statement.dependencies||[]))];
   return {ir:languageCoreProgramIr({language,source,statements,metadata:{filename,
       statementRows:rows.map(row=>Object.assign({},row)),expectedMemory:executed.memory}}),
-    diagnostics:[...diagnostics,...executed.diagnostics],dependencies,effects:executed.effects,trace:executed.trace};
+    diagnostics:[...diagnostics,...controlFlow.diagnostics,...executed.diagnostics],
+    dependencies,effects:executed.effects,trace:executed.trace};
 }
 
 registerLanguageCoreService('parseProgram',parseCoreProgram);

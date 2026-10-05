@@ -241,10 +241,13 @@ function renderManualResponseVisual(descriptor,control){
   }
   if(descriptor.visualType==='evaluate-unary'){
     const node=descriptor.unaryNode;
+    const operand=node.inner.kind==='literal'
+      ?h('span',{class:'tok tok-lit'},formatValue(node.inner.value,node.inner.dataType))
+      :manualResponseBindingCard(node.inner.name,node.inner.kind,formatValue(unaryBaseValue(node)));
     return h('div',{class:'manual-response-flow connector-flow'},
       manualResponseOperationRow(h('span',{class:'tok manual-response-operator',style:`color:${descriptor.operationColor};`,
         'data-manual-connector-source':'','aria-hidden':'true'},node.op),
-        manualResponseBindingCard(node.inner.name,node.inner.kind,formatValue(unaryBaseValue(node)))),
+        operand),
       manualResponseResultBox(control,descriptor.operationColor));
   }
   if(descriptor.visualType==='assign'){

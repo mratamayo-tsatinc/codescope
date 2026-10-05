@@ -2,8 +2,8 @@
 @codescope
 @title Two Integers in One scanf
 @result y
-@input target=x value=8 min=1 max=100
-@input target=y value=15 min=1 max=100
+@input target=x value=8 min=1 max=100 step=1
+@input target=y value=15 min=1 max=100 step=1
 */
 #include <stdio.h>
 

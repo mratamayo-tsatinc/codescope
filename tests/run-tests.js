@@ -2718,7 +2718,7 @@ function testSimulateOutputPlugin(){
     item._feedbackAnimated=true;
     initializeSeededRandom(9876);const sourceBeforeRetry=item.source;
     const retry=soRetry({item,profile});
-    const retryReseeded=item.source!==sourceBeforeRetry;
+    const retrySeedStable=item.source===sourceBeforeRetry;
     const resetClean=!soHasResponse(item)&&!item.checked&&item.points===null
       &&item._feedbackAnimated===false;
     soApplyAction({item,action:{type:'SET_OUTPUT',value:item.expectedLines.join('\\n')+'\\nEXTRA'}});
@@ -2733,6 +2733,8 @@ function testSimulateOutputPlugin(){
     const edited=soParseExercise({id:'Edited',filename:'Edited.c',raw:editedSimulateFixture},'c');
     const hotel=soParseExercise({id:'Hotel',filename:'TaskHotel.c',raw:hotelFixture},'c');
     const sierra=items.find(candidate=>candidate.filename==='TaskSierra.c');
+    const booleanAnswerWords=[sourceProgramAnswerValue({value:true,dataType:'int'}),
+      sourceProgramAnswerValue({value:false,dataType:'int'})];
     let embeddedRejected=false,incompleteRejected=false;
     try{soParseExercise({id:'Old',filename:'Old.c',raw:oldSimulateFixture},'c');}
     catch(error){embeddedRejected=/embedded answer metadata/.test(error.message);}
@@ -2750,6 +2752,7 @@ function testSimulateOutputPlugin(){
       bankMaximum:items.reduce((sum,candidate)=>sum+activityItemMaxPoints(candidate,profile),0),
       editedOutput:edited.expectedLines,editedVariables:edited.variables,
       carriageOutput:hotel.expectedLines,
+      booleanAnswerWords,
       constantsExcluded:!sierra.variables.some(variable=>variable.name==='MEMBER_DISCOUNT_YEARS'
         ||variable.name==='TAX_RATE'||variable.name==='SHOP_NAME'),embeddedRejected,incompleteRejected,
       retrySeedStable,
@@ -2762,6 +2765,7 @@ function testSimulateOutputPlugin(){
     editedOutput:['Score: 7'],editedVariables:[{name:'score',dataType:'int',expected:'7'}],
     carriageOutput:['Learning escape characters in C','She said, "C programming is fun!"',
       "It's time to practice.",'File path: C:\\Programs\\C','Loading Done!'],
+    booleanAnswerWords:['true','false'],
     constantsExcluded:true,embeddedRejected:true,incompleteRejected:true,
     retry:true,resetClean:true,retrySeedStable:true,
     extraPenalty:true,snapshotStable:true,withheld:true,released:true});
@@ -3535,8 +3539,10 @@ function testProgramOutputStatementPlugin(){
   assert(!outputStyles.includes('.program-source-context-code{font-size:11px;}'));
   assert(!terminalSource.includes("escape.textContent='\\\\n'"));
   assert(terminalStyles.includes('.program-output-escape-cue.is-visible{display:inline-flex'));
-  assert(terminalStyles.includes('left:calc(13px + var(--terminal-left,0ch))'));
-  assert(terminalSource.includes('programTerminalPositionCursor(cursor,terminalState)'));
+  assert(terminalStyles.includes('.program-output-cursor{position:relative;display:inline-block'));
+  assert(terminalStyles.includes('.program-output-cursor.is-hidden{display:none;}'));
+  assert(terminalSource.includes('programTerminalPositionCursor(cursor,terminalState,pre)'));
+  assert(terminalSource.includes('parent.insertBefore(cursor,node.splitText(remaining))'));
   assert(!terminalStyles.includes('.program-output-escape-cue{position:absolute'));
   assert.strictEqual(result.canonicalPrints,4);
   assert(result.serializable&&result.outputSettings>0);
@@ -4238,6 +4244,7 @@ int main() {
 function testProgramInputPlugin(){
   const inputRendererSource=fs.readFileSync(path.join(ROOT,'plugins','program-input','renderer.js'),'utf8');
   const inputStyles=fs.readFileSync(path.join(ROOT,'plugins','program-input','styles.css'),'utf8');
+  const connectorSource=fs.readFileSync(path.join(ROOT,'js','connector-lines.js'),'utf8');
   const ctx=context();installFakeDom(ctx);
   load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
     'program-ir.js','language-core.js','expression-parser.js','expression-semantics.js','output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js','statement-parser.js','statement-semantics.js','program-parser.js','source-program-pipeline.js','program-core.js','legacy-expression-plugin.js','declaration-statement-plugin.js',
@@ -4296,8 +4303,9 @@ function testProgramInputPlugin(){
     return JSON.stringify({profileId:profile.id,categoryProfiles:category.profileIds,inputMode:profileInputValueMode(profile),
       cKinds:seeded.program.statements.map(statement=>statement.kind),cReads:cInput.reads.length,cRaw:cInput.rawInput,
       sourceInputValues:seeded.sourceInputValues,repeatInputValues:repeated.sourceInputValues,changedInputValues:changed.sourceInputValues,
-      start:start.applied,earlyEnter:earlyEnter.applied,keyboardKeys:countNodesWithClass(consoleBefore,'program-input-key'),
-      enterKeys:countNodesWithClass(consoleBefore,'enter-key'),beforeWrites,submit:submit.applied,
+      start:start.applied,earlyEnter:earlyEnter.applied,
+      keyboardIndicators:countNodesWithClass(consoleBefore,'program-input-keyboard-indicator'),
+      enterKeys:countNodesWithClass(consoleBefore,'program-input-enter-key'),beforeWrites,submit:submit.applied,
       postSubmitReads,postSubmitTrace,
       prematureWrite:prematureWrite.applied,consoleTokens:countNodesWithClass(consoleAfter,'program-input-console-token'),
       eventTypes:program.events.map(event=>event.type),memory:Object.fromEntries(Object.entries(program.memory).map(([name,row])=>[name,row.value])),
@@ -4314,7 +4322,7 @@ function testProgramInputPlugin(){
   assert(result.cKinds.includes('input')&&result.cReads===3&&/^\d+ \d+ \d+$/.test(result.cRaw));
   assert.deepStrictEqual(result.sourceInputValues,result.repeatInputValues);
   assert.notDeepStrictEqual(result.sourceInputValues,result.changedInputValues);
-  assert(result.start&&!result.earlyEnter&&result.keyboardKeys===14&&result.enterKeys===1);
+  assert(result.start&&!result.earlyEnter&&result.keyboardIndicators===1&&result.enterKeys===1);
   assert.deepStrictEqual(result.beforeWrites,[]);
   assert.strictEqual(result.prematureWrite,false);
   assert.deepStrictEqual(result.postSubmitReads,[
@@ -4331,7 +4339,9 @@ function testProgramInputPlugin(){
   assert(result.timelineRows>=5);
   assert.deepStrictEqual(result.javaInputs,['x','y','z']);
   assert(result.javaKinds.filter(kind=>kind==='input').length===3);
-  assert(result.manifestCapabilities.includes('numeric-keyboard'));
+  assert(result.manifestCapabilities.includes('typed-input'));
+  assert(result.manifestCapabilities.includes('keyboard-indicator'));
+  assert(result.manifestCapabilities.includes('persistent-enter-control'));
   assert(result.codeDependencies.includes('language-core:input-statements'));
   assert(result.codeDependencies.includes('program-input:timeline-presentation'));
   assert(inputRendererSource.includes('runVarFinalComet(sources[index].getBoundingClientRect()'));
@@ -4339,12 +4349,20 @@ function testProgramInputPlugin(){
   assert(inputRendererSource.includes('runVarFinalComet(source.getBoundingClientRect(),destination.getBoundingClientRect()'));
   assert(inputRendererSource.indexOf("const commit=()=>handleTokenClick({type:'write-input'")
     <inputRendererSource.indexOf('runVarFinalComet(source.getBoundingClientRect(),destination.getBoundingClientRect()'));
-  assert(inputRendererSource.includes("programInputAction(`&${entry.target}`,'input-address"));
+  assert(inputRendererSource.includes("entry.addressRequired?'&':''"));
   assert(!inputRendererSource.includes('program-input-target-name'));
-  assert(inputRendererSource.includes('programInputPlaybackTimer=setTimeout(step,180)'));
-  assert(inputRendererSource.includes('},240)'));
+  assert(inputRendererSource.includes('paintPreview(raw.slice(0,index))'));
+  assert(inputRendererSource.includes('programInputPlaybackTimer=setTimeout(typeCharacter,260)'));
+  assert(!inputRendererSource.includes("const keys=['1','2','3'"));
   assert(inputStyles.includes('.program-input-placeholder-spinner'));
   assert(inputStyles.includes('.program-input-console-token'));
+  assert(inputStyles.includes('.program-input-keyboard-indicator'));
+  assert(inputStyles.includes('.program-input-enter-key.is-pressed'));
+  assert(inputRendererSource.includes('function programInputFinishedConnectorVisuals(panel,statement)'));
+  assert(inputRendererSource.includes("path.setAttribute('stroke-dasharray','3 4')"));
+  assert(inputRendererSource.includes('data-input-written-indices'));
+  assert(inputStyles.includes('.program-input-connected-row'));
+  assert(connectorSource.includes("statement.kind==='input'&&typeof programInputFinishedConnectorVisuals==='function'"));
 }
 
 testExerciseLibraryRegistry();

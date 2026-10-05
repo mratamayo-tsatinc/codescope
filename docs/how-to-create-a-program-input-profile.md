@@ -24,27 +24,50 @@ Use one `@input` directive for every input destination:
 ```c
 /*
 @codescope
-@title Multiple Integer Input
-@input target=x value=4 min=1 max=20
-@input target=y value=7 min=1 max=20
+@title Typed Input
+@input target=x value=4 min=1 max=20 step=2
+@input target=price value=9.5 min=5.0 max=20.0 step=0.5 decimals=1
+@input target=letter value='B' choices='A'|'B'|'C'
+@input target=name value="Ada" choices="Ada"|"Grace"|"Linus"
 */
 ```
 
-`value` is the authored input. `min` and `max` are inclusive integer limits.
+`value` is the authored input. Numeric `min` and `max` are inclusive. Optional
+`step` limits the generated sequence from `min`, and `decimals` controls the
+rendered precision of generated floating point input. Character and string
+inputs use `choices=` (the shared `values=` spelling is also accepted).
+An input with only `value=` remains fixed in seeded mode.
 An input destination without matching metadata is rejected so the simulation
 cannot invent an unexplained value.
 
-Supported initial statements are:
+Supported C statements and destination types are:
 
 ```c
-scanf("%d %d", &x, &y);
+int count;
+float price;
+double rate;
+char letter;
+char name[24];
+scanf("%d %f %lf %c %s", &count, &price, &rate, &letter, name);
 ```
+
+Supported Java Scanner statements are:
 
 ```java
-x = input.nextInt();
+count = input.nextInt();
+price = input.nextFloat();
+rate = input.nextDouble();
+letter = input.next().charAt(0);
+name = input.next();
+line = input.nextLine();
 ```
 
-The destination must be a declared mutable `int`. C supports `%d` and `%i`.
+Destinations must be declared mutable variables with matching types. C supports
+`%d`, `%i`, `%f`, `%lf`, `%c`, and `%s`. `%s` and Java `next()` accept one
+whitespace-free token; Java `nextLine()` accepts spaces. C format literals are
+preserved in the simulated input, so `%d/%d/%d` produces input such as
+`10/2/2026`. Leading format whitespace such as `" %c"` consumes pending
+whitespace and does not add a fabricated space before the entered character.
 
 ## 3. Configure the profile
 
@@ -77,8 +100,8 @@ choose a value from its source-local range whenever the item is regenerated.
 
 1. Click the input statement.
 2. Click `scanf` or `nextInt()` to start input.
-3. Watch the virtual keyboard enter the configured value. C whitespace is
-   shown with the Space key.
+3. Watch the keyboard indicator while the configured input appears in the
+   console one character at a time.
 4. Press Enter. The input is not committed before this action.
 5. Watch all submitted values travel from Program Console to their matching
    format placeholders. Each placeholder shows a spinner until its value
@@ -88,6 +111,7 @@ choose a value from its source-local range whenever the item is regenerated.
    value. In Java, click the assignment target for the same transfer. Input
    remains visible in Program Console alongside output events.
 
-The keyboard playback and console-to-placeholder trails are presentation.
+The keyboard indicator, persistent released/pressed Enter key, and
+console-to-placeholder trails are presentation.
 Enter, the batch conversion, each memory write, scoring, Undo, Reset, and
 persistence are semantic state transitions.

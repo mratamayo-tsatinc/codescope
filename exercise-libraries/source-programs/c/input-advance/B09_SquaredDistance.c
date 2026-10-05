@@ -2,10 +2,10 @@
 @codescope
 @title Squared Distance Between Two Points
 @result distSquared
-@input target=x1 value=1 min=-20 max=20
-@input target=y1 value=2 min=-20 max=20
-@input target=x2 value=4 min=-20 max=20
-@input target=y2 value=6 min=-20 max=20
+@input target=x1 value=1 min=-20 max=20 step=1
+@input target=y1 value=2 min=-20 max=20 step=1
+@input target=x2 value=4 min=-20 max=20 step=1
+@input target=y2 value=6 min=-20 max=20 step=1
 */
 #include <stdio.h>
 

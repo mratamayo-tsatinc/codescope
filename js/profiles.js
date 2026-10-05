@@ -755,6 +755,19 @@ const PROFILES_RAW = [
   },
   {
     enabled:true,
+    meta:{id:'trace-compound-selection',name:'Compound Selection',
+      description:'Trigger each supported statement and trace compound selection flow through a complete C or Java source program.'},
+    shape:{operandSources:{variable:1,literal:1},operandRange:{min:1,max:100},allowNegativeOperands:false},
+    operators:{allowed:[...OPS.COMPARISON,...OPS.LOGICAL]},template:'operand cmp operand',
+    scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
+    content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'simulate-compound-selection'},
+      values:{variables:'seeded'},selection:{count:'all',shuffle:false}},
+    lesson:{focus:'program-flow',constructs:['selection']},
+    interaction:{declarations:'interactive'},
+    presentation:{workspace:'source-program',timeline:'statement-modal'},
+  },
+  {
+    enabled:true,
     meta:{id:'trace-output-variables',name:'Trace Output + Variables',
       description:'Trigger each supported statement and trace the actual flow through a complete C or Java source program.'},
     scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true},
@@ -810,7 +823,7 @@ const PROFILE_CATEGORIES = [
   {id:'simulate-output-commands',name:'Simulate Output Commands',enabled:true,
     profileIds:['simulate-basic-output','simulate-output-variables']},
   {id:'trace-selection-commands',name:'Trace Selection Commands',enabled:true,
-    profileIds:['trace-basic-selection']},
+    profileIds:['trace-basic-selection','trace-compound-selection']},
   {id:'simulate-selection-commands',name:'Simulate Selection Commands',enabled:true,
     profileIds:['simulate-basic-selection','simulate-compound-selection']},
 

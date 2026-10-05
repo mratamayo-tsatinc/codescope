@@ -2,8 +2,8 @@
 @codescope
 @title Rectangle Area and Perimeter in One scanf
 @result area
-@input target=length value=12 min=1 max=50
-@input target=width value=5 min=1 max=50
+@input target=length value=12 min=1 max=50 step=1
+@input target=width value=5 min=1 max=50 step=1
 */
 #include <stdio.h>
 

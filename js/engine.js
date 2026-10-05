@@ -84,7 +84,11 @@ function makeBinOp(op,left,right){ return {id:nextId(), kind:'binop', op, left, 
 // other part of the engine (flattening, paren-tagging, readiness checks) a
 // unary node behaves like any other non-binop leaf.
 function makeUnary(op, form, inner){ return {id:nextId(), kind:'unary', op, form, inner, substituted:false, resolved:false}; }
-function unaryBaseValue(node){ return node.inner.kind==='literal' ? node.inner.value : node.inner.declaredValue; }
+function unaryBaseValue(node){
+  if(node.inner.kind==='literal') return node.inner.value;
+  if(node.inner.kind==='variable'||node.inner.kind==='constant') return node.inner.declaredValue;
+  return evalTree(node.inner);
+}
 function unaryComputedValue(node){
   const base = unaryBaseValue(node);
   return evaluateUnaryOperation(node.op,node.form,base).expressionValue;
@@ -101,12 +105,13 @@ function numericValue(node){
 }
 function deepClone(node){
   if(node.kind==='binop') return {id:node.id, kind:'binop', op:node.op, left:deepClone(node.left), right:deepClone(node.right)};
-  if(node.kind==='unary') return Object.assign({}, node, {inner:Object.assign({}, node.inner)});
+  if(node.kind==='unary') return Object.assign({}, node, {inner:deepClone(node.inner)});
   return Object.assign({}, node);
 }
 function replaceNode(node,targetId,replacement){
   if(node.id===targetId) return replacement;
   if(node.kind==='binop') return {id:node.id, kind:'binop', op:node.op, left:replaceNode(node.left,targetId,replacement), right:replaceNode(node.right,targetId,replacement)};
+  if(node.kind==='unary') return Object.assign({},node,{inner:replaceNode(node.inner,targetId,replacement)});
   return node;
 }
 function resolveNode(node,targetId){
@@ -115,6 +120,7 @@ function resolveNode(node,targetId){
     return Object.assign({}, node, {resolved:true});
   }
   if(node.kind==='binop') return {id:node.id, kind:'binop', op:node.op, left:resolveNode(node.left,targetId), right:resolveNode(node.right,targetId)};
+  if(node.kind==='unary') return Object.assign({},node,{inner:resolveNode(node.inner,targetId)});
   return node;
 }
 // Marks a unary node's underlying variable value as revealed (e.g. "++x" ->
@@ -128,19 +134,25 @@ function substituteNode(node,targetId){
     return node;
   }
   if(node.kind==='binop') return {id:node.id, kind:'binop', op:node.op, left:substituteNode(node.left,targetId), right:substituteNode(node.right,targetId)};
+  if(node.kind==='unary') return Object.assign({},node,{inner:substituteNode(node.inner,targetId)});
   return node;
 }
 function collectUnresolved(node,out){
   out = out || [];
-  if(node.kind==='variable'||node.kind==='constant'||node.kind==='unary'){ if(!node.resolved) out.push(node); }
+  if(node.kind==='variable'||node.kind==='constant'){if(!node.resolved)out.push(node);}
+  else if(node.kind==='unary'){
+    if(node.inner.kind==='binop')collectUnresolved(node.inner,out);
+    else if(!node.resolved)out.push(node);
+  }
   else if(node.kind==='binop'){ collectUnresolved(node.left,out); collectUnresolved(node.right,out); }
   return out;
 }
 function collectReducible(node,out){
   out = out || [];
+  if(node.kind==='unary'){collectReducible(node.inner,out);return out;}
   if(node.kind!=='binop') return out;
-  if(node.left.kind==='binop') collectReducible(node.left,out);
-  if(node.right.kind==='binop') collectReducible(node.right,out);
+  collectReducible(node.left,out);
+  collectReducible(node.right,out);
   if(isNumeric(node.left) && isNumeric(node.right)) out.push(node);
   return out;
 }
@@ -149,6 +161,16 @@ function getMaxPrecCandidates(tree){
   if(reducible.length===0) return [];
   const maxP = Math.max.apply(null, reducible.map(n=>prec(n.op)));
   return reducible.filter(n=>prec(n.op)===maxP);
+}
+function collectReadyUnaryNodes(node,out){
+  out=out||[];
+  if(node.kind==='unary'){
+    collectReadyUnaryNodes(node.inner,out);
+    if(!node.resolved&&isNumeric(node.inner))out.push(node);
+  }else if(node.kind==='binop'){
+    collectReadyUnaryNodes(node.left,out);collectReadyUnaryNodes(node.right,out);
+  }
+  return out;
 }
 function evalTree(node){
   if(node.kind==='literal') return node.value;
@@ -189,7 +211,17 @@ function buildCanonicalTrace(originalTree){
       treeStates.push(deepClone(working));
     }
   }
-  while(working.kind==='binop'){
+  while(!isNumeric(working)){
+    const readyUnary=collectReadyUnaryNodes(working,[]);
+    if(readyUnary.length){
+      const node=readyUnary[0],base=unaryBaseValue(node),result=evaluateUnaryOperation(node.op,node.form,base).expressionValue;
+      const before=renderString(working);
+      working=resolveNode(working,node.id);
+      const after=renderString(working);
+      steps.push({action:'UNARY',op:node.op,form:node.form,target:renderString(node.inner),sourceValue:base,
+        result,expressionBefore:before,expressionAfter:after,resultNodeId:node.id});
+      treeStates.push(deepClone(working));continue;
+    }
     const cands = getMaxPrecCandidates(working);
     if(cands.length===0) throw new EngineError('STUCK');
     const node = cands[0];
@@ -202,7 +234,7 @@ function buildCanonicalTrace(originalTree){
     steps.push({action:'EVALUATE', target:{operator:node.op, operands:[a,b]}, result, expressionBefore:before, expressionAfter:after, resultNodeId:newLiteral.id, leftId:node.left.id, rightId:node.right.id});
     treeStates.push(deepClone(working));
   }
-  return {steps, finalValue:working.value, treeStates};
+  return {steps, finalValue:numericValue(working), treeStates};
 }
 function renderString(node,minPrec){
   minPrec = minPrec || 0;
@@ -210,6 +242,7 @@ function renderString(node,minPrec){
   if(node.kind==='variable'||node.kind==='constant') return node.resolved ? formatValue(node.declaredValue,node.dataType) : node.name;
   if(node.kind==='unary'){
     if(node.resolved) return formatValue(node.resultValue);
+    if(node.inner.kind==='binop')return node.op+'('+renderString(node.inner,0)+')';
     const nm = node.substituted ? String(unaryBaseValue(node)) : (node.inner.kind==='literal' ? String(node.inner.value) : node.inner.name);
     if(node.op==='!') return '!'+nm;
     return node.form==='prefix' ? node.op+nm : nm+node.op;

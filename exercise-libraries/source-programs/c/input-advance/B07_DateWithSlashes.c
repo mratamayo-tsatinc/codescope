@@ -2,9 +2,9 @@
 @codescope
 @title Reading a Date with Slashes
 @result code
-@input target=month value=10 min=1 max=12
-@input target=day value=2 min=1 max=31
-@input target=year value=2026 min=1900 max=2100
+@input target=month value=10 min=1 max=12 step=1
+@input target=day value=2 min=1 max=31 step=1
+@input target=year value=2026 min=1900 max=2100 step=1
 */
 #include <stdio.h>
 
@@ -14,8 +14,8 @@ int main() {
     int year;
     int code;
 
-    printf("Enter a date as MM DD YYYY: ");
-    scanf("%d %d %d", &month, &day, &year);
+    printf("Enter a date as MM/DD/YYYY: ");
+    scanf("%d/%d/%d", &month, &day, &year);
     code = year * 10000 + month * 100 + day;
     printf("Month: %d\n", month);
     printf("Day: %d\n", day);

@@ -273,7 +273,10 @@ function renderProgramSourceFilePanel(item,program){
     onscroll:()=>rememberSourceFlowViewport(item,source),onwheel:markUserScroll,
     ontouchstart:markUserScroll,onpointerdown:markUserScroll,onkeydown:flowKeydown});
   display.lines.forEach(line=>{
-    const entry=line.primary&&line.statementId?statements.get(line.statementId):null;
+    const lineStatementIds=Array.isArray(line.statementIds)&&line.statementIds.length
+      ?line.statementIds:(line.statementId?[line.statementId]:[]);
+    const displayedStatementId=active&&lineStatementIds.includes(active.id)?active.id:lineStatementIds[0];
+    const entry=line.primary&&displayedStatementId?statements.get(displayedStatementId):null;
     const statement=entry&&entry.statement;
     const isOrigin=!!(statement&&transition&&statement.id===transition.originId);
     const isDestination=!!(statement&&transition&&statement.id===transition.destinationId);

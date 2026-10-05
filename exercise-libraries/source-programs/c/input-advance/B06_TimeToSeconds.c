@@ -2,9 +2,9 @@
 @codescope
 @title Hours, Minutes, Seconds to Total Seconds
 @result totalSeconds
-@input target=hours value=1 min=0 max=23
-@input target=minutes value=25 min=0 max=59
-@input target=seconds value=30 min=0 max=59
+@input target=hours value=1 min=0 max=23 step=1
+@input target=minutes value=25 min=0 max=59 step=1
+@input target=seconds value=30 min=0 max=59 step=1
 */
 #include <stdio.h>
 

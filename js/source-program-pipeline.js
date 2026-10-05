@@ -144,10 +144,58 @@ function sourceProgramRangeDecimals(directive,binding){
     directive.step===null?0:places(directive.step),places(binding.initializer)));
 }
 
-// Input metadata is shared by every source-file activity. Input statements
-// currently support integer reads, so this contract intentionally keeps the
-// existing integer value/range vocabulary until the language core adds more
-// input conversions.
+function sourceProgramInputFields(spec,filename,line){
+  const fields={};let index=0;
+  while(index<spec.length){
+    while(/\s/.test(spec[index]||''))index++;
+    if(index>=spec.length)break;
+    const name=/^[A-Za-z][A-Za-z0-9]*/.exec(spec.slice(index));
+    if(!name||spec[index+name[0].length]!=='=')
+      throw new Error(`${filename}: metadata line ${line}: invalid @input field near '${spec.slice(index)}'`);
+    const key=name[0];index+=key.length+1;
+    if(key==='choices'||key==='values'){
+      fields[key]=spec.slice(index).trim();index=spec.length;continue;
+    }
+    const quote=spec[index];let value='';
+    if(quote==='"'||quote==="'"){
+      const start=index++;let escaped=false;
+      while(index<spec.length){
+        const character=spec[index++];
+        if(escaped){escaped=false;continue;}
+        if(character==='\\'){escaped=true;continue;}
+        if(character===quote)break;
+      }
+      if(spec[index-1]!==quote)throw new Error(`${filename}: metadata line ${line}: unterminated ${key} literal`);
+      value=spec.slice(start,index);
+    }else{
+      const start=index;while(index<spec.length&&!/\s/.test(spec[index]))index++;
+      value=spec.slice(start,index);
+    }
+    fields[key]=value;
+  }
+  return fields;
+}
+
+function sourceProgramInputLiteral(raw,filename,line,target){
+  const value=String(raw==null?'':raw).trim(),label=`${filename}: metadata line ${line}: @input '${target}'`;
+  if(/^-?\d+$/.test(value)){
+    const parsed=Number(value);if(!Number.isSafeInteger(parsed))throw new Error(`${label} integer is outside the safe range`);
+    return {value:parsed,kind:'int',raw:String(parsed)};
+  }
+  if(/^-?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)[fFdD]?$/.test(value)){
+    const parsed=Number(value.replace(/[fFdD]$/,''));if(!Number.isFinite(parsed))throw new Error(`${label} requires a finite number`);
+    return {value:parsed,kind:'number',raw:value.replace(/[fFdD]$/,'')};
+  }
+  let match=/^'((?:\\.|[^'\\]))'$/.exec(value);
+  if(match)return {value:decodeCoreStringEscape(match[1],label),kind:'char',raw:decodeCoreStringEscape(match[1],label)};
+  match=/^"((?:\\.|[^"\\])*)"$/.exec(value);
+  if(match)return {value:decodeCoreStringEscape(match[1],label),kind:'string',raw:decodeCoreStringEscape(match[1],label)};
+  throw new Error(`${label} value must be a number, character literal, or string literal`);
+}
+
+// Input metadata is shared by every source-file activity. A value is the
+// authored input. Numeric ranges may add step/decimals, while characters and
+// strings use choices (values is accepted as the shared @seed vocabulary).
 function sourceProgramInputDirectives(metadata,filename,mode='authored',randomInteger){
   if(!['authored','seeded'].includes(mode))throw new Error(`${filename}: inputValueMode must be 'authored' or 'seeded'`);
   const definitions=[],choose=typeof randomInteger==='function'?randomInteger:
@@ -155,24 +203,62 @@ function sourceProgramInputDirectives(metadata,filename,mode='authored',randomIn
   String(metadata||'').split('\n').forEach((raw,index)=>{
     const line=raw.replace(/^\s*\*?\s*/,'').trim();
     if(!line.startsWith('@input'))return;
-    const fields={};
-    line.slice(6).trim().split(/\s+/).filter(Boolean).forEach(part=>{
-      const match=/^([A-Za-z][A-Za-z0-9]*)=(.+)$/.exec(part);
-      if(!match)throw new Error(`${filename}: metadata line ${index+1}: invalid @input field '${part}'`);
-      fields[match[1]]=match[2];
-    });
-    const allowed=new Set(['target','value','min','max']);
+    const fields=sourceProgramInputFields(line.slice(6).trim(),filename,index+1);
+    const allowed=new Set(['target','value','min','max','step','decimals','choices','values']);
     Object.keys(fields).forEach(name=>{if(!allowed.has(name))
       throw new Error(`${filename}: metadata line ${index+1}: unsupported @input field '${name}'`);});
     if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(fields.target||''))
       throw new Error(`${filename}: metadata line ${index+1}: @input requires target=<identifier>`);
-    const value=Number(fields.value),min=Number(fields.min),max=Number(fields.max);
-    if(!Number.isSafeInteger(value)||!Number.isSafeInteger(min)||!Number.isSafeInteger(max)||min>max||value<min||value>max)
-      throw new Error(`${filename}: metadata line ${index+1}: integer input requires value/min/max with min <= value <= max`);
+    if(fields.value===undefined)throw new Error(`${filename}: metadata line ${index+1}: @input requires value=<literal>`);
+    if(fields.choices!==undefined&&fields.values!==undefined)
+      throw new Error(`${filename}: metadata line ${index+1}: use either choices= or values=, not both`);
+    const authored=sourceProgramInputLiteral(fields.value,filename,index+1,fields.target);
+    const choiceSpec=fields.choices===undefined?fields.values:fields.choices;
+    let kind='fixed',min=null,max=null,step=null,decimals=null,choices=null,materialized=authored;
+    if(choiceSpec!==undefined){
+      if(fields.min!==undefined||fields.max!==undefined||fields.step!==undefined||fields.decimals!==undefined)
+        throw new Error(`${filename}: metadata line ${index+1}: choices cannot be combined with a numeric range`);
+      const rawChoices=sourceProgramSplitSeedChoices(choiceSpec,filename,index+1,fields.target);
+      choices=rawChoices.map(choice=>sourceProgramInputLiteral(choice,filename,index+1,fields.target));
+      const compatible=choice=>choice.kind===authored.kind
+        ||['int','number'].includes(choice.kind)&&['int','number'].includes(authored.kind);
+      if(choices.some(choice=>!compatible(choice)))
+        throw new Error(`${filename}: metadata line ${index+1}: @input choices must match the authored value type`);
+      if(!choices.some(choice=>choice.value===authored.value))
+        throw new Error(`${filename}: metadata line ${index+1}: authored input value must appear in choices`);
+      kind='choices';if(mode==='seeded')materialized=choices[choose(0,choices.length-1)];
+    }else if(fields.min!==undefined||fields.max!==undefined||fields.step!==undefined||fields.decimals!==undefined){
+      if(!['int','number'].includes(authored.kind)||fields.min===undefined||fields.max===undefined)
+        throw new Error(`${filename}: metadata line ${index+1}: numeric input ranges require min and max`);
+      min=Number(fields.min);max=Number(fields.max);step=fields.step===undefined?null:Number(fields.step);
+      decimals=fields.decimals===undefined?null:Number(fields.decimals);
+      if(!Number.isFinite(min)||!Number.isFinite(max)||min>max||authored.value<min||authored.value>max
+        ||step!==null&&(!Number.isFinite(step)||step<=0)
+        ||decimals!==null&&(!Number.isSafeInteger(decimals)||decimals<0||decimals>8))
+        throw new Error(`${filename}: metadata line ${index+1}: invalid @input numeric range`);
+      const rangeKind=authored.kind==='number'||decimals!==null&&decimals>0
+        ||![min,max].every(Number.isSafeInteger)||step!==null&&!Number.isSafeInteger(step)?'number':'int';
+      if(rangeKind==='int'&&(!Number.isSafeInteger(min)||!Number.isSafeInteger(max)
+        ||step!==null&&!Number.isSafeInteger(step)))
+        throw new Error(`${filename}: metadata line ${index+1}: integer input range and step require whole numbers`);
+      const places=value=>{const match=/\.(\d+)/.exec(String(value));return match?match[1].length:0;};
+      decimals=decimals===null?(rangeKind==='int'?0:Math.min(8,Math.max(places(fields.value),places(fields.min),places(fields.max),places(fields.step||0)))):decimals;
+      const scale=10**decimals,scaledMin=Math.round(min*scale),scaledMax=Math.round(max*scale);
+      const scaledStep=step===null?1:Math.round(step*scale);
+      if(step!==null&&(scaledStep<=0||Math.abs(scaledStep/scale-step)>1e-10))
+        throw new Error(`${filename}: metadata line ${index+1}: step cannot be represented with decimals=${decimals}`);
+      if(step!==null&&Math.abs((authored.value-min)/step-Math.round((authored.value-min)/step))>1e-8)
+        throw new Error(`${filename}: metadata line ${index+1}: authored value does not align with step`);
+      kind='range';
+      if(mode==='seeded'){
+        const slots=Math.floor((scaledMax-scaledMin)/scaledStep),value=(scaledMin+choose(0,slots)*scaledStep)/scale;
+        materialized={value,kind:rangeKind,raw:decimals?value.toFixed(decimals):String(value)};
+      }
+    }
     if(definitions.some(definition=>definition.target===fields.target))
       throw new Error(`${filename}: metadata line ${index+1}: duplicate @input target '${fields.target}'`);
-    definitions.push({target:fields.target,value,min,max,
-      materializedValue:mode==='seeded'?choose(min,max):value,used:false,metadataLine:index+1});
+    definitions.push({target:fields.target,value:authored.value,valueKind:authored.kind,min,max,step,decimals,choices,kind,
+      materializedValue:materialized.value,materializedRaw:materialized.raw,used:false,metadataLine:index+1});
   });
   return definitions;
 }
@@ -258,7 +344,7 @@ function sourceProgramTerminalScreen(stream){
 function sourceProgramAnswerValue(binding){
   const value=binding&&binding.value;
   if(Array.isArray(value))return value.map(entry=>String(entry));
-  if(typeof value==='boolean'&&binding&&['int','long','short'].includes(binding.dataType))return value?'1':'0';
+  if(typeof value==='boolean')return value?'true':'false';
   return String(value==null?'':value);
 }
 

@@ -27,11 +27,39 @@ function programTerminalCursorStyle(state){
   return `--terminal-left:${state.column}ch;--terminal-top:${state.row*1.65}em;`;
 }
 
-function programTerminalPositionCursor(cursor,state){
+function programTerminalCursorOffset(state){
+  const lines=Array.isArray(state&&state.lines)?state.lines:[];
+  let offset=0;
+  for(let index=0;index<(state&&state.row||0);index++)offset+=String(lines[index]||'').length+1;
+  return offset+Math.min(state&&state.column||0,String(lines[state&&state.row||0]||'').length);
+}
+
+function programTerminalPositionCursor(cursor,state,pre){
   if(!cursor||!state)return;
-  cursor.setAttribute('style',programTerminalCursorStyle(state));
   cursor.setAttribute('data-terminal-row',String(state.row));
   cursor.setAttribute('data-terminal-column',String(state.column));
+  if(!pre||!pre.childNodes||typeof pre.appendChild!=='function'){
+    cursor.setAttribute('style',programTerminalCursorStyle(state));return;
+  }
+  cursor.removeAttribute&&cursor.removeAttribute('style');
+  if(cursor.parentNode)cursor.parentNode.removeChild(cursor);
+  const nodes=[];
+  const collect=node=>{Array.from(node&&node.childNodes||[]).forEach(child=>{
+    if(child===cursor)return;if(child.nodeType===3)nodes.push(child);else collect(child);
+  });};
+  collect(pre);let remaining=programTerminalCursorOffset(state);
+  for(const node of nodes){
+    const length=String(node.nodeValue||'').length;
+    if(remaining>length){remaining-=length;continue;}
+    const parent=node.parentNode;
+    if(!parent||typeof parent.insertBefore!=='function')break;
+    if(remaining===0)parent.insertBefore(cursor,node);
+    else if(remaining===length)parent.insertBefore(cursor,node.nextSibling||null);
+    else if(typeof node.splitText==='function')parent.insertBefore(cursor,node.splitText(remaining));
+    else break;
+    return;
+  }
+  pre.appendChild(cursor);
 }
 
 function appendProgramTerminalEvents(pre,events,program){
@@ -77,17 +105,18 @@ function renderProgramTerminalPanel(item,program,options){
   appendProgramTerminalEvents(pre,visibleEvents,program);
   const terminalState=coreTerminalScreen(pre._programTerminalStream);
   const cursor=h('span',{class:'program-output-cursor','aria-hidden':'true',
-    style:programTerminalCursorStyle(terminalState),
     'data-terminal-row':String(terminalState.row),
     'data-terminal-column':String(terminalState.column)},'▌');
   const escape=h('span',{class:'program-output-escape-cue','aria-hidden':'true',
     title:'newline (\\n)'},'↵');
   const hasInput=program.statements.some(statement=>statement.kind==='input');
   const title=hasInput?'Program Console':'Program Output';
+  const body=h('div',{class:'program-output-screen-body','aria-live':'polite'},pre,escape,cursor);
   const panel=h('aside',{class:'program-output-screen','aria-label':title,'data-output-surface':surface},
     h('div',{class:'program-output-screen-title'},
       h('i',{class:'fa-solid fa-display','aria-hidden':'true'}),h('span',{},title)),
-    h('div',{class:'program-output-screen-body','aria-live':'polite'},pre,escape,cursor));
+    body);
+  programTerminalPositionCursor(cursor,terminalState,pre);
   if(hasInput&&typeof renderProgramInputConsoleControls==='function')
     renderProgramInputConsoleControls(item,program,panel,pre,surface);
   if(ownsPending)requestAnimationFrame(()=>startProgramTerminalAnimation(panel,pre,escape,cursor,pending));
@@ -104,11 +133,11 @@ function startProgramTerminalAnimation(panel,pre,escape,cursor,pending){
   const paint=()=>{
     const terminalState=coreTerminalScreen(terminalStream);
     pre.textContent=terminalState.text;pre._programTerminalStream=terminalStream;
-    programTerminalPositionCursor(cursor,terminalState);
+    programTerminalPositionCursor(cursor,terminalState,pre);
   };
   let finished=false;
   const finish=()=>{if(finished)return;finished=true;programTerminalAnimationActive=false;programTerminalAnimationTimer=null;
-    escape.classList.remove('is-visible');panel.classList.remove('is-printing');
+    escape.classList.remove('is-visible');cursor.classList.remove('is-hidden');panel.classList.remove('is-printing');
     if(pending.onComplete)pending.onComplete();};
   if(reduced||!PROGRAM_TERMINAL_SETTINGS.characterAnimation){terminalStream+=text;paint();finish();return;}
   programTerminalAnimationActive=true;panel.classList.add('is-printing');
@@ -121,9 +150,9 @@ function startProgramTerminalAnimation(panel,pre,escape,cursor,pending){
       if(index>=text.length){finish();return;}
       const character=text[index++];
       if(character==='\n'){
-        escape.classList.add('is-visible');
+        escape.classList.add('is-visible');cursor.classList.add('is-hidden');
         programTerminalAnimationTimer=setTimeout(()=>{
-          terminalStream+=character;paint();escape.classList.remove('is-visible');step();
+          terminalStream+=character;paint();escape.classList.remove('is-visible');cursor.classList.remove('is-hidden');step();
         },PROGRAM_TERMINAL_SETTINGS.escapeDelayMs);
       }else{
         terminalStream+=character;paint();

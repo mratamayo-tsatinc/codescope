@@ -48,6 +48,10 @@
 function tagParenGroups(node, ctxMinPrec, groupId){
   ctxMinPrec = ctxMinPrec || 0;
   groupId = groupId==null ? null : groupId;
+  if(node.kind==='unary'&&node.inner&&node.inner.kind==='binop'){
+    tagParenGroups(node.inner,0,node.id);
+    return;
+  }
   if(node.kind !== 'binop'){
     node.parenGroup = groupId;
     return;
@@ -67,6 +71,13 @@ function tagParenGroups(node, ctxMinPrec, groupId){
   tagParenGroups(node.right, p+1, groupId);
 }
 function flattenFull(node){
+  if(node.kind==='unary'&&node.inner&&node.inner.kind==='binop'){
+    const flat=flattenFull(node.inner);
+    flat.operands.forEach(operand=>{
+      operand.unaryGroup=node.id;operand.unaryGroupOperator=node.op;operand.unaryGroupForm=node.form;
+    });
+    return flat;
+  }
   if(node.kind !== 'binop') return {operands:[node], operators:[]};
   const l = flattenFull(node.left);
   const r = flattenFull(node.right);
@@ -80,7 +91,7 @@ function flattenInstance(tree){
 }
 function deepCloneFlat(flat){
   return {
-    operands: flat.operands.map(op=> op.kind==='unary' ? Object.assign({}, op, {inner:Object.assign({}, op.inner)}) : Object.assign({}, op)),
+    operands: flat.operands.map(op=>op.kind==='unary'?deepClone(op):Object.assign({},op)),
     operators: flat.operators.slice()
   };
 }
@@ -183,6 +194,10 @@ function countGroupMembers(flat, groupId){
   for(const op of flat.operands) if(op.parenGroup===groupId) n++;
   return n;
 }
+function countUnaryGroupMembers(flat,groupId){
+  if(groupId==null)return 0;
+  return flat.operands.filter(operand=>operand.unaryGroup===groupId).length;
+}
 // Locates the specific adjacent (leftId,rightId) pair and, if found, returns
 // a NEW flat structure with that pair collapsed into a single new literal.
 // The new literal's parenGroup: if both merged operands belonged to the SAME
@@ -200,12 +215,25 @@ function evaluateFlatAt(flat, leftId, rightId, resultOverride){
       try{ result = evalOp(op,a,b); } catch(e){ return {applied:false}; }
       const computedResult=result;
       if(arguments.length>=4) result=resultOverride;
-      const newLiteral = makeLiteral(result);
+      let newLiteral = makeLiteral(result);
       if(L.parenGroup!=null && L.parenGroup===R.parenGroup){
         const remainingBefore = countGroupMembers(flat, L.parenGroup);
         newLiteral.parenGroup = (remainingBefore - 1) <= 1 ? null : L.parenGroup;
       } else {
         newLiteral.parenGroup = null;
+      }
+      if(L.unaryGroup!=null&&L.unaryGroup===R.unaryGroup){
+        const remaining=countUnaryGroupMembers(flat,L.unaryGroup)-1;
+        if(remaining<=1){
+          const inner=newLiteral;
+          newLiteral=makeUnary(L.unaryGroupOperator,L.unaryGroupForm||'prefix',inner);
+          newLiteral.id=L.unaryGroup;newLiteral.substituted=true;
+          newLiteral.parenGroup=inner.parenGroup;
+        }else{
+          newLiteral.unaryGroup=L.unaryGroup;
+          newLiteral.unaryGroupOperator=L.unaryGroupOperator;
+          newLiteral.unaryGroupForm=L.unaryGroupForm;
+        }
       }
       const newOperands = flat.operands.slice(0,i).concat([newLiteral], flat.operands.slice(i+2));
       const newOperators = flat.operators.slice(0,i).concat(flat.operators.slice(i+1));
@@ -242,14 +270,30 @@ function computeParenRuns(flat){
   }
   return runs;
 }
+function computeUnaryRuns(flat){
+  const runs=[];let index=0;
+  while(index<flat.operands.length){
+    const group=flat.operands[index].unaryGroup;
+    if(group==null){index++;continue;}
+    let end=index;
+    while(end<flat.operands.length&&flat.operands[end].unaryGroup===group)end++;
+    runs.push({start:index,end:end-1,group,operator:flat.operands[index].unaryGroupOperator||'!'});
+    index=end;
+  }
+  return runs;
+}
 function flatToString(flat){
   const runs = computeParenRuns(flat);
   const openAt = new Set(runs.map(r=>r.start)), closeAt = new Set(runs.map(r=>r.end));
+  const unaryRuns=computeUnaryRuns(flat),unaryOpen=new Map(unaryRuns.map(run=>[run.start,run])),
+    unaryClose=new Set(unaryRuns.map(run=>run.end));
   let s = '';
   for(let i=0;i<flat.operands.length;i++){
-    if(openAt.has(i)) s += '(';
+    if(unaryOpen.has(i))s+=unaryOpen.get(i).operator+'(';
+    else if(openAt.has(i)) s += '(';
     s += flatLeafToString(flat.operands[i]);
-    if(closeAt.has(i)) s += ')';
+    if(unaryClose.has(i))s+=')';
+    else if(closeAt.has(i)) s += ')';
     if(i<flat.operators.length) s += ' '+flat.operators[i]+' ';
   }
   return s;

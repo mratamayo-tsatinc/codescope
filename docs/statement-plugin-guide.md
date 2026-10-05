@@ -207,19 +207,19 @@ authored executable statement. Neither path appends a synthetic assignment.
 
 `plugins/program-input/` registers input interaction and rendering over
 canonical Input IR. The shared core supports C `scanf` with
-`%d` or `%i` and Java `Scanner.nextInt()` assignments to declared mutable
-integers. Each source destination has an `@input` metadata directive with an
-authored value and inclusive seeded range.
+`%d`, `%i`, `%f`, `%lf`, `%c`, or `%s`, plus Java Scanner integer,
+floating point, character, token, and line reads. Each source destination has
+an `@input` directive with an authored value and an optional numeric range
+and step or a character/string choice list.
 
 The interaction mirrors output in reverse:
 
 1. Activate the input command.
-2. Watch the configured characters and spaces appear through the numeric
-   keyboard.
+2. Watch the keyboard indicator communicate the configured input operation.
 3. Press Enter to emit one `INPUT` event. Conversion and memory writes remain
    unavailable before Enter.
 4. Watch every submitted value travel from its exact Program Console token to
-   the matching `%d`/`%i` or `nextInt()` result position. Receivers show a
+   the matching conversion or Scanner result position. Receivers show a
    spinner until their value arrives.
 5. Activate the complete C address expression such as `&x`, or the Java
    assignment target, to emit `INPUT_WRITE` and update Program Memory.
@@ -230,7 +230,8 @@ Program Output render into the shared Program Console, while only output events
 count as printed program output. Keyboard playback and key highlighting are
 presentation, as are the colored console-to-placeholder trails. The Enter
 gate and learner-controlled writes are interaction state; conversion, memory
-effects, and canonical semantic traces come from the core.
+effects, and canonical semantic traces come from the core. Enter stays visible
+and changes from released to pressed after submission.
 
 ## Code Simulator source programs
 

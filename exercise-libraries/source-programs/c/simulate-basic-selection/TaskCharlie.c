@@ -1,7 +1,7 @@
 /*
 @codescope
 @title Integer and Multiple Simple Ifs
-@seed score min=66 max=70
+@seed score min=50 max=80
 @seed points min=8 max=12
 @seed level min=1 max=4
 */

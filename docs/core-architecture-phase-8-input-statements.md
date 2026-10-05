@@ -1,18 +1,21 @@
 # Core architecture migration: Phase 8 input statements
 
-Phase 8 moves input language behavior from the Program Input plugin into the
-app shell. C `scanf` and Java Scanner `nextInt()` now produce canonical Input
-Statement IR and the same ordered console-read and memory-write effects.
+Phase 8 moved input language behavior from the Program Input plugin into the
+app shell. The shared contract now covers typed C `scanf` and Java Scanner
+reads, which produce canonical Input Statement IR and the same ordered
+console-read and memory-write effects.
 
 ## Core responsibilities
 
 `js/input-statement-core.js` now owns:
 
-- C integer `scanf` parsing for `%d` and `%i`;
-- whitespace-separated multiple conversions;
+- C `scanf` parsing for `%d`, `%i`, `%f`, `%lf`, `%c`, and `%s`;
+- multiple conversions with whitespace or authored literal separators;
+- C leading format whitespace used to consume pending input whitespace;
 - `&identifier` destination validation;
-- Java `target = scanner.nextInt()` parsing;
-- mutable integer target validation;
+- Java `nextInt`, `nextFloat`, `nextDouble`, `next`, `nextLine`, and
+  `next().charAt(0)` parsing;
+- matching mutable target type validation;
 - authored or seeded input value materialization supplied by a source adapter;
 - raw console input construction;
 - conversion trace events; and
@@ -27,7 +30,7 @@ statements observe the entered values.
 
 Exercise metadata still decides authored values and seed ranges because that is
 content configuration. The Program Input plugin owns presentation and learner
-interaction: the virtual keyboard, slower key playback, explicit Enter press,
+interaction: the keyboard indicator, persistent released/pressed Enter key,
 placeholder transfer, address-token click, connector animation, undo, and
 scoring.
 

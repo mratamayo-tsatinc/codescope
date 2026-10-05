@@ -86,8 +86,8 @@ their statement-specific interaction; they must not duplicate the terminal
 buffer or special-case escape characters locally.
 
 Program Input follows the same composition boundary. The core parses and
-executes `scanf` and `Scanner.nextInt()`. The plugin hydrates their interaction
-runtime and owns the submitted-input workflow, numeric keyboard playback,
+executes typed C `scanf` and Java Scanner reads. The plugin hydrates their interaction
+runtime and owns the submitted-input workflow, keyboard indicator,
 conversion visualization, destination-write interaction, and rendering. Code
 Simulator receives those statements from the shared program parser and routes
 their IR through Program Core. Input and Output share a

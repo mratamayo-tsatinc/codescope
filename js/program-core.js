@@ -136,12 +136,28 @@ function statementPluginFor(statement){
   return statement ? statementPluginRegistry.get(statement.kind) || null : null;
 }
 
+function programDeclarationGroup(program,statement){
+  if(!program||!statement||statement.kind!=='declaration'
+    ||!Array.isArray(statement.declarationGroupStatementIds)
+    ||statement.declarationGroupStatementIds.length<2) return [];
+  const byId=new Map(program.statements.map(candidate=>[candidate.id,candidate]));
+  return statement.declarationGroupStatementIds.map(id=>byId.get(id)).filter(Boolean);
+}
+
 // Source-flow presentations ask the owning statement plugin how a line should
 // respond. This keeps the shell free of declaration/output/selection rules.
 function statementInteractionPlan(item,statement){
   const program=ensureProgramEnvelope(item),plugin=statementPluginFor(statement);
   if(!program||!plugin||typeof plugin.interactionPlan!=='function'){
     return {mode:'modal',focus:'statement',label:'Open statement trace'};
+  }
+  const declarationGroup=programDeclarationGroup(program,statement);
+  if(declarationGroup.length&&declarationGroup[0]===statement){
+    const plans=declarationGroup.map(candidate=>plugin.interactionPlan({item,program,statement:candidate})||{});
+    if(plans.every(plan=>plan.mode==='direct'&&plan.action)){
+      return {mode:'direct',action:{type:'commit-declaration-group',statementId:statement.id},
+        label:'Execute declarations'};
+    }
   }
   const plan=plugin.interactionPlan({item,program,statement})||{};
   if(plan.mode==='direct'&&plan.action){
@@ -190,6 +206,34 @@ function dispatchProgramAction(item, action, services){
   }
   const plugin = statementPluginFor(statement);
   if(!plugin || typeof plugin.applyAction !== 'function') return {applied:false, reason:'unsupported-statement'};
+  if(action&&action.type==='commit-declaration-group'){
+    const group=programDeclarationGroup(program,statement);
+    if(!group.length||group[0]!==statement)return {applied:false,reason:'invalid-declaration-group'};
+    const events=[],effects=[];let wasCorrect=true;
+    for(const candidate of group){
+      if(currentProgramStatement(item)!==candidate)return {applied:false,reason:'declaration-group-out-of-sequence'};
+      const candidatePlugin=statementPluginFor(candidate);
+      const plan=candidatePlugin&&candidatePlugin.interactionPlan
+        ?candidatePlugin.interactionPlan({item,program,statement:candidate}):null;
+      if(!plan||plan.mode!=='direct'||!plan.action)return {applied:false,reason:'declaration-group-requires-detail'};
+      const result=candidatePlugin.applyAction({program,statement:candidate,item,action:plan.action,
+        services:services||{},semantics:programSemanticServices(program)})||{applied:false};
+      if(!result.applied||!result.completed)return {applied:false,reason:'declaration-group-action-failed'};
+      const resultEvents=result.event?[result.event]:(Array.isArray(result.events)?result.events:[]);
+      resultEvents.forEach(event=>{events.push(event);if(event.effects)effects.push(...event.effects);
+        if(event.wasCorrect===false)wasCorrect=false;});
+      const binding=program.memory[candidate.binding&&candidate.binding.name];
+      if(binding&&typeof binding==='object')binding.lastStatementId=statement.id;
+      if(result.event)program.events.push(result.event);
+      if(Array.isArray(result.events))program.events.push(...result.events);
+      advanceProgram(program,result.nextStatementId);
+    }
+    program.statements.forEach(candidate=>{
+      if(!group.includes(candidate))candidate._uiJustCompleted=false;
+    });
+    return {applied:true,completed:true,events,event:{type:'ASSIGN',action:'ASSIGN',
+      statementId:statement.id,targets:group.map(candidate=>candidate.binding.name),effects,wasCorrect}};
+  }
   const result = plugin.applyAction({program, statement, item, action, services:services||{},
     semantics:programSemanticServices(program)}) || {applied:false};
   if(result.applied){
@@ -253,6 +297,21 @@ function undoProgramAction(item, services){
     :program.statements.findIndex(candidate=>candidate.id===previousId);
   if(previousIndex<0) return {applied:false};
   const previous = program.statements[previousIndex];
+  const declarationGroup=programDeclarationGroup(program,previous);
+  if(declarationGroup.length&&declarationGroup[declarationGroup.length-1]===previous){
+    for(let index=declarationGroup.length-1;index>=0;index--){
+      const candidate=declarationGroup[index],candidatePlugin=statementPluginFor(candidate);
+      if(!candidatePlugin||typeof candidatePlugin.rollbackCompletion!=='function')return {applied:false};
+      const rolledBack=candidatePlugin.rollbackCompletion({program,statement:candidate,item,
+        services:services||{},semantics:programSemanticServices(program)})||{applied:false};
+      if(!rolledBack.applied)return rolledBack;
+      if(program.executionHistory[program.executionHistory.length-1]===candidate.id)program.executionHistory.pop();
+      candidate.status=index===0?'active':'locked';candidate._uiJustCompleted=false;
+    }
+    if(current&&!declarationGroup.includes(current))current.status='locked';
+    program.cursor=program.statements.indexOf(declarationGroup[0]);program.status='running';
+    return {applied:true};
+  }
   const previousPlugin = statementPluginFor(previous);
   if(!previousPlugin || typeof previousPlugin.rollbackCompletion !== 'function') return {applied:false};
   const result = previousPlugin.rollbackCompletion({program, statement:previous, item, services:services||{},

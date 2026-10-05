@@ -428,6 +428,12 @@ function drawDeclarationConnectorLines(item){
   panels.forEach(panel=>{
     const id = panel.getAttribute('data-statement-id');
     const statement = item.program.statements.find(s=>s.id===id);
+    if(statement&&statement.kind==='input'&&typeof programInputFinishedConnectorVisuals==='function'){
+      panel.classList.add('connector-measuring');void panel.offsetHeight;
+      const visuals=programInputFinishedConnectorVisuals(panel,statement);
+      panel.classList.remove('connector-measuring');
+      appendConnectorSvg(panel,visuals.paths,visuals.dots);return;
+    }
     const trace = statement && statement.runtime ? statement.runtime.trace : [];
     const assignmentResultId = statement && statement.kind==='assignment'
       ? (statement.runtime.assignmentResultNodeId
