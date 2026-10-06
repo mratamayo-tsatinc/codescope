@@ -108,7 +108,7 @@ const DEFAULT_APP_SETTINGS = Object.freeze({
   schemaVersion: 7,
   // local-configurable | state-only. This deployment switch is intentionally
   // read only: persisted browser data can never override it.
-  settingsPolicy: 'local-configurable',
+  settingsPolicy: 'state-only',
   // Deployment-owned switches. Browser-saved settings cannot override these.
   // Each mode keeps its own per-student snapshot when enabled.
   persistence: Object.freeze({practice:false, exam:true}),
