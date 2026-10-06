@@ -212,10 +212,10 @@ function evaluateFlatAt(flat, leftId, rightId, resultOverride){
       const op = flat.operators[i];
       const a = flatOperandValue(L), b = flatOperandValue(R);
       let result;
-      try{ result = evalOp(op,a,b); } catch(e){ return {applied:false}; }
+      try{ result = evalOp(op,a,b,L.dataType,R.dataType); } catch(e){ return {applied:false}; }
       const computedResult=result;
       if(arguments.length>=4) result=resultOverride;
-      let newLiteral = makeLiteral(result);
+      let newLiteral = makeLiteral(result,{dataType:operationResultDataType(op,L.dataType,R.dataType)});
       if(L.parenGroup!=null && L.parenGroup===R.parenGroup){
         const remainingBefore = countGroupMembers(flat, L.parenGroup);
         newLiteral.parenGroup = (remainingBefore - 1) <= 1 ? null : L.parenGroup;
@@ -243,7 +243,7 @@ function evaluateFlatAt(flat, leftId, rightId, resultOverride){
   return {applied:false};
 }
 function flatLeafToString(op){
-  if(op.kind==='literal') return formatValue(op.value,op.dataType);
+  if(op.kind==='literal') return formatLiteralNode(op);
   if(op.kind==='unary'){
     if(op.resolved) return formatValue(op.resultValue);
     const nm = op.substituted ? String(unaryBaseValue(op)) : (op.inner.kind==='literal' ? String(op.inner.value) : op.inner.name);

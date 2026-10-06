@@ -839,6 +839,8 @@ function testSharedExpressionParser(){
       p:{kind:'variable',value:4,initialized:true,dataType:'int'},
       q:{kind:'variable',value:4,initialized:true,dataType:'int'},
       x:{kind:'variable',value:2,initialized:true,dataType:'int'},
+      a:{kind:'variable',value:5,initialized:true,dataType:'int'},
+      b:{kind:'variable',value:6,initialized:true,dataType:'int'},
       LIMIT:{kind:'constant',value:10,initialized:true,dataType:'int',mutable:false}
     };
     const normalize=node=>{
@@ -856,6 +858,9 @@ function testSharedExpressionParser(){
     const engineTree=coreExpressionIrToEngineTree(c.ir,symbols);
     const precedence=coreParseExpression({language:'c',source:'1 + x * 3 < LIMIT && !false',symbols});
     const character=coreParseExpression({language:'c',source:"'B'",symbols});
+    const decimal=coreParseExpression({language:'c',source:'(a + b) / 2.0',symbols});
+    const decimalTree=coreExpressionIrToEngineTree(decimal.ir,symbols);
+    const decimalTrace=buildCanonicalTrace(decimalTree);
     let constantUnaryRejected=false,doublePostfixRejected=false,unknownRejected=false;
     try{coreParseExpression({language:'c',source:'LIMIT++',symbols});}catch(error){constantUnaryRejected=/mutable variable/.test(error.message);}
     try{coreParseExpression({language:'c',source:'p++++',symbols});}catch(error){doublePostfixRejected=/unsupported expression/.test(error.message);}
@@ -864,6 +869,9 @@ function testSharedExpressionParser(){
       c:normalize(c.ir),java:normalize(java.ir),generated:normalize(generated),
       dependencies:c.dependencies,value:evalTree(engineTree),canonicalActions:buildCanonicalTrace(engineTree).steps.map(step=>step.action),
       precedence:normalize(precedence.ir),character:normalize(character.ir),
+      decimalSourceText:decimal.ir.right.sourceText,decimalTreeText:renderString(decimalTree),
+      decimalFlatText:flatToString(flattenInstance(deepClone(decimalTree))),decimalValue:evalTree(decimalTree),
+      decimalFinalValue:decimalTrace.finalValue,
       constantUnaryRejected,doublePostfixRejected,unknownRejected
     });
   })()`));
@@ -878,6 +886,11 @@ function testSharedExpressionParser(){
   assert.strictEqual(result.precedence.left.left.right.operator,'*');
   assert.strictEqual(result.precedence.right.operator,'!');
   assert.deepStrictEqual(result.character,{kind:'literal',value:'B',dataType:'char'});
+  assert.strictEqual(result.decimalSourceText,'2.0');
+  assert.strictEqual(result.decimalTreeText,'(a + b) / 2.0');
+  assert.strictEqual(result.decimalFlatText,'(a + b) / 2.0');
+  assert.strictEqual(result.decimalValue,5.5);
+  assert.strictEqual(result.decimalFinalValue,5.5);
   assert(result.constantUnaryRejected&&result.doublePostfixRejected&&result.unknownRejected);
 }
 
@@ -891,6 +904,10 @@ function testSharedExpressionSemantics(){
     const parsed=coreParseExpression({language:'c',source:'++p + q++',symbols});
     const sourceMemory={p:binding(4),q:binding(4)};
     const evaluated=coreEvaluateExpression({language:'c',expression:parsed.ir,memory:sourceMemory});
+    const typedBinding=(value,dataType)=>({kind:'variable',mutable:true,initialized:true,value,dataType});
+    const decimalMemory={a:typedBinding(5,'int'),b:typedBinding(6,'int')};
+    const decimalParsed=coreParseExpression({language:'c',source:'(a + b) / 2.0',symbols:decimalMemory});
+    const decimalEvaluated=coreEvaluateExpression({language:'c',expression:decimalParsed.ir,memory:decimalMemory});
     const inputUnchanged=sourceMemory.p.value===4&&sourceMemory.q.value===4;
     const appliedMemory={p:binding(4),q:binding(4)};
     const snapshot=captureCoreMemoryTargets(appliedMemory,['p','q']);
@@ -935,7 +952,8 @@ function testSharedExpressionSemantics(){
       program:assignmentProgram,item:assignmentItem});
     const assignmentRestored={x:assignmentProgram.memory.x.value,p:assignmentProgram.memory.p.value,q:assignmentProgram.memory.q.value};
     return JSON.stringify({
-      value:evaluated.value,inputUnchanged,
+      value:evaluated.value,inputUnchanged,decimalValue:decimalEvaluated.value,
+      decimalDataType:decimalEvaluated.dataType,
       effectKinds:evaluated.effects.map(effect=>effect.kind),
       writes:evaluated.effects.filter(effect=>effect.kind==='write').map(effect=>[effect.target,effect.previousValue,effect.nextValue,effect.form]),
       trace:evaluated.trace.map(step=>[step.action,typeof step.target==='string'?step.target:null,step.result,step.writeValue]),
@@ -947,6 +965,8 @@ function testSharedExpressionSemantics(){
     });
   })()`));
   assert.strictEqual(result.value,9);
+  assert.strictEqual(result.decimalValue,5.5);
+  assert.strictEqual(result.decimalDataType,'float');
   assert(result.inputUnchanged);
   assert.deepStrictEqual(result.effectKinds,['read','write','read','write']);
   assert.deepStrictEqual(result.writes,[['p',4,5,'prefix'],['q',4,5,'postfix']]);
@@ -3781,6 +3801,67 @@ int main() {
     const breakResult=dispatchProgramAction(breakProbe,breakPlan.action);
     const first=items[0],selectionIndex=first.program.statements.findIndex(statement=>statement.kind==='selection');
     const firstMemoryNames=ensureBindings(first).map(binding=>binding.name);
+    const strictProbe=csBuildItem(profile,{id:'StrictFlow',filename:'StrictFlow.c',raw:csLiveControlFixture},'c',103);
+    state.profileId=profile.id;state.items=[strictProbe];state.itemIndex=0;state.mode='practice';
+    state.practicePolicy=snapshotPracticePolicy({practice:{interactionMode:'strict-sequence'}});
+    strictProbe.program.statements[2].status='blocked';
+    const strictSourceHost=h('div',{});renderProgramItem(strictSourceHost,strictProbe,{});
+    const strictExpectedCandidates=strictProbe.sourceDisplay.lines.filter(line=>line.primary
+      &&(line.statementId||(Array.isArray(line.statementIds)&&line.statementIds.length))).length;
+    const strictStatementCandidates=countNodesWithClass(strictSourceHost,'strict-sequence-statement-candidate');
+    const strictActiveRows=countNodesWithClass(strictSourceHost,'is-active');
+    const strictCurrentDots=countNodesWithClass(strictSourceHost,'current');
+    const strictBlockedMarkers=countNodesWithClass(strictSourceHost,'blocked')
+      +countNodesWithClass(strictSourceHost,'is-blocked');
+    const strictWrongStatement=strictProbe.program.statements[1];
+    const strictWrongSelection=attemptProgramStatementSelection(strictProbe,strictWrongStatement.id);
+    const strictPracticePaused=strictWrongSelection.invalid
+      &&strictProbe.practiceInvalidExecution.reason==='statement-out-of-sequence';
+    handleUndo();const strictPracticeRecovered=!strictProbe.practiceInvalidExecution;
+    const strictCorrectSelection=attemptProgramStatementSelection(strictProbe,
+      strictProbe.program.statements[strictProbe.program.cursor].id).applied;
+    const strictBranchProbe=csBuildItem(profile,{id:'StrictBranch',filename:'StrictBranch.c',raw:csLiveControlFixture},'c',105);
+    state.items=[strictBranchProbe];state.itemIndex=0;
+    const strictBranchDeclaration=strictBranchProbe.program.statements[0];
+    dispatchProgramAction(strictBranchProbe,statementInteractionPlan(strictBranchProbe,strictBranchDeclaration).action,
+      {applyExpressionAction});
+    const strictBranchSelection=currentProgramStatement(strictBranchProbe);
+    strictBranchSelection.runtime.workingFlat={operands:[{id:'strict-if-result',kind:'literal',value:true}],operators:[]};
+    dispatchProgramAction(strictBranchProbe,{type:'commit-branch',statementId:strictBranchSelection.id},{applyExpressionAction});
+    const strictIncorrectIfBranch=strictBranchSelection.branches.find(candidate=>
+      candidate.targetStatementId!==strictBranchSelection.runtime.selectedTargetStatementId);
+    const strictIncorrectIfChoice=attemptProgramStatementSelection(strictBranchProbe,
+      strictIncorrectIfBranch.targetStatementId);
+    const strictIfBranchContinues=strictIncorrectIfChoice.applied&&strictIncorrectIfChoice.branchChoice
+      &&strictIncorrectIfChoice.wasCorrect===false&&!strictBranchProbe.practiceInvalidExecution
+      &&currentProgramStatement(strictBranchProbe).id===strictIncorrectIfBranch.targetStatementId
+      &&strictBranchSelection.runtime.branchChoiceCorrect===false;
+    const strictSwitchProbe=csBuildItem(profile,{id:'StrictSwitch',filename:'StrictSwitch.c',raw:csSwitchFallthroughFixture},'c',106);
+    state.items=[strictSwitchProbe];state.itemIndex=0;
+    dispatchProgramAction(strictSwitchProbe,statementInteractionPlan(strictSwitchProbe,
+      strictSwitchProbe.program.statements[0]).action,{applyExpressionAction});
+    const strictSwitchSelection=currentProgramStatement(strictSwitchProbe);
+    strictSwitchSelection.runtime.workingFlat={operands:[{id:'strict-switch-result',kind:'literal',value:2}],operators:[]};
+    dispatchProgramAction(strictSwitchProbe,{type:'commit-branch',statementId:strictSwitchSelection.id},{applyExpressionAction});
+    const strictIncorrectCase=strictSwitchSelection.branches.find(candidate=>
+      candidate.targetStatementId!==strictSwitchSelection.runtime.selectedTargetStatementId);
+    const strictIncorrectCaseChoice=attemptProgramStatementSelection(strictSwitchProbe,
+      strictIncorrectCase.targetStatementId);
+    const strictCaseBranchContinues=strictIncorrectCaseChoice.applied&&strictIncorrectCaseChoice.branchChoice
+      &&strictIncorrectCaseChoice.wasCorrect===false&&!strictSwitchProbe.practiceInvalidExecution
+      &&currentProgramStatement(strictSwitchProbe).id===strictIncorrectCase.targetStatementId
+      &&strictSwitchSelection.runtime.branchChoiceCorrect===false;
+    strictProbe.program.statements[0].status='complete';strictProbe.program.cursor=1;
+    strictProbe.program.statements[1].status='active';
+    const strictTransitionSuppressed=stageSourceFlowTransition(strictProbe,strictProbe.program.statements[0])===null;
+    const strictExamProbe=csBuildItem(profile,{id:'StrictExamFlow',filename:'StrictExamFlow.c',raw:csLiveControlFixture},'c',104);
+    state.mode='exam';state.examPolicy=snapshotExamPolicy({exam:{interactionMode:'strict-sequence'}});
+    state.items=[strictExamProbe];state.itemIndex=0;
+    const strictExamWrong=attemptProgramStatementSelection(strictExamProbe,strictExamProbe.program.statements[1].id);
+    const strictExamTerminated=strictExamWrong.invalid&&strictExamProbe.checked
+      &&strictExamProbe.examSequenceFailure.reason==='statement-out-of-sequence'
+      &&strictExamProbe.program.status==='terminated';
+    state.mode='practice';state.practicePolicy=snapshotPracticePolicy({practice:{interactionMode:'guided'}});
     state.profileId=profile.id;state.items=items;state.itemIndex=0;state.mode='practice';
     const sourceHost=h('div',{});renderProgramItem(sourceHost,first,{});
     const sourcePanels=countNodesWithClass(sourceHost,'program-source-file-panel');
@@ -3911,6 +3992,9 @@ int main() {
       profileName:profile.name,profileProvider:profileContentProviderFor(profile).id,
       sourceValueMode:profileVariableValueMode(profile),timelinePresentation:profileTimelineMode(profile),
       profileItemCount:profile.scoring.itemCount,profileSelectionCount:profile.content.selection.count,
+      strictExpectedCandidates,strictStatementCandidates,strictActiveRows,strictCurrentDots,strictBlockedMarkers,
+      strictPracticePaused,strictPracticeRecovered,strictCorrectSelection,strictIfBranchContinues,
+      strictCaseBranchContinues,strictTransitionSuppressed,strictExamTerminated,
       manifestVersion:CODE_SIMULATOR_PLUGIN_MANIFEST.version,sourcePanels,sourceRows,firstMemoryNames,
       sourceLineCount:first.sourceDisplay.lines.length,sourceActions,directActions,modalActions,activeSourceRows,oldTimelineRows,inlinePanels,
       contextDocks,contextTabs,memoryDockHosts,
@@ -4035,6 +4119,13 @@ int main() {
   assert.strictEqual(result.timelinePresentation,'statement-modal');
   assert.strictEqual(result.profileItemCount,'manifest');
   assert.strictEqual(result.profileSelectionCount,'all');
+  assert.strictEqual(result.strictStatementCandidates,result.strictExpectedCandidates);
+  assert.strictEqual(result.strictActiveRows,0);
+  assert.strictEqual(result.strictCurrentDots,0);
+  assert.strictEqual(result.strictBlockedMarkers,0);
+  assert(result.strictPracticePaused&&result.strictPracticeRecovered&&result.strictCorrectSelection);
+  assert(result.strictIfBranchContinues&&result.strictCaseBranchContinues);
+  assert(result.strictTransitionSuppressed&&result.strictExamTerminated);
   assert.deepStrictEqual(result.firstMemoryNames,['score','absences']);
   assert.strictEqual(new Set(result.firstMemoryNames).size,result.firstMemoryNames.length);
   assert.strictEqual(result.sourcePanels,1);

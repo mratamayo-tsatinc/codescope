@@ -38,17 +38,17 @@ function coreExpressionTokenize(source,context){
     const number=/^(?:(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)[fFdD]?/.exec(source.slice(index));
     if(number){
       const raw=number[0],numeric=raw.replace(/[fFdD]$/,'');
-      tokens.push({type:'literal',value:Number(numeric),dataType:/[.eEfFdD]/.test(raw)?'float':'int',offset:index});
+      tokens.push({type:'literal',value:Number(numeric),dataType:/[.eEfFdD]/.test(raw)?'float':'int',sourceText:raw,offset:index});
       index+=raw.length;continue;
     }
     const character=/^'((?:\\.|[^'\\]))'/.exec(source.slice(index));
     if(character){
-      tokens.push({type:'literal',value:decodeCoreStringEscape(character[1],context.label),dataType:'char',offset:index});
+      tokens.push({type:'literal',value:decodeCoreStringEscape(character[1],context.label),dataType:'char',sourceText:character[0],offset:index});
       index+=character[0].length;continue;
     }
     const string=/^"((?:\\.|[^"\\])*)"/.exec(source.slice(index));
     if(string){tokens.push({type:'literal',value:decodeCoreStringEscape(string[1],context.label),
-      dataType:'string',offset:index});index+=string[0].length;continue;}
+      dataType:'string',sourceText:string[0],offset:index});index+=string[0].length;continue;}
     const name=/^[A-Za-z_][A-Za-z0-9_]*/.exec(source.slice(index));
     if(name){tokens.push({type:'name',value:name[0],offset:index});index+=name[0].length;continue;}
     if('+-*/%()!<>'.includes(source[index])){tokens.push({type:source[index],value:source[index],offset:index++});continue;}
@@ -89,7 +89,7 @@ function parseCoreExpressionSource(request){
     const token=tokens[cursor++];
     if(!token) throw new Error(`${context.label}: incomplete expression '${source.trim()}'`);
     let expression;
-    if(token.type==='literal') expression=literalExpression(token.value,{dataType:token.dataType});
+    if(token.type==='literal') expression=literalExpression(token.value,{dataType:token.dataType,sourceText:token.sourceText});
     else if(token.type==='name'){
       if(token.value==='true'||token.value==='false') expression=literalExpression(token.value==='true',{dataType:'boolean'});
       else{
@@ -105,7 +105,7 @@ function parseCoreExpressionSource(request){
     }else if(token.type==='-'&&tokens[cursor]&&tokens[cursor].type==='literal'
       &&typeof tokens[cursor].value==='number'){
       const literal=tokens[cursor++];
-      expression=literalExpression(-literal.value,{dataType:literal.dataType});
+      expression=literalExpression(-literal.value,{dataType:literal.dataType,sourceText:'-'+literal.sourceText});
     }else if(token.type==='('){
       expression=parse(0);
       if(!tokens[cursor]||tokens[cursor].type!==')') throw new Error(`${context.label}: missing ')'`);
@@ -135,7 +135,8 @@ function parseCoreExpressionSource(request){
 
 function coreExpressionIrToEngineTree(expression,symbols){
   const table=coreExpressionSymbolTable(symbols);
-  if(expression.kind==='literal') return makeLiteral(expression.value,{dataType:expression.dataType});
+  if(expression.kind==='literal') return makeLiteral(expression.value,
+    {dataType:expression.dataType,sourceText:expression.sourceText});
   if(expression.kind==='identifier'){
     const symbol=table[expression.name];
     if(!symbol||symbol.initialized===false||symbol.value===undefined)

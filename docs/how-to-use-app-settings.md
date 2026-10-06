@@ -242,9 +242,18 @@ Settings modal and browser-saved settings cannot override them.
 
 - `guided`: unavailable elements remain locked. This preserves the original
   guided activity behavior.
-- `strict-sequence`: operation candidates are selectable. Executable
-  lower-precedence choices may continue and are scored per step. A genuinely
-  unexecutable action is treated as an invalid execution.
+- `strict-sequence`: every supported statement in a source-program workspace
+  and every operation candidate inside the selected statement is selectable.
+  The learner must choose the statement that matches the hidden program-flow
+  cursor. Executable lower-precedence choices may continue and are scored per
+  step. After an `if`, `else if`, or `switch` condition resolves, any authored
+  branch target can be selected. A wrong branch continues along the selected
+  path and loses the selection commit credit. An unrelated statement jump or
+  genuinely unexecutable action is treated as an invalid execution.
+
+Strict source-program activities do not highlight or animate toward the
+expected next line. Guided mode retains the current-line highlight and
+automatic transition to the next executable statement.
 
 The invalid-execution result differs by mode:
 

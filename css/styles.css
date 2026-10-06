@@ -2295,6 +2295,18 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
 .program-source-file-line.is-active:hover .program-source-file-state,.program-source-file-line.is-active:focus-visible .program-source-file-state{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--op) 15%,var(--panel-alt)) 24%);}
 .program-source-file-line.is-active:focus-visible{box-shadow:inset 3px 0 0 var(--op),inset 0 0 0 2px color-mix(in srgb,var(--op) 72%,transparent);}
 .program-source-file-line.is-active .program-source-file-number{color:var(--op);font-weight:800;}
+.program-source-file-line.strict-sequence-statement-candidate{cursor:pointer;}
+.program-source-file-line.strict-sequence-statement-candidate:hover,
+.program-source-file-line.strict-sequence-statement-candidate:focus-visible{
+  background:color-mix(in srgb,var(--op) 15%,transparent);outline:0;
+}
+.program-source-file-line.strict-sequence-statement-candidate:hover .program-source-file-state,
+.program-source-file-line.strict-sequence-statement-candidate:focus-visible .program-source-file-state{
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--op) 15%,var(--panel-alt)) 24%);
+}
+.program-source-file-line.strict-sequence-statement-candidate:focus-visible{
+  box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--op) 72%,transparent);
+}
 .program-source-file-line.is-flow-origin{background:color-mix(in srgb,var(--good) 9%,transparent);box-shadow:inset 3px 0 0 var(--good);}
 .program-source-file-line.is-flow-origin .program-source-file-number{color:var(--good);font-weight:800;}
 .program-source-file-line.is-flow-origin .program-source-file-state{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--good) 9%,var(--panel-alt)) 24%);}

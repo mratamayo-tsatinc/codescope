@@ -32,6 +32,8 @@ function completeSelection(statement,value,program,semantics){
   runtime.checked=true;runtime.assignedValue=value;runtime.selectedTargetLine=branch.targetLine;
   runtime.selectedTargetText=branch.targetText;runtime.selectedTargetStatementId=branch.nextStatementId;
   runtime.selectedLabel=branch.label;runtime.correctSteps=evaluations.filter(step=>step.wasCorrect).length;
+  runtime.studentSelectedTargetStatementId=null;runtime.studentSelectedLabel=null;
+  runtime.branchChoiceCorrect=null;
   runtime.totalOpSteps=evaluations.length;runtime.wasCorrectAssignment=value===runtime.expectedValue;
   const effects=typeof coreExpressionWriteEffectsFromTrace==='function'
     ?coreExpressionWriteEffectsFromTrace(runtime.trace,runtime.expectedEffects):[];
@@ -73,6 +75,7 @@ registerStatementPlugin({
     if(typeof restoreCoreMemoryTargets==='function')restoreCoreMemoryTargets(ctx.program.memory,runtime.beforeEffectMemory);
     runtime.checked=false;runtime.assignedValue=null;runtime.selectedTargetLine=null;runtime.selectedTargetText=null;runtime.selectedTargetStatementId=null;
     runtime.selectedLabel=null;runtime.correctSteps=0;runtime.totalOpSteps=0;runtime.wasCorrectAssignment=null;
+    runtime.studentSelectedTargetStatementId=null;runtime.studentSelectedLabel=null;runtime.branchChoiceCorrect=null;
     runtime.beforeEffectMemory=null;runtime.expressionEffects=[];
     return {applied:true};},
   reset(ctx){const runtime=ctx.statement.runtime;if(!runtime)return {applied:false};
@@ -80,7 +83,8 @@ registerStatementPlugin({
     runtime.workingFlat=deepCloneFlat(runtime.originalFlat);runtime.history=[deepCloneFlat(runtime.originalFlat)];
     runtime.trace=[];runtime.checked=false;runtime.assignedValue=null;runtime.selectedTargetLine=null;runtime.selectedTargetStatementId=null;
     runtime.selectedTargetText=null;runtime.selectedLabel=null;runtime.correctSteps=0;runtime.totalOpSteps=0;
-    runtime.wasCorrectAssignment=null;runtime.beforeEffectMemory=null;runtime.expressionEffects=[];return {applied:changed};},
+    runtime.wasCorrectAssignment=null;runtime.studentSelectedTargetStatementId=null;runtime.studentSelectedLabel=null;
+    runtime.branchChoiceCorrect=null;runtime.beforeEffectMemory=null;runtime.expressionEffects=[];return {applied:changed};},
   buildCanonicalTrace(ctx){const runtime=ctx.statement.runtime;
     return runtime.canonicalTrace.steps.map(step=>Object.assign({statementId:ctx.statement.id},step))
       .concat({type:'BRANCH',action:'BRANCH',statementId:ctx.statement.id,value:runtime.expectedValue});}

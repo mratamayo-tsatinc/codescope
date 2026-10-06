@@ -20,7 +20,7 @@ function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
     const isFlash = flashId!=null && op.id===flashId;
     const attrs = {class:'tok tok-lit'+(col?(isFlash?' tok-colored-flash':' tok-colored'):''), 'data-token-id': op.id};
     if(col) attrs.style = `color:${col};`;
-    return h('span',attrs, formatValue(op.value,op.dataType));
+    return h('span',attrs, formatLiteralNode(op));
   }
   if(op.kind==='unary'){
     if(op.resolved){
@@ -153,7 +153,7 @@ function renderStaticFlatOperand(op, colorMap, flashId, pending){
     const isFlash = flashId!=null && op.id===flashId;
     const attrs = {class:'tok tok-lit'+(col?(isFlash?' tok-colored-flash':' tok-colored'):''), 'data-token-id': op.id};
     if(col) attrs.style = `color:${col};`;
-    return h('span',attrs, formatValue(op.value,op.dataType));
+    return h('span',attrs, formatLiteralNode(op));
   }
   if(op.kind==='unary'){
     if(op.resolved){

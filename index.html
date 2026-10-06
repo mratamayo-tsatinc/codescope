@@ -98,9 +98,9 @@
         <label class="settings-field-label" for="practiceInteractionMode">Evaluation interaction</label>
         <select id="practiceInteractionMode" class="settings-select">
           <option value="guided">Guided readiness — unavailable operations remain locked</option>
-          <option value="strict-sequence">Strict sequence — invalid actions pause until Undo</option>
+          <option value="strict-sequence">Strict sequence — choose statements and operations</option>
         </select>
-        <small class="input-hint">Strict Practice lets students test executable operator orders. An action that cannot execute pauses the item, explains the problem, and must be undone before continuing.</small>
+        <small class="input-hint">Strict Practice lets students choose statements, operation order, and selection branches. An incorrect branch continues with lost credit; an unrelated statement or impossible action pauses the item.</small>
         <label class="settings-field-label" for="practiceManualMode">Student-derived values</label>
         <select id="practiceManualMode" class="settings-select" onchange="handleManualModeChange('practice')">
           <option value="profile">Use each profile's setting</option><option value="off">Always auto-derive</option><option value="custom">Use custom rates</option>
@@ -130,9 +130,9 @@
           <label class="settings-field-label" for="examInteractionMode">Evaluation interaction</label>
           <select id="examInteractionMode" class="settings-select">
             <option value="guided">Guided readiness — unavailable operations remain locked</option>
-            <option value="strict-sequence">Strict sequence — all operation candidates are selectable</option>
+            <option value="strict-sequence">Strict sequence — choose statements and operations</option>
           </select>
-          <small class="input-hint">In strict sequence mode, executable choices continue even when their order is wrong. An operation that cannot yet be computed ends the item, preserving only earned prefix credit.</small>
+          <small class="input-hint">Strict sequence exposes every supported statement, operation candidate, and selection branch. An incorrect branch continues with lost credit; an unrelated statement or impossible action ends the item.</small>
           <label class="settings-field-label" for="examManualMode">Student-derived values</label>
           <select id="examManualMode" class="settings-select" onchange="handleManualModeChange('exam')">
             <option value="profile">Use each profile's setting</option><option value="off">Always auto-derive</option><option value="custom">Use custom rates</option>

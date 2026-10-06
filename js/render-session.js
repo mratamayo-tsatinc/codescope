@@ -77,6 +77,7 @@ function strictPracticeInvalidMessage(item){
     'output-value-unread':'The placeholder cannot be resolved until its variable value is read from memory.',
     'output-unresolved':'The output command cannot execute until every dynamic value is resolved.',
     'output-order':'Output values must be resolved from left to right.',
+    'statement-out-of-sequence':'The selected line is not the next executable statement in the current program flow.',
     'division-by-zero':'This operation cannot execute because division or remainder by zero is undefined.'
   };
   return `${labels[item.practiceInvalidExecution.reason]||'This action cannot execute in the current program state.'} Use Undo to return to the executable state.`;
@@ -280,21 +281,27 @@ function renderProgramSourceFilePanel(item,program){
     const statement=entry&&entry.statement;
     const isOrigin=!!(statement&&transition&&statement.id===transition.originId);
     const isDestination=!!(statement&&transition&&statement.id===transition.destinationId);
-    const isActive=!!(statement&&active&&statement.id===active.id&&program.status!=='complete'&&!transition);
-    const interactive=isActive&&!item.checked,plan=interactive?statementInteractionPlan(item,statement):null;
+    const isExpected=!!(statement&&active&&statement.id===active.id&&program.status!=='complete'&&!transition);
+    const strictStatements=typeof strictSequenceEnabled==='function'&&strictSequenceEnabled();
+    const strictCandidate=!!(strictStatements&&statement&&program.status==='running'&&!transition
+      &&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked());
+    const interactive=!!(statement&&!transition&&!item.checked&&!item.practiceInvalidExecution
+      &&!examInteractionLocked()&&(isExpected||strictCandidate));
+    const activeVisual=isExpected&&!strictStatements;
+    const plan=interactive?statementInteractionPlan(item,statement):null;
     const interactionClass=plan?` interaction-${plan.mode}`:'',result=statementTraceResult(statement);
+    const visualStatus=strictStatements&&program.status==='running'&&statement
+      &&statement.status!=='complete'&&statement.status!=='invalid'?'waiting':statement&&statement.status;
     const stateClass=statement
-      ?(statement.status==='active'&&transition?'is-pending':`is-${statement.status}`)
+      ?(statement.status==='active'&&transition?'is-pending':`is-${visualStatus}`)
       :'is-context';
     const transitionClass=isOrigin?` is-flow-origin is-${transition.phase}`:(isDestination?' is-flow-destination':'');
-    const row=h(interactive?'button':'div',{class:`program-source-file-line ${stateClass}${interactive?' is-active':''}${interactionClass}${transitionClass}`,
+    const row=h(interactive?'button':'div',{class:`program-source-file-line ${stateClass}${activeVisual?' is-active':''}${strictCandidate?' strict-sequence-statement-candidate':''}${interactionClass}${transitionClass}`,
       type:interactive?'button':null,'data-source-line':String(line.number),
       'data-statement-id':statement&&statement.id||null,
       'aria-label':interactive?`${plan.label}, line ${line.number}`:null,
       title:interactive?plan.label:null,
-      onclick:interactive?(plan.mode==='direct'
-        ?()=>handleTokenClick(plan.action)
-        :event=>openProgramStatementTrace(item,statement.id,event.currentTarget)):null});
+      onclick:interactive?event=>activateProgramSourceStatement(item,statement.id,event.currentTarget):null});
     row.appendChild(h('span',{class:'program-source-file-number','aria-hidden':'true'},String(line.number)));
     row.appendChild(h('code',{class:'program-source-file-text'},...programSourceFragments(line.text,item.language)));
     const state=h('span',{class:'program-source-file-state'});
@@ -314,6 +321,12 @@ function renderProgramSourceFilePanel(item,program){
     source.appendChild(h('span',{class:'program-source-flow-highlight','aria-hidden':'true'}));
   }
   panel.appendChild(source);
+  const invalidSelection=item.practiceInvalidExecution||item.examSequenceFailure;
+  if(invalidSelection&&invalidSelection.reason==='statement-out-of-sequence'){
+    const selected=program.statements.find(candidate=>candidate.id===invalidSelection.selectedStatementId);
+    const alert=renderInvalidExecutionAlert(item,selected);
+    if(alert)panel.appendChild(alert);
+  }
   if(typeof requestAnimationFrame==='function') requestAnimationFrame(()=>{
     source.scrollTop=viewport.top;source.scrollLeft=viewport.left;
     const preserveViewport=!!viewport.userOverride;
@@ -378,6 +391,7 @@ let sourceFlowTransitionTimer=null;
 
 function stageSourceFlowTransition(item,originStatement,phase='waiting'){
   if(!item||!item.sourceFlow||!item.program||!originStatement||originStatement.status!=='complete') return null;
+  if(typeof strictSequenceEnabled==='function'&&strictSequenceEnabled())return null;
   const destination=item.program.status==='running'?item.program.statements[item.program.cursor]:null;
   if(!destination||destination.id===originStatement.id) return null;
   const transition={originId:originStatement.id,destinationId:destination.id,phase,userScrolled:false};
@@ -437,6 +451,17 @@ function statementTraceResult(statement){
   if(!statement||statement.kind!=='selection'||statement.status!=='complete'||!statement.runtime||!statement.runtime.checked) return null;
   if(statement.selectionKind==='switch') return `${formatValue(statement.runtime.assignedValue)} · ${statement.runtime.selectedLabel}`;
   return formatValue(Boolean(statement.runtime.assignedValue));
+}
+
+function activateProgramSourceStatement(item,statementId,trigger){
+  const selection=typeof attemptProgramStatementSelection==='function'
+    ?attemptProgramStatementSelection(item,statementId):{applied:false,ignored:true};
+  if(!selection.applied)return false;
+  const statement=selection.statement,plan=statementInteractionPlan(item,statement);
+  if(plan.mode==='direct'){
+    handleTokenClick(plan.action);return true;
+  }
+  openProgramStatementTrace(item,statement.id,trigger);return true;
 }
 
 function openProgramStatementTrace(item,statementId,trigger){
@@ -669,16 +694,18 @@ function renderProgramWorkspaceShell(container,item,program){
   if(examBar) container.appendChild(examBar);
   const workspace=h('section',{class:'program-workspace'+(item.sourceFlow?' source-program-workspace':''),
     'aria-label':'Program execution'});
-  const completionMode=program.progressMode==='completion';
+  const strictStatementChoice=!!(item.sourceFlow&&typeof strictSequenceEnabled==='function'&&strictSequenceEnabled());
+  const completionMode=program.progressMode==='completion'||strictStatementChoice;
   const completedStatements=program.statements.filter(statement=>statement.status==='complete'||statement.status==='invalid').length;
   const progress=h('div',{class:'program-progress-visual',role:'progressbar',
     'aria-label':completionMode?`${completedStatements} of ${program.statements.length} statements completed`:`Program statement ${Math.min(program.cursor+1,program.statements.length)} of ${program.statements.length}`,
     'aria-valuemin':completionMode?'0':'1','aria-valuemax':String(program.statements.length),
     'aria-valuenow':String(completionMode?completedStatements:Math.min(program.cursor+1,program.statements.length))});
   program.statements.forEach((statement,index)=>{
+    const concealStrictCursor=strictStatementChoice&&program.status==='running';
     const status=statement.status==='complete'?'complete'
-      :(statement.status==='invalid'?'invalid':(statement.status==='blocked'?'blocked'
-        :(statement.status==='partial'?'partial':(index===program.cursor?'current':'waiting'))));
+      :(statement.status==='invalid'?'invalid':(concealStrictCursor?'waiting':(statement.status==='blocked'?'blocked'
+        :(statement.status==='partial'?'partial':(!concealStrictCursor&&index===program.cursor?'current':'waiting')))));
     progress.appendChild(h('span',{class:`program-progress-dot ${status}`,
       title:`Line ${programStatementDisplayNumber(statement,index)}: ${status}`,'aria-hidden':'true'}));
   });

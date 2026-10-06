@@ -20,17 +20,18 @@ function evaluateCoreExpression(request){
   const expression=request.expression,memory=coreExpressionMemory(request.memory);
   const effects=[],trace=[];
   const evaluate=node=>{
-    if(node.kind==='literal') return node.value;
+    if(node.kind==='literal') return {value:node.value,dataType:node.dataType||null};
     if(node.kind==='identifier'){
       const binding=memory[node.name];
       if(!binding||binding.initialized===false||binding.value===undefined)
         throw new Error(`Expression identifier '${node.name}' is used before it is initialized`);
       effects.push({kind:'read',target:node.name,value:binding.value});
       trace.push({action:'SUBSTITUTE',target:node.name,targetKind:binding.kind||node.bindingKind||'variable',sourceValue:binding.value});
-      return binding.value;
+      return {value:binding.value,dataType:binding.dataType||node.dataType||null};
     }
     if(node.kind==='unary'){
-      const base=evaluate(node.operand),outcome=evaluateUnaryOperation(node.operator,node.form||'prefix',base);
+      const operand=evaluate(node.operand),base=operand.value;
+      const outcome=evaluateUnaryOperation(node.operator,node.form||'prefix',base);
       const target=node.operand&&node.operand.kind==='identifier'?node.operand.name:null;
       if(outcome.hasWrite){
         if(!target) throw new Error(`${node.operator} requires an identifier operand`);
@@ -43,14 +44,18 @@ function evaluateCoreExpression(request){
       }
       trace.push({action:'UNARY',operator:node.operator,op:node.operator,form:node.form||'prefix',
         target,result:outcome.expressionValue,writeValue:outcome.writeValue,sourceValue:base});
-      return outcome.expressionValue;
+      return {value:outcome.expressionValue,dataType:node.operator==='!'?'boolean':operand.dataType};
     }
-    const left=evaluate(node.left),right=evaluate(node.right),result=evalOp(node.operator,left,right);
-    trace.push({action:'EVALUATE',operator:node.operator,target:{operator:node.operator,operands:[left,right]},result});
-    return result;
+    const left=evaluate(node.left),right=evaluate(node.right);
+    const result=evalOp(node.operator,left.value,right.value,left.dataType,right.dataType);
+    trace.push({action:'EVALUATE',operator:node.operator,
+      target:{operator:node.operator,operands:[left.value,right.value]},result});
+    return {value:result,dataType:operationResultDataType(node.operator,left.dataType,right.dataType)};
   };
+  const evaluated=evaluate(expression);
   return {
-    value:evaluate(expression),
+    value:evaluated.value,
+    dataType:evaluated.dataType,
     dependencies:[...collectExpressionDependencies(expression)],
     effects,
     trace

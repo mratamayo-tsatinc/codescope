@@ -77,6 +77,7 @@ function languageCoreResult(spec){
     trace:Object.freeze((spec.trace||[]).map(languageCoreTraceEvent))
   };
   if(Object.prototype.hasOwnProperty.call(spec,'value')) result.value=spec.value;
+  if(Object.prototype.hasOwnProperty.call(spec,'dataType')) result.dataType=spec.dataType;
   return Object.freeze(result);
 }
 

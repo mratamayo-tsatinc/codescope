@@ -7,7 +7,8 @@
 // ============================================================================
 
 function engineNodeToProgramIr(node){
-  if(node.kind === 'literal') return literalExpression(node.value, {id:node.id,dataType:node.dataType});
+  if(node.kind === 'literal') return literalExpression(node.value,
+    {id:node.id,dataType:node.dataType,sourceText:node.sourceText});
   if(node.kind === 'variable' || node.kind === 'constant'){
     return identifierExpression(node.name, {id:node.id,dataType:node.dataType});
   }

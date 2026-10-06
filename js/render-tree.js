@@ -17,7 +17,7 @@ function renderStaticExpr(node, ctxPrec, colorMap, flashId, pendingId, pendingCo
     const isFlash = flashId!=null && node.id===flashId;
     const attrs = {class:'tok tok-lit'+(col?(isFlash?' tok-colored-flash':' tok-colored'):''), 'data-token-id': node.id};
     if(col) attrs.style = `color:${col};`;
-    return h('span',attrs, formatValue(node.value,node.dataType));
+    return h('span',attrs, formatLiteralNode(node));
   }
   if((node.kind==='variable'||node.kind==='constant') && node.resolved){
     const col = colorMap.get(node.id);

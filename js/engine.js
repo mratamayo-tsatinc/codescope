@@ -20,12 +20,23 @@ function prec(op){
     default: return 5;
   }
 }
-function evalOp(op,a,b){
+function arithmeticResultDataType(leftType,rightType){
+  if(leftType==='string'||rightType==='string')return 'string';
+  if(leftType==='double'||rightType==='double')return 'double';
+  if(leftType==='float'||rightType==='float')return 'float';
+  return 'int';
+}
+function operationResultDataType(op,leftType,rightType){
+  if(['<','>','<=','>=','==','!=','&&','||'].includes(op))return 'boolean';
+  return arithmeticResultDataType(leftType,rightType);
+}
+function evalOp(op,a,b,leftType,rightType){
   switch(op){
     case '+': return a+b;
     case '-': return a-b;
     case '*': return a*b;
-    case '/': if(b===0) throw new EngineError('DIV_BY_ZERO'); return Math.trunc(a/b);
+    case '/': if(b===0) throw new EngineError('DIV_BY_ZERO');
+      return arithmeticResultDataType(leftType,rightType)==='int'?Math.trunc(a/b):a/b;
     case '%': if(b===0) throw new EngineError('DIV_BY_ZERO'); return a % b;
     case '<': return a<b;
     case '>': return a>b;
@@ -69,6 +80,14 @@ function formatValue(v,dataType){
     return `"${escaped}"`;
   }
   return v<0 ? '('+v+')' : String(v);
+}
+
+// Authored literals retain their exact source spelling (`2.0`, `2.00f`,
+// character quotes, and escapes). Derived values intentionally have no
+// sourceText and continue through the normal value formatter.
+function formatLiteralNode(node){
+  return node&&typeof node.sourceText==='string'&&node.sourceText.length
+    ?node.sourceText:formatValue(node&&node.value,node&&node.dataType);
 }
 
 function makeLiteral(value,opts){ return Object.assign({id:nextId(),kind:'literal',value},opts||{}); }
@@ -172,11 +191,18 @@ function collectReadyUnaryNodes(node,out){
   }
   return out;
 }
+function expressionNodeDataType(node){
+  if(!node)return null;
+  if(node.kind==='literal'||node.kind==='variable'||node.kind==='constant')return node.dataType||null;
+  if(node.kind==='unary')return node.op==='!'?'boolean':expressionNodeDataType(node.inner);
+  return operationResultDataType(node.op,expressionNodeDataType(node.left),expressionNodeDataType(node.right));
+}
 function evalTree(node){
   if(node.kind==='literal') return node.value;
   if(node.kind==='variable'||node.kind==='constant') return node.declaredValue;
   if(node.kind==='unary') return unaryComputedValue(node);
-  return evalOp(node.op, evalTree(node.left), evalTree(node.right));
+  return evalOp(node.op,evalTree(node.left),evalTree(node.right),
+    expressionNodeDataType(node.left),expressionNodeDataType(node.right));
 }
 function buildCanonicalTrace(originalTree){
   let working = deepClone(originalTree);
@@ -226,9 +252,10 @@ function buildCanonicalTrace(originalTree){
     if(cands.length===0) throw new EngineError('STUCK');
     const node = cands[0];
     const a = numericValue(node.left), b = numericValue(node.right);
-    const result = evalOp(node.op,a,b);
+    const result = evalOp(node.op,a,b,expressionNodeDataType(node.left),expressionNodeDataType(node.right));
     const before = renderString(working);
-    const newLiteral = makeLiteral(result);
+    const newLiteral = makeLiteral(result,{dataType:operationResultDataType(node.op,
+      expressionNodeDataType(node.left),expressionNodeDataType(node.right))});
     working = replaceNode(working, node.id, newLiteral);
     const after = renderString(working);
     steps.push({action:'EVALUATE', target:{operator:node.op, operands:[a,b]}, result, expressionBefore:before, expressionAfter:after, resultNodeId:newLiteral.id, leftId:node.left.id, rightId:node.right.id});
@@ -238,7 +265,7 @@ function buildCanonicalTrace(originalTree){
 }
 function renderString(node,minPrec){
   minPrec = minPrec || 0;
-  if(node.kind==='literal') return formatValue(node.value,node.dataType);
+  if(node.kind==='literal') return formatLiteralNode(node);
   if(node.kind==='variable'||node.kind==='constant') return node.resolved ? formatValue(node.declaredValue,node.dataType) : node.name;
   if(node.kind==='unary'){
     if(node.resolved) return formatValue(node.resultValue);

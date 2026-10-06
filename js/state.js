@@ -398,7 +398,7 @@ function finalizeSourceProgramItem(item){
     correctChecks+=runtime.correctSteps||0;
     totalChecks+=runtime.totalOpSteps||0;
     totalChecks++;
-    if(runtime.wasCorrectAssignment===true) correctChecks++;
+    if(runtime.wasCorrectAssignment===true&&runtime.branchChoiceCorrect!==false) correctChecks++;
   });
   const manualFacts=typeof manualResponseFacts==='function'?manualResponseFacts(item):{correct:0,total:0};
   correctChecks+=manualFacts.correct;totalChecks+=manualFacts.total;
@@ -524,7 +524,8 @@ function examCurrentCorrectScoredChecks(item){
       const plugin=statementPluginFor(statement);
       if(!plugin||!plugin.scoresCommit||!statement.runtime) return;
       correct+=statement.runtime.trace.filter(step=>step.action==='EVALUATE'&&step.wasCorrect===true).length;
-      if(statement.runtime.checked&&statement.runtime.wasCorrectAssignment===true) correct++;
+      if(statement.runtime.checked&&statement.runtime.wasCorrectAssignment===true
+        &&statement.runtime.branchChoiceCorrect!==false) correct++;
     });
   }
   if(typeof manualResponseFacts==='function') correct+=manualResponseFacts(item).correct;
@@ -591,22 +592,23 @@ function strictSequenceInvalidAttemptReason(item,statement,runtime,action){
     ? classifyRejectedProgramAction(item,action) : null;
 }
 
-function pauseStrictPracticeItem(item,action,reason,statement){
+function pauseStrictPracticeItem(item,action,reason,statement,detail){
   if(!item||item.practiceInvalidExecution) return false;
-  item.practiceInvalidExecution={
+  item.practiceInvalidExecution=Object.assign({
     reason,
     timestamp:Date.now(),
     attemptedAction:action&&action.type?action.type:String(action),
     statementId:statement&&statement.id,
     recoverable:true
-  };
+  },detail||{});
   render();
   if(typeof bringInvalidExecutionAlertIntoView==='function') bringInvalidExecutionAlertIntoView();
   return true;
 }
 
-function terminateStrictExamItem(item,action,reason,statement){
-  if(!markStrictExamSequenceFailure(item,action,reason,true,{statementId:statement&&statement.id})) return false;
+function terminateStrictExamItem(item,action,reason,statement,detail){
+  if(!markStrictExamSequenceFailure(item,action,reason,true,
+    Object.assign({statementId:statement&&statement.id},detail||{}))) return false;
   if(item.program&&Array.isArray(item.program.statements)){
     item.program.status='terminated';
     item.program.statements.forEach((candidate,index)=>{
@@ -638,6 +640,62 @@ function terminateStrictExamItem(item,action,reason,statement){
   render();
   if(typeof bringInvalidExecutionAlertIntoView==='function') bringInvalidExecutionAlertIntoView();
   return true;
+}
+
+// Strict Sequence exposes every supported source statement and lets the
+// learner choose the control-flow order. The program cursor remains the
+// semantic source of truth; selecting any other statement is an invalid
+// execution attempt and reuses the existing Practice/Exam consequences.
+function attemptProgramStatementSelection(item,statementId){
+  if(!item||item.checked||state.examExpired||item.practiceInvalidExecution)return {applied:false,ignored:true};
+  const program=ensureProgramEnvelope(item),selected=program&&program.statements.find(candidate=>candidate.id===statementId);
+  const expected=currentProgramStatement(item);
+  if(!program||program.status!=='running'||!selected||!expected)return {applied:false,ignored:true};
+  if(!strictSequenceEnabled())return selected.id===expected.id
+    ?{applied:true,statement:selected}:{applied:false,ignored:true,reason:'non-current-statement'};
+
+  // A completed selection has already advanced the semantic cursor to its
+  // correct target. In Strict Sequence, the following source-line click is
+  // the learner's branch decision. Any real branch target is executable;
+  // choosing a different target continues that path but forfeits this
+  // selection's commit credit. Unrelated lines remain invalid jumps.
+  const history=Array.isArray(program.executionHistory)?program.executionHistory:[];
+  const previousId=history.length?history[history.length-1]:null;
+  const previous=previousId&&program.statements.find(candidate=>candidate.id===previousId);
+  const previousRuntime=previous&&previous.runtime;
+  const pendingSelection=previous&&previous.kind==='selection'&&previousRuntime&&previousRuntime.checked
+    &&previousRuntime.studentSelectedTargetStatementId==null?previous:null;
+  const chosenBranch=pendingSelection&&Array.isArray(pendingSelection.branches)
+    ?pendingSelection.branches.find(branch=>branch.targetStatementId===selected.id
+      ||branch.nextStatementId===selected.id):null;
+  if(chosenBranch){
+    const correct=selected.id===previousRuntime.selectedTargetStatementId;
+    previousRuntime.studentSelectedTargetStatementId=selected.id;
+    previousRuntime.studentSelectedLabel=chosenBranch.label;
+    previousRuntime.branchChoiceCorrect=correct;
+    const event={type:'BRANCH_CHOICE',action:'BRANCH_CHOICE',statementId:pendingSelection.id,
+      selectedTargetStatementId:selected.id,expectedTargetStatementId:previousRuntime.selectedTargetStatementId,
+      label:chosenBranch.label,wasCorrect:correct};
+    program.events.push(event);
+    recordExamAction(item,{type:'select-branch',statementId:pendingSelection.id},{
+      selectedStatementId:selected.id,expectedStatementId:previousRuntime.selectedTargetStatementId,
+      wasCorrect:correct,scoredAction:true,creditEligible:correct});
+    if(!correct){
+      expected.status='blocked';
+      program.cursor=program.statements.indexOf(selected);
+      selected.status='active';
+    }
+    return {applied:true,statement:selected,branchChoice:true,wasCorrect:correct,event};
+  }
+  if(selected.id===expected.id)return {applied:true,statement:selected};
+  const action={type:'select-statement',statementId:selected.id,selectedStatementId:selected.id,
+    expectedStatementId:expected.id};
+  const detail={selectedStatementId:selected.id,expectedStatementId:expected.id,
+    selectedLine:Number.isInteger(selected.sourceLine)?selected.sourceLine:program.statements.indexOf(selected)+1,
+    expectedLine:Number.isInteger(expected.sourceLine)?expected.sourceLine:program.cursor+1};
+  if(state.mode==='exam')terminateStrictExamItem(item,action,'statement-out-of-sequence',selected,detail);
+  else pauseStrictPracticeItem(item,action,'statement-out-of-sequence',selected,detail);
+  return {applied:false,invalid:true,reason:'statement-out-of-sequence'};
 }
 
 function recordExamAction(item,action,detail){
@@ -990,7 +1048,7 @@ function checkExpressionItem(item){
       priorCorrectChecks += statement.runtime.correctSteps;
       priorTotalChecks += statement.runtime.totalOpSteps;
       priorTotalChecks += 1; // the declaration's explicit `=` assignment
-      if(statement.runtime.wasCorrectAssignment) priorCorrectChecks += 1;
+      if(statement.runtime.wasCorrectAssignment&&statement.runtime.branchChoiceCorrect!==false) priorCorrectChecks += 1;
     });
   }
   item.checked = true;
@@ -1023,7 +1081,8 @@ function checkExpressionItem(item){
           return !!(plugin&&plugin.scoresCommit&&statement.runtime&&statement.runtime.checked);
         }) : [];
       scoringFacts.correctSteps=attemptedEvaluations.filter(entry=>entry.wasCorrect===true).length
-        +assignmentStatements.filter(statement=>statement.runtime.wasCorrectAssignment).length;
+        +assignmentStatements.filter(statement=>statement.runtime.wasCorrectAssignment
+          &&statement.runtime.branchChoiceCorrect!==false).length;
       scoringFacts.totalOpSteps=attemptedEvaluations.length+assignmentStatements.length+manualFacts.total;
       scoringFacts.correctSteps+=manualFacts.correct;
     }

@@ -30,6 +30,8 @@ function csBuildSelection(id,kind,statement,lineIndex,lines,memory,kinds,branche
   statement.runtime.expectedEffects=semantic.effects.filter(effect=>effect.scope==='expression');
   statement.runtime.semanticTrace=semantic.trace;
   statement.runtime.selectedTargetLine=null;statement.runtime.selectedTargetText=null;statement.runtime.selectedLabel=null;
+  statement.runtime.studentSelectedTargetStatementId=null;statement.runtime.studentSelectedLabel=null;
+  statement.runtime.branchChoiceCorrect=null;
   return statement;
 }
 
