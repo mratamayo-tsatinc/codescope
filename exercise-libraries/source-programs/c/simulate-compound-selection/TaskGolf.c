@@ -37,7 +37,8 @@ int main(void)
         fee = fee + 0;
     } else if (!status || finalBalance < 0) {
         fee = fee + 10;
-
+    }
+    
     if (choice == 2) {
         finalBalance = balance - amount - fee;
     }

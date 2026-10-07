@@ -1,15 +1,15 @@
 {
-  "title": "C - Basic Output",
+  "title": "Java - Compound Selection",
   "exercises": [
-    "TaskAlpha.c",
-    "TaskBravo.c",
-    "TaskCharlie.c",
-    "TaskDelta.c",
-    "TaskEcho.c",
-    "TaskFoxtrot.c",
-    "TaskGolf.c",
-    "TaskHotel.c",
-    "TaskOscar.c",
-    "TaskTango.c"
+    "TaskAlpha.java",
+    "TaskBravo.java",
+    "TaskCharlie.java",
+    "TaskDelta.java",
+    "TaskEcho.java",
+    "TaskFoxtrot.java",
+    "TaskGolf.java",
+    "TaskHotel.java",
+    "TaskIndia.java",
+    "TaskJuliet.java"
   ]
 }

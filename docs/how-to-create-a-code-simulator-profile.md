@@ -68,7 +68,9 @@ or when recognized source/metadata contains an invalid reference or value.
 
 ## Optional source-owned seeding
 
-The leading metadata block may allowlist literal integer declarations:
+The leading metadata block may allowlist literal declarations. Numeric values
+use an inclusive range, while Boolean, character, and string values use
+`values=` choices:
 
 ```c
 /*
@@ -77,6 +79,7 @@ The leading metadata block may allowlist literal integer declarations:
 @seed score min=60 max=100
 @seed absences min=0 max=10
 @seed balance min=1000 max=1400 step=100
+@seed member values=true|false
 */
 ```
 

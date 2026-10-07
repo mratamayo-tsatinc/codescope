@@ -1489,6 +1489,16 @@ int main(void) {
   printf("%d %d %d\\n", itemCost, quantity, discount);
   return 0;
 }`;
+  ctx.booleanSeedFixture=`/* @codescope
+ * @title Boolean seed
+ * @seed member values=true|false
+ */
+public class BooleanSeed {
+  public static void main(String[] args) {
+    boolean member = true;
+    System.out.println(member);
+  }
+}`;
   const result=JSON.parse(evaluate(ctx,`(()=>{
     const authored=sourceProgramParseExercise({raw:pipelineFixture,filename:'Seed.c',language:'c',
       sourceValueMode:'authored',randomInteger:()=>4});
@@ -1498,6 +1508,10 @@ int main(void) {
       filename:'Stepped.c',language:'c',sourceValueMode:'seeded',randomInteger:()=>slot}));
     const multi=sourceProgramParseExercise({raw:multiSeedFixture,filename:'Store.c',language:'c',
       sourceValueMode:'seeded',randomInteger:min=>min});
+    const booleanAuthored=sourceProgramParseExercise({raw:booleanSeedFixture,filename:'BooleanSeed.java',
+      language:'java',sourceValueMode:'authored'});
+    const booleanSeeded=sourceProgramParseExercise({raw:booleanSeedFixture,filename:'BooleanSeed.java',
+      language:'java',sourceValueMode:'seeded',randomInteger:(min,max)=>max});
     const invalidSteps=[];
     for(const metadata of ['@seed x min=1 max=5 step=0','@seed x min=1 max=5 step=-1']){
       try{sourceProgramSeedDirectives(metadata,'Invalid.c');}catch(error){invalidSteps.push(error.message);}
@@ -1519,7 +1533,11 @@ int main(void) {
       steppedSources:stepped.map(entry=>entry.source),invalidSteps,
       multi:{source:multi.source,seedValues:multi.seedValues,
         declarations:multi.coreProgramResult.ir.statements.filter(statement=>statement.kind==='declaration')
-          .map(statement=>statement.binding.name),memory:multi.coreProgramResult.ir.metadata.expectedMemory}});
+          .map(statement=>statement.binding.name),memory:multi.coreProgramResult.ir.metadata.expectedMemory},
+      booleanAuthored:{source:booleanAuthored.source,seedValues:booleanAuthored.seedValues,
+        diagnostics:booleanAuthored.coreProgramResult.diagnostics.map(diagnostic=>diagnostic.code)},
+      booleanSeeded:{source:booleanSeeded.source,seedValues:booleanSeeded.seedValues,
+        diagnostics:booleanSeeded.coreProgramResult.diagnostics.map(diagnostic=>diagnostic.code)}});
   })()`));
   assert.deepStrictEqual(result.manifest,{title:'Demo',exercises:['One.c','Two.c']});
   assert.strictEqual(result.errors.length,3);
@@ -1545,6 +1563,50 @@ int main(void) {
   assert.strictEqual(result.multi.memory.itemCost.value,430);
   assert.strictEqual(result.multi.memory.quantity.value,2);
   assert.strictEqual(result.multi.memory.discount.value,50);
+  assert(result.booleanAuthored.source.includes('boolean member = true;'));
+  assert.deepStrictEqual(result.booleanAuthored.seedValues,{member:true});
+  assert.deepStrictEqual(result.booleanAuthored.diagnostics,[]);
+  assert(result.booleanSeeded.source.includes('boolean member = false;'));
+  assert.deepStrictEqual(result.booleanSeeded.seedValues,{member:false});
+  assert.deepStrictEqual(result.booleanSeeded.diagnostics,[]);
+
+  const compoundDirectory=path.join(ROOT,'exercise-libraries','source-programs','java','simulate-compound-selection');
+  const compoundManifest=JSON.parse(fs.readFileSync(path.join(compoundDirectory,'manifest.json'),'utf8'));
+  for(const filename of compoundManifest.exercises){
+    ctx.compoundRaw=fs.readFileSync(path.join(compoundDirectory,filename),'utf8');
+    ctx.compoundFilename=filename;
+    const compound=JSON.parse(evaluate(ctx,`(()=>{
+      const parsed=sourceProgramParseExercise({raw:compoundRaw,filename:compoundFilename,language:'java',
+        sourceValueMode:'seeded',randomInteger:min=>min});
+      return JSON.stringify({title:parsed.title,seedNames:Object.keys(parsed.seedValues),
+        diagnostics:parsed.coreProgramResult.diagnostics.map(diagnostic=>diagnostic.code),
+        answer:sourceProgramGenerateAnswer(parsed,compoundFilename)});
+    })()`));
+    assert(compound.title!==filename.replace(/\.java$/,''),`${filename} must provide @title metadata`);
+    assert(compound.seedNames.length>0,`${filename} must provide @seed metadata`);
+    assert.deepStrictEqual(compound.diagnostics,[],`${filename} must parse without core diagnostics`);
+    assert(compound.answer.screenLines.length>0,`${filename} must generate an output answer key`);
+  }
+
+  const advancedInputDirectory=path.join(ROOT,'exercise-libraries','source-programs','java','input-advance');
+  const advancedInputManifest=JSON.parse(fs.readFileSync(path.join(advancedInputDirectory,'manifest.json'),'utf8'));
+  assert.strictEqual(advancedInputManifest.exercises.length,10);
+  for(const filename of advancedInputManifest.exercises){
+    ctx.advancedInputRaw=fs.readFileSync(path.join(advancedInputDirectory,filename),'utf8');
+    ctx.advancedInputFilename=filename;
+    const advancedInput=JSON.parse(evaluate(ctx,`(()=>{
+      const details=sourceProgramMetadataAndSource(advancedInputRaw,advancedInputFilename);
+      const inputs=sourceProgramInputDirectives(details.metadata,advancedInputFilename,'seeded',min=>min);
+      const parsed=sourceProgramParseExercise({details,filename:advancedInputFilename,language:'java',
+        sourceValueMode:'authored',inputValues:Object.fromEntries(inputs.map(input=>[input.target,input]))});
+      return JSON.stringify({diagnostics:parsed.coreProgramResult.diagnostics.map(diagnostic=>diagnostic.code),
+        inputCount:parsed.coreProgramResult.ir.statements.filter(statement=>statement.kind==='input').length,
+        answer:sourceProgramGenerateAnswer(parsed,advancedInputFilename)});
+    })()`));
+    assert.deepStrictEqual(advancedInput.diagnostics,[],`${filename} must parse without core diagnostics`);
+    assert(advancedInput.inputCount>0,`${filename} must expose Scanner input statements`);
+    assert(advancedInput.answer.screenLines.length>0,`${filename} must generate an output answer key`);
+  }
 
   for(const language of ['c','java']){
     const directory=path.join(ROOT,'exercise-libraries','source-programs',language,'output-basics');

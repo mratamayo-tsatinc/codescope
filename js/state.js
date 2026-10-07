@@ -79,7 +79,7 @@ const state = {
   screen: 'login', // login | setup | session | done
   userEmail: null,
   userStudentId: null,
-  language: 'c',
+  language: 'java',
   mode: 'practice',
   profileId: null,
   itemIndex: 0,

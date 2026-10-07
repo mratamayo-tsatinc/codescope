@@ -98,10 +98,16 @@ function sourceProgramLiteralValue(raw,dataType,filename,line,name){
     if(!match)throw new Error(`${label} requires string literal choices such as values="Ada"|"Grace"`);
     return decodeCoreStringEscape(match[1],label);
   }
+  if(dataType==='boolean'){
+    if(value!=='true'&&value!=='false')
+      throw new Error(`${label} requires boolean literal choices such as values=true|false`);
+    return value==='true';
+  }
   throw new Error(`${label} does not support data type '${dataType}'`);
 }
 
 function sourceProgramSeedLiteral(value,dataType,language,decimals){
+  if(dataType==='boolean')return value?'true':'false';
   if(dataType==='char'){
     const escaped=String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\t/g,'\\t').replace(/\r/g,'\\r');
     return `'${escaped}'`;

@@ -1,0 +1,15 @@
+{
+  "title": "Java Program Input: Advanced Input Patterns",
+  "exercises": [
+    "B01_TwoIntegers.java",
+    "B02_SumOfThree.java",
+    "B03_AverageOfTwoFloats.java",
+    "B04_MixedTypes.java",
+    "B05_Rectangle.java",
+    "B06_TimeToSeconds.java",
+    "B07_Date.java",
+    "B08_ExamAverageWithSection.java",
+    "B09_SquaredDistance.java",
+    "B10_SimpleInterest.java"
+  ]
+}

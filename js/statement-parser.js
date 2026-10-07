@@ -39,7 +39,7 @@ function coreSplitTopLevelCommaSegments(source){
 
 function coreDeclarationFragments(source,language){
   const pattern=language==='java'
-    ?/^(\s*(final\s+)?(int|float|double|char|String)\s+)([\s\S]*?)(\s*;\s*)$/
+    ?/^(\s*(final\s+)?(int|float|double|char|boolean|String)\s+)([\s\S]*?)(\s*;\s*)$/
     :/^(\s*(const\s+)?(int|float|double|char)\s+)([\s\S]*?)(\s*;\s*)$/;
   const declaration=pattern.exec(String(source||''));if(!declaration)return null;
   const prefix=declaration[1],body=declaration[4],bodyStart=prefix.length;
@@ -133,7 +133,7 @@ function parseCoreStatement(request){
   }
 
   const declarationPattern=language==='java'
-    ?/^(final\s+)?(int|float|double|char|String)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*=\s*([\s\S]+))?$/
+    ?/^(final\s+)?(int|float|double|char|boolean|String)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*=\s*([\s\S]+))?$/
     :/^(const\s+)?(int|float|double|char)\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*=\s*([\s\S]+))?$/;
   const declaration=declarationPattern.exec(source);
   if(declaration){

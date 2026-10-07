@@ -765,6 +765,12 @@ const PROFILES_RAW = [
     lesson:{focus:'program-flow',constructs:['selection']},
     interaction:{declarations:'interactive'},
     presentation:{workspace:'source-program',timeline:'statement-modal'},
+    feedback: {
+      showCorrectSolution: {
+        practice: true,
+        exam: false
+       }
+    }
   },
   {
     enabled:true,

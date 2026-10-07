@@ -19,7 +19,7 @@ int main(void)
 
     if (covered && totalCost <= 550) {
         totalCost = totalCost + 0;
-    } else if (!covered || totalCost > 800) {}
+    } else if (!covered || totalCost > 800) {
         totalCost = totalCost + 75;
     }
 
