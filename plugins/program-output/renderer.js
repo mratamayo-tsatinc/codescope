@@ -88,6 +88,23 @@ function renderProgramOutputConsumedIdentifier(statement,entry,partState,showDer
   return h('span',{class:'program-output-consumed-source'},...nodes);
 }
 
+function renderProgramOutputResolvedJavaString(statement,partStates){
+  const nodes=[h('span',{class:'program-output-string'},'"')];
+  statement.parts.forEach((part,index)=>{
+    if(part.kind==='text'){
+      nodes.push(h('span',{class:'program-output-string'},outputEscapeLiteral(part.value)));
+      return;
+    }
+    const name=programOutputPartName(part),partState=partStates[index];
+    nodes.push(h('span',{class:'program-output-string program-output-resolved-value binding-identity',
+      style:bindingIdentityStyle(name,'variable'),
+      'data-token-id':programOutputResultTokenId(statement,index)},
+    programOutputFormatValue(partState.resolvedValue,part.format)));
+  });
+  nodes.push(h('span',{class:'program-output-string'},'"'));
+  return nodes;
+}
+
 function renderProgramOutputState(statement,item,program,options){
   options=options||{};
   const language=program.language||item.language||state.language;
@@ -157,7 +174,9 @@ function renderProgramOutputState(statement,item,program,options){
       }
     });
   }else{
-    statement.parts.forEach((part,index)=>{
+    if(resolved){
+      renderProgramOutputResolvedJavaString(statement,partStates).forEach(node=>code.appendChild(node));
+    }else statement.parts.forEach((part,index)=>{
       if(index>0){
         const partState=part.kind==='expression'?partStates[index]:null;
         const actionable=part.kind==='expression'&&programOutputResolveActionable(interactive,partState);
@@ -177,7 +196,10 @@ function renderProgramOutputState(statement,item,program,options){
         const name=programOutputPartName(part);
         const actionable=programOutputReadActionable(interactive,partState);
         if(partState.resolvedValue!==null){
-          code.appendChild(renderProgramOutputConsumedIdentifier(statement,{part,index},partState,true));
+          code.appendChild(h('span',{class:'program-output-resolved-value binding-identity',
+            style:bindingIdentityStyle(name,'variable'),
+            'data-token-id':programOutputResultTokenId(statement,index)},
+          programOutputFormatValue(partState.resolvedValue,part.format)));
         }else if(partState.stagedValue!==null){
           code.appendChild(name?renderValueCard({id:programOutputReadTokenId(statement,index),name,
             value:partState.stagedValue,kind:'variable',dataType:part.expression&&part.expression.dataType,
@@ -207,7 +229,8 @@ function renderProgramOutputTimeline(statement,item,program,statementIndex,isAct
     const isLatest=traceCount===visualTrace.length;
     const isCurrent=isActive&&isLatest&&!statement.runtime.checked;
     const previousStep=traceCount>0?visualTrace[traceCount-1]:null;
-    const substitutionRow=!!(previousStep&&previousStep.action==='EVALUATE'&&previousStep.outputAction);
+    const substitutionRow=program.language==='c'
+      &&!!(previousStep&&previousStep.action==='EVALUATE'&&previousStep.outputAction);
     const row=h('div',{class:`tl-row ${isSource?'source-row ':''}${isCurrent?'current':'done'}${substitutionRow?' output-substitution-row':''}`});
     const color=previousStep?stepVisualColor(previousStep,traceCount-1):'#4b5364';
     row.appendChild(h('div',{class:'tl-dot'+(isSource?' statement-source-dot':''),

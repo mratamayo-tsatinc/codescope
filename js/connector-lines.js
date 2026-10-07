@@ -109,7 +109,10 @@ function originColorForStep(steps, i){
 const CONNECTOR_MAX_LEAD = DEFAULT_APP_SETTINGS.shell.connectors.maxLeadPx;
 
 function appendOutputSubstitutionConnector(paths,dots,panelRect,row,step,color,isCurrent){
-  if(step.action!=='EVALUATE'||!step.outputAction) return;
+  // C formatting visibly transfers a retrieved value into a placeholder.
+  // Java concatenation renders the assembled string directly, so it has no
+  // same-row substitution arc.
+  if(step.action!=='EVALUATE'||step.outputAction!=='FORMAT_VALUE') return;
   const source=row.querySelector(`[data-token-id="${step.sourceNodeId}"]`);
   const destination=row.querySelector(`[data-token-id="${step.resultNodeId}"]`);
   if(!source||!destination||source===destination) return;

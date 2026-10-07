@@ -3337,6 +3337,7 @@ function testModeScopedPersistence(){
 
 function testProgramOutputStatementPlugin(){
   const rendererSource=fs.readFileSync(path.join(ROOT,'plugins','program-output','renderer.js'),'utf8');
+  const connectorSource=fs.readFileSync(path.join(ROOT,'js','connector-lines.js'),'utf8');
   const outputStyles=fs.readFileSync(path.join(ROOT,'plugins','program-output','styles.css'),'utf8');
   const terminalSource=fs.readFileSync(path.join(ROOT,'js','program-terminal.js'),'utf8');
   const terminalStyles=fs.readFileSync(path.join(ROOT,'css','styles.css'),'utf8');
@@ -3423,6 +3424,7 @@ function testProgramOutputStatementPlugin(){
     item.program.language='java';
     const javaSource=outputStatementSource(dynamic,item);
     const javaLineSource=outputStatementSource(item.program.statements[5],item);
+    const javaResolvedState=renderProgramOutputState(dynamic,item,item.program,{traceCount:2,interactive:false});
     const multi=sourceItems[1];
     multi.program.memory={};
     multi.decls.forEach(declaration=>{multi.program.memory[declaration.name]={name:declaration.name,
@@ -3526,6 +3528,10 @@ function testProgramOutputStatementPlugin(){
       combinedTimelineText,visualStepIds,combineSourceId,
       sourceBinding,bindingColor,formatColor,
       cSource,javaSource,javaLineSource,cText,panelText,terminalPanelText,carriageSource,
+      javaResolvedText:javaResolvedState.textContent,
+      javaResolvedCards:countNodesWithClass(javaResolvedState,'tok-card'),
+      javaResolvedDerivedValues:countNodesWithClass(javaResolvedState,'program-output-derived-value'),
+      javaResolvedHighlights:countNodesWithClass(javaResolvedState,'program-output-resolved-value'),
       carriageCursorRow:carriageCursor.attributes['data-terminal-row'],
       carriageCursorColumn:carriageCursor.attributes['data-terminal-column'],canonicalPrints:canonical.filter(event=>event.action==='PRINT').length,
       canonicalBindings:canonical.filter(event=>event.outputAction).every(event=>!!event.sourceBinding),
@@ -3601,6 +3607,10 @@ function testProgramOutputStatementPlugin(){
   assert(result.javaSource.startsWith('System.out.println("Value of '));
   assert(result.javaSource.includes(' + '));
   assert(result.javaLineSource.startsWith('System.out.println("Value of '));
+  assert(!result.javaResolvedText.includes(' + ')&&!result.javaResolvedText.includes('→'));
+  assert.strictEqual(result.javaResolvedCards,0);
+  assert.strictEqual(result.javaResolvedDerivedValues,0);
+  assert.strictEqual(result.javaResolvedHighlights,1);
   assert(result.cText.startsWith('OUTPUT LESSON\nValue of '));
   assert(result.panelText.includes('Program Output')&&result.panelText.includes('OUTPUT LESSON'));
   assert(result.terminalPanelText.includes('Loading Done!'));
@@ -3611,6 +3621,8 @@ function testProgramOutputStatementPlugin(){
   assert(terminalSource.includes("pre,escape,cursor"));
   assert(terminalSource.includes("escape.classList.add('is-visible')"));
   assert(rendererSource.includes("style:bindingIdentityStyle(name,'variable')"));
+  assert(rendererSource.includes('renderProgramOutputResolvedJavaString'));
+  assert(connectorSource.includes("step.outputAction!=='FORMAT_VALUE'"));
   assert(outputStyles.includes('.program-output-string{color:color-mix(in srgb,var(--text) 74%,var(--text-dim));'));
   assert(!outputStyles.includes('.program-output-string{color:#9fda72;'));
   assert(outputStyles.includes('.program-output-resolved-value{color:var(--binding-color,var(--good));}'));
