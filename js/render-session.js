@@ -257,9 +257,20 @@ function revealSourceFlowLine(source,row,behavior='auto'){
   return target!==previous;
 }
 
+function completedProgramUndoStatementId(item,program){
+  if(!item||!program||item.checked||item.practiceInvalidExecution||item._sourceFlowTransition
+    ||!canUndoForCurrentMode(item))return null;
+  if(typeof programTerminalInteractionLocked==='function'&&programTerminalInteractionLocked())return null;
+  const current=currentProgramStatement(item),plugin=statementPluginFor(current);
+  if(plugin&&typeof plugin.canUndo==='function'&&plugin.canUndo({program,statement:current,item}))return null;
+  const history=Array.isArray(program.executionHistory)?program.executionHistory:[];
+  return history.length?history[history.length-1]:null;
+}
+
 function renderProgramSourceFilePanel(item,program){
   const display=item.sourceDisplay,statements=new Map(program.statements.map((statement,index)=>[statement.id,{statement,index}]));
   const active=program.statements[program.cursor],transition=item._sourceFlowTransition||null;
+  const completedUndoStatementId=completedProgramUndoStatementId(item,program);
   const flowTiming=sourceFlowTimings(),viewport=sourceFlowViewportState(item);
   const markUserScroll=()=>markSourceFlowUserScroll(item,source);
   const flowKeydown=event=>{if(sourceFlowScrollKeys.has(event.key))markUserScroll();};
@@ -284,11 +295,13 @@ function renderProgramSourceFilePanel(item,program){
     const isExpected=!!(statement&&active&&statement.id===active.id&&program.status!=='complete'&&!transition);
     const strictStatements=typeof strictSequenceEnabled==='function'&&strictSequenceEnabled();
     const strictCandidate=!!(strictStatements&&statement&&program.status==='running'&&!transition
-      &&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked());
+      &&!item.checked&&!examInteractionLocked()
+      &&strictProgramStatementSelectable(item,statement));
+    const strictPaused=!!(strictCandidate&&item.practiceInvalidExecution);
     const interactive=!!(statement&&!transition&&!item.checked&&!item.practiceInvalidExecution
       &&!examInteractionLocked()&&(isExpected||strictCandidate));
     const activeVisual=isExpected&&!strictStatements;
-    const plan=interactive?statementInteractionPlan(item,statement):null;
+    const plan=(interactive||strictPaused)?statementInteractionPlan(item,statement):null;
     const interactionClass=plan?` interaction-${plan.mode}`:'',result=statementTraceResult(statement);
     const visualStatus=strictStatements&&program.status==='running'&&statement
       &&statement.status!=='complete'&&statement.status!=='invalid'?'waiting':statement&&statement.status;
@@ -296,9 +309,10 @@ function renderProgramSourceFilePanel(item,program){
       ?(statement.status==='active'&&transition?'is-pending':`is-${visualStatus}`)
       :'is-context';
     const transitionClass=isOrigin?` is-flow-origin is-${transition.phase}`:(isDestination?' is-flow-destination':'');
-    const row=h(interactive?'button':'div',{class:`program-source-file-line ${stateClass}${activeVisual?' is-active':''}${strictCandidate?' strict-sequence-statement-candidate':''}${interactionClass}${transitionClass}`,
+    const row=h(interactive?'button':'div',{class:`program-source-file-line ${stateClass}${activeVisual?' is-active':''}${strictCandidate?' strict-sequence-statement-candidate':''}${strictPaused?' strict-sequence-candidate-paused':''}${interactionClass}${transitionClass}`,
       type:interactive?'button':null,'data-source-line':String(line.number),
       'data-statement-id':statement&&statement.id||null,
+      'aria-disabled':strictPaused?'true':null,
       'aria-label':interactive?`${plan.label}, line ${line.number}`:null,
       title:interactive?plan.label:null,
       onclick:interactive?event=>activateProgramSourceStatement(item,statement.id,event.currentTarget):null});
@@ -311,6 +325,12 @@ function renderProgramSourceFilePanel(item,program){
     }else if(statement&&statement.status==='complete'){
       state.appendChild(h('i',{class:'fa-solid fa-check program-source-file-complete',title:'Completed','aria-label':'Completed statement'}));
     }
+    if(completedUndoStatementId&&lineStatementIds.includes(completedUndoStatementId)){
+      state.appendChild(h('button',{class:'inline-eval-action inline-undo-action program-source-completed-undo',
+        type:'button',title:'Undo completed statement','aria-label':`Undo completed statement on line ${line.number}`,
+        onclick:event=>{if(event&&event.stopPropagation)event.stopPropagation();handleUndo();}},
+      h('i',{class:'fa-solid fa-rotate-left','aria-hidden':'true'})));
+    }
     if(plan){
       const icon=plan.mode==='direct'?'fa-play':'fa-up-right-and-down-left-from-center';
       state.appendChild(h('i',{class:`fa-solid ${icon} program-source-file-action ${plan.mode}-action`,'aria-hidden':'true'}));
@@ -322,9 +342,11 @@ function renderProgramSourceFilePanel(item,program){
   }
   panel.appendChild(source);
   const invalidSelection=item.practiceInvalidExecution||item.examSequenceFailure;
-  if(invalidSelection&&invalidSelection.reason==='statement-out-of-sequence'){
-    const selected=program.statements.find(candidate=>candidate.id===invalidSelection.selectedStatementId);
-    const alert=renderInvalidExecutionAlert(item,selected);
+  if(invalidSelection){
+    const failedStatementId=invalidSelection.statementId||invalidSelection.selectedStatementId;
+    const failed=program.statements.find(candidate=>candidate.id===failedStatementId)
+      ||currentProgramStatement(item);
+    const alert=renderInvalidExecutionAlert(item,failed);
     if(alert)panel.appendChild(alert);
   }
   if(typeof requestAnimationFrame==='function') requestAnimationFrame(()=>{
@@ -1168,7 +1190,7 @@ function renderExpressionEvaluationPanel(options){
       prefixNodes({showLabel:true,isSource:true,ready,isCurrent:true,isFinalRow:resolved(),activeColor:stepColor(0),
         stepCount:0,pendingStep:null,currentStep:null,flashId:null}),
       canInteract
-        ? renderInteractiveFlatExpr(runtime.workingFlat,new Map(),stepColor(0),null,unresolved)
+        ? renderInteractiveFlatExpr(runtime.workingFlat,new Map(),stepColor(0),null,unresolved,options.statementId)
         : renderStaticFlatExpr(runtime.workingFlat,new Map(),null,null),terminator({isSource:true}),
       trailingActions({isCurrent:true,isFinalRow:resolved(),runtime})));
   } else {
@@ -1207,7 +1229,7 @@ function renderExpressionEvaluationPanel(options){
           activeColor:stepColor(runtime.trace.length),stepCount:index+1,pendingStep:null,
           currentStep:step,flashId}),
         customFinalValue || (canInteract
-          ? renderInteractiveFlatExpr(runtime.workingFlat,colors,stepColor(runtime.trace.length),flashId,unresolved)
+          ? renderInteractiveFlatExpr(runtime.workingFlat,colors,stepColor(runtime.trace.length),flashId,unresolved,options.statementId)
           : renderStaticFlatExpr(runtime.workingFlat,colors,flashId,null)),terminator({isSource:false,isFinalRow}),
         trailingActions({isCurrent:true,isFinalRow,runtime})));
     } else {

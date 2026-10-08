@@ -151,6 +151,13 @@ function statementInteractionPlan(item,statement){
   if(!program||!plugin||typeof plugin.interactionPlan!=='function'){
     return {mode:'modal',focus:'statement',label:'Open statement trace'};
   }
+  // A completed multi-step statement that was rolled back still contains its
+  // learner derivation. Reopen that derivation before considering a direct
+  // commit plan, including declarations that belong to one source-line group.
+  const rollbackFocus=statement.runtime&&statement.runtime.rollbackReviewFocus;
+  if(rollbackFocus){
+    return {mode:'modal',focus:rollbackFocus,label:'Review and correct statement'};
+  }
   const declarationGroup=programDeclarationGroup(program,statement);
   if(declarationGroup.length&&declarationGroup[0]===statement){
     const plans=declarationGroup.map(candidate=>plugin.interactionPlan({item,program,statement:candidate})||{});
@@ -243,7 +250,10 @@ function dispatchProgramAction(item, action, services){
   }
   if(result.event) program.events.push(result.event);
   if(Array.isArray(result.events)) program.events.push(...result.events);
-  if(result.completed) advanceProgram(program,result.nextStatementId);
+  if(result.completed){
+    if(statement.runtime)delete statement.runtime.rollbackReviewFocus;
+    advanceProgram(program,result.nextStatementId);
+  }
   return result;
 }
 
@@ -305,6 +315,8 @@ function undoProgramAction(item, services){
       const rolledBack=candidatePlugin.rollbackCompletion({program,statement:candidate,item,
         services:services||{},semantics:programSemanticServices(program)})||{applied:false};
       if(!rolledBack.applied)return rolledBack;
+      if(index===0&&candidate.runtime&&rolledBack.reopenFocus)
+        candidate.runtime.rollbackReviewFocus=rolledBack.reopenFocus;
       if(program.executionHistory[program.executionHistory.length-1]===candidate.id)program.executionHistory.pop();
       candidate.status=index===0?'active':'locked';candidate._uiJustCompleted=false;
     }
@@ -317,6 +329,7 @@ function undoProgramAction(item, services){
   const result = previousPlugin.rollbackCompletion({program, statement:previous, item, services:services||{},
     semantics:programSemanticServices(program)}) || {applied:false};
   if(!result.applied) return result;
+  if(previous.runtime&&result.reopenFocus)previous.runtime.rollbackReviewFocus=result.reopenFocus;
   if(previousId!=null) program.executionHistory.pop();
   if(current) current.status = 'locked';
   previous.status = 'active';
@@ -339,6 +352,7 @@ function resetProgramAction(item, services){
     statement.status = index===0 ? 'active' : 'locked';
     statement._uiJustCompleted = false;
     statement._uiExpanded = false;
+    if(statement.runtime)delete statement.runtime.rollbackReviewFocus;
   });
   program.cursor = 0;
   program.status = 'running';

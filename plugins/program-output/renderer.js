@@ -109,7 +109,7 @@ function renderProgramOutputState(statement,item,program,options){
   options=options||{};
   const language=program.language||item.language||state.language;
   const partStates=programOutputPartStates(statement,options.traceCount||0);
-  const interactive=!!options.interactive&&!item.checked&&!examInteractionLocked();
+  const interactive=!!options.interactive&&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked();
   const resolved=programOutputDynamicParts(statement).every(entry=>partStates[entry.index].resolvedValue!==null);
   const readyToPrint=interactive&&(resolved||programOutputStrictControls());
   const command=language==='c'?'printf':(statement.newline?'System.out.println':'System.out.print');
@@ -269,7 +269,9 @@ function renderOutputStatement(ctx){
   const panel=h('div',{class:'program-expression-panel program-output-eval-panel expression-scroll-surface',
     'data-statement-id':statement.id},renderProgramOutputTimeline(statement,item,program,statementIndex,isActive));
   if(isActive&&!statement.runtime.checked){
-    if(state.mode!=='exam'||activeExamPolicy().showNeutralGuidance){
+    const invalidExecutionAlert=renderInvalidExecutionAlert(item,statement);
+    if(invalidExecutionAlert)panel.appendChild(invalidExecutionAlert);
+    if(!item.practiceInvalidExecution&&(state.mode!=='exam'||activeExamPolicy().showNeutralGuidance)){
       const unresolved=programOutputDynamicParts(statement).filter(entry=>
         statement.runtime.parts[entry.index].resolvedValue===null);
       const message=!unresolved.length
@@ -279,7 +281,9 @@ function renderOutputStatement(ctx){
           : `Read variables in any order. Each retrieved value unlocks its matching ${program.language==='c'?'placeholder':'concatenation operator'}.`);
       panel.appendChild(renderContextHelp(message));
     }
-    const reset=renderItemResetControl(state.mode==='practice'&&(program.cursor>0||statement.runtime.trace.length>0));
+    const reset=renderItemResetControl(state.mode==='practice'
+      &&!(ctx.services&&ctx.services.statementTraceModal)
+      &&(program.cursor>0||statement.runtime.trace.length>0));
     if(reset) panel.appendChild(reset);
   }
   card.appendChild(panel);

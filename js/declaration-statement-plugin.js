@@ -163,7 +163,7 @@ registerStatementPlugin({
         break;
       }
     }
-    return {applied:true};
+    return {applied:true,reopenFocus:declarationHasInitializer(ctx.statement)?'expression':null};
   },
 
   reset(ctx){
@@ -181,6 +181,7 @@ registerStatementPlugin({
     runtime.totalOpSteps = 0;
     runtime.beforeEffectMemory=null;
     runtime.expressionEffects=[];
+    delete runtime.rollbackReviewFocus;
     return {applied:changed};
   },
 

@@ -73,18 +73,24 @@ registerStatementPlugin({
     return typeof undo==='function'?{applied:!!undo(ctx.statement.runtime)}:{applied:false};},
   rollbackCompletion(ctx){const runtime=ctx.statement.runtime;if(!runtime||!runtime.checked)return {applied:false};
     if(typeof restoreCoreMemoryTargets==='function')restoreCoreMemoryTargets(ctx.program.memory,runtime.beforeEffectMemory);
+    for(let index=ctx.program.events.length-1;index>=0;index--){
+      const event=ctx.program.events[index];
+      if(event.statementId===ctx.statement.id&&(event.type==='BRANCH'||event.type==='BRANCH_CHOICE'))
+        ctx.program.events.splice(index,1);
+    }
     runtime.checked=false;runtime.assignedValue=null;runtime.selectedTargetLine=null;runtime.selectedTargetText=null;runtime.selectedTargetStatementId=null;
     runtime.selectedLabel=null;runtime.correctSteps=0;runtime.totalOpSteps=0;runtime.wasCorrectAssignment=null;
     runtime.studentSelectedTargetStatementId=null;runtime.studentSelectedLabel=null;runtime.branchChoiceCorrect=null;
     runtime.beforeEffectMemory=null;runtime.expressionEffects=[];
-    return {applied:true};},
+    return {applied:true,reopenFocus:'condition-expression'};},
   reset(ctx){const runtime=ctx.statement.runtime;if(!runtime)return {applied:false};
     const changed=runtime.checked||runtime.trace.length>0;
     runtime.workingFlat=deepCloneFlat(runtime.originalFlat);runtime.history=[deepCloneFlat(runtime.originalFlat)];
     runtime.trace=[];runtime.checked=false;runtime.assignedValue=null;runtime.selectedTargetLine=null;runtime.selectedTargetStatementId=null;
     runtime.selectedTargetText=null;runtime.selectedLabel=null;runtime.correctSteps=0;runtime.totalOpSteps=0;
     runtime.wasCorrectAssignment=null;runtime.studentSelectedTargetStatementId=null;runtime.studentSelectedLabel=null;
-    runtime.branchChoiceCorrect=null;runtime.beforeEffectMemory=null;runtime.expressionEffects=[];return {applied:changed};},
+    runtime.branchChoiceCorrect=null;runtime.beforeEffectMemory=null;runtime.expressionEffects=[];
+    delete runtime.rollbackReviewFocus;return {applied:changed};},
   buildCanonicalTrace(ctx){const runtime=ctx.statement.runtime;
     return runtime.canonicalTrace.steps.map(step=>Object.assign({statementId:ctx.statement.id},step))
       .concat({type:'BRANCH',action:'BRANCH',statementId:ctx.statement.id,value:runtime.expectedValue});}

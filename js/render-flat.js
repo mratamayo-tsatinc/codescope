@@ -14,7 +14,12 @@
 // step and draw a line between them. Nothing here reads or depends on those
 // attributes.
 // ---------------------------------------------------------------------------
-function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
+function flatExpressionAction(type,details,statementId){
+  const action=Object.assign({type},details||{});
+  if(statementId!=null)action.statementId=statementId;
+  return action;
+}
+function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId, statementId){
   if(op.kind==='literal'){
     const col = colorMap.get(op.id);
     const isFlash = flashId!=null && op.id===flashId;
@@ -55,8 +60,8 @@ function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
       const opSpan = h('span',opAttrs, op.op);
       const parts = (op.op==='!' || op.form==='prefix') ? [opSpan, card] : [card, opSpan];
       return h('span',{class:'unary-token-group tok-unary-pending', tabindex:'0', role:'button', 'aria-label':`apply ${op.op}`,
-        onclick:()=>handleTokenClick({type:'apply-unary', id:op.id}),
-        onkeydown:(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handleTokenClick({type:'apply-unary', id:op.id}); } }
+        onclick:()=>handleTokenClick(flatExpressionAction('apply-unary',{id:op.id},statementId)),
+        onkeydown:(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handleTokenClick(flatExpressionAction('apply-unary',{id:op.id},statementId)); } }
       }, ...parts);
     }
     // Stage 1: still just the variable name (with its unary decoration) —
@@ -70,13 +75,13 @@ function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
         style:namedKind?bindingIdentityStyle(nm,namedKind,activeColor):`color:${activeColor};`,
         tabindex:'0',role:'button','aria-label':`substitute ${nm}`,'data-token-id':op.id,
         'data-binding-name':namedKind?nm:null,
-        onclick:()=>handleTokenClick({type:'substitute',id:op.id}),
-        onkeydown:(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();handleTokenClick({type:'substitute',id:op.id});}}};
+        onclick:()=>handleTokenClick(flatExpressionAction('substitute',{id:op.id},statementId)),
+        onkeydown:(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();handleTokenClick(flatExpressionAction('substitute',{id:op.id},statementId));}}};
       const operatorAttrs={class:'tok tok-op-active tok-colored strict-sequence-candidate',
         style:`color:${activeColor};`,tabindex:'0',role:'button',
         'aria-label':`attempt to apply ${op.op}`,
-        onclick:()=>handleTokenClick({type:'apply-unary',id:op.id}),
-        onkeydown:(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();handleTokenClick({type:'apply-unary',id:op.id});}}};
+        onclick:()=>handleTokenClick(flatExpressionAction('apply-unary',{id:op.id},statementId)),
+        onkeydown:(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();handleTokenClick(flatExpressionAction('apply-unary',{id:op.id},statementId));}}};
       const valueNode=h('span',valueAttrs,nm);
       const operatorNode=h('span',operatorAttrs,op.op);
       const strictParts=(op.op==='!'||op.form==='prefix')?[operatorNode,valueNode]:[valueNode,operatorNode];
@@ -86,8 +91,8 @@ function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
       style:namedKind ? bindingIdentityStyle(nm,namedKind,activeColor) : `color:${activeColor};`,
       tabindex:'0', role:'button', 'aria-label':`substitute ${nm}`, 'data-token-id':op.id,
       'data-binding-name':namedKind ? nm : null,
-      onclick:()=>handleTokenClick({type:'substitute', id:op.id}),
-      onkeydown:(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handleTokenClick({type:'substitute', id:op.id}); } }
+      onclick:()=>handleTokenClick(flatExpressionAction('substitute',{id:op.id},statementId)),
+      onkeydown:(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handleTokenClick(flatExpressionAction('substitute',{id:op.id},statementId)); } }
     }, label);
   }
   // variable or constant
@@ -100,8 +105,8 @@ function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
   return h('span',{class:cls, style:bindingIdentityStyle(op.name,op.kind,activeColor),
     tabindex:'0', role:'button', 'aria-label':`substitute ${op.name}`, 'data-token-id':op.id,
     'data-binding-name':op.name,
-    onclick:()=>handleTokenClick({type:'substitute', id:op.id}),
-    onkeydown:(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handleTokenClick({type:'substitute', id:op.id}); } }
+    onclick:()=>handleTokenClick(flatExpressionAction('substitute',{id:op.id},statementId)),
+    onkeydown:(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handleTokenClick(flatExpressionAction('substitute',{id:op.id},statementId)); } }
   }, op.name);
 }
 // Every ready adjacent pair is clickable here — including one whose left or
@@ -109,7 +114,7 @@ function renderInteractiveFlatOperand(op, colorMap, activeColor, flashId){
 // that reaches across where a parenthesis was. Parens are drawn (via
 // computeParenRuns) purely as a visual echo of the source; they never gate
 // which operator lights up as `ready`.
-function renderInteractiveFlatExpr(flat, colorMap, activeColor, flashId, unresolvedAny){
+function renderInteractiveFlatExpr(flat, colorMap, activeColor, flashId, unresolvedAny, statementId){
   const runs = computeParenRuns(flat);
   const openAt = new Set(runs.map(r=>r.start)), closeAt = new Set(runs.map(r=>r.end));
   const unaryRuns=computeUnaryRuns(flat),unaryOpen=new Map(unaryRuns.map(run=>[run.start,run])),
@@ -118,7 +123,7 @@ function renderInteractiveFlatExpr(flat, colorMap, activeColor, flashId, unresol
   for(let i=0;i<flat.operands.length;i++){
     if(unaryOpen.has(i))parts.push(h('span',{class:'tok tok-op-muted'},unaryOpen.get(i).operator+'('));
     else if(openAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, '('));
-    parts.push(renderInteractiveFlatOperand(flat.operands[i], colorMap, activeColor, flashId));
+    parts.push(renderInteractiveFlatOperand(flat.operands[i], colorMap, activeColor, flashId, statementId));
     if(unaryClose.has(i))parts.push(h('span',{class:'tok tok-op-muted'},')'));
     else if(closeAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, ')'));
     if(i<flat.operators.length){
@@ -129,8 +134,8 @@ function renderInteractiveFlatExpr(flat, colorMap, activeColor, flashId, unresol
       const opCls = 'tok '+(selectable ? 'tok-op-active tok-colored'+(strictSequence?' strict-sequence-candidate':'') : 'tok-op-muted');
       const opAttrs = {class:opCls, tabindex: selectable ? '0' : '-1', role:'button', 'aria-label':`evaluate ${opStr}`,
         'data-op-left': L.id, 'data-op-right': R.id,
-        onclick: selectable ? ()=>handleTokenClick({type:'evaluate', leftId:L.id, rightId:R.id}) : null,
-        onkeydown: selectable ? (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handleTokenClick({type:'evaluate', leftId:L.id, rightId:R.id}); } } : null
+        onclick: selectable ? ()=>handleTokenClick(flatExpressionAction('evaluate',{leftId:L.id,rightId:R.id},statementId)) : null,
+        onkeydown: selectable ? (e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handleTokenClick(flatExpressionAction('evaluate',{leftId:L.id,rightId:R.id},statementId)); } } : null
       };
       if(selectable) opAttrs.style = `color:${activeColor};`;
       parts.push(' ', h('span',opAttrs, opStr), ' ');

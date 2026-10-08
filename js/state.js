@@ -79,7 +79,7 @@ const state = {
   screen: 'login', // login | setup | session | done
   userEmail: null,
   userStudentId: null,
-  language: 'java',
+  language: 'c',
   mode: 'practice',
   profileId: null,
   itemIndex: 0,
@@ -116,7 +116,7 @@ const DEFAULT_APP_SETTINGS = Object.freeze({
   timerMinutes: 120,
   shell: DEFAULT_SHELL_SETTINGS,
   practice: Object.freeze({
-    interactionMode: 'guided', // guided | strict-sequence
+    interactionMode: 'strict-sequence', // guided | strict-sequence
     manualResponses:Object.freeze({mode:'profile',namedValueRate:50,operatorRate:50})
   }),
   exam: Object.freeze({
@@ -642,8 +642,62 @@ function terminateStrictExamItem(item,action,reason,statement,detail){
   return true;
 }
 
-// Strict Sequence exposes every supported source statement and lets the
-// learner choose the control-flow order. The program cursor remains the
+function strictPendingBranchSelection(program){
+  if(!program||!Array.isArray(program.executionHistory))return null;
+  const previousId=program.executionHistory[program.executionHistory.length-1];
+  const previous=previousId&&program.statements.find(candidate=>candidate.id===previousId);
+  const runtime=previous&&previous.runtime;
+  return previous&&previous.kind==='selection'&&runtime&&runtime.checked
+    &&runtime.studentSelectedTargetStatementId==null?previous:null;
+}
+
+// Undo the learner's branch choice before rolling back the completed
+// condition. This preserves the derived condition value and restores every
+// branch as a selectable decision.
+
+function undoStrictBranchChoice(item){
+  if(!item||!strictSequenceEnabled())return false;
+  const program=ensureProgramEnvelope(item),history=program&&program.executionHistory;
+  if(!program||!Array.isArray(history)||!history.length)return false;
+  const selection=program.statements.find(candidate=>candidate.id===history[history.length-1]);
+  const runtime=selection&&selection.runtime;
+  if(!selection||selection.kind!=='selection'||!runtime||runtime.studentSelectedTargetStatementId==null)return false;
+  const selected=program.statements.find(candidate=>candidate.id===runtime.studentSelectedTargetStatementId);
+  const current=currentProgramStatement(item);
+  if(!selected||current!==selected||selected.status==='complete'||selected.status==='invalid')return false;
+  const selectedPlugin=statementPluginFor(selected);
+  if(selectedPlugin&&typeof selectedPlugin.canUndo==='function'
+    &&selectedPlugin.canUndo({program,statement:selected,item}))return false;
+  const expected=program.statements.find(candidate=>candidate.id===runtime.selectedTargetStatementId);
+  if(!expected)return false;
+  for(let index=program.events.length-1;index>=0;index--){
+    const event=program.events[index];
+    if(event&&event.type==='BRANCH_CHOICE'&&event.statementId===selection.id){program.events.splice(index,1);break;}
+  }
+  selected.status='locked';expected.status='active';
+  program.cursor=program.statements.indexOf(expected);program.status='running';
+  runtime.studentSelectedTargetStatementId=null;runtime.studentSelectedLabel=null;runtime.branchChoiceCorrect=null;
+  return true;
+}
+
+// Completed statements and statements already passed by the cursor are no
+// longer selectable. The one exception is the pending branch decision: every
+// real branch remains available until the learner chooses one, including an
+// intentionally incorrect branch that appears earlier than the semantic
+// target in source order.
+function strictProgramStatementSelectable(item,statement){
+  const program=item&&ensureProgramEnvelope(item);
+  if(!program||!statement||program.status!=='running')return false;
+  if(statement.status==='complete'||statement.status==='invalid')return false;
+  const pending=strictPendingBranchSelection(program);
+  if(pending&&Array.isArray(pending.branches)&&pending.branches.some(branch=>
+    branch.targetStatementId===statement.id||branch.nextStatementId===statement.id))return true;
+  const index=program.statements.indexOf(statement);
+  return index>=program.cursor;
+}
+
+// Strict Sequence exposes every still-reachable forward statement and lets
+// the learner choose the control-flow order. The program cursor remains the
 // semantic source of truth; selecting any other statement is an invalid
 // execution attempt and reuses the existing Practice/Exam consequences.
 function attemptProgramStatementSelection(item,statementId){
@@ -654,17 +708,17 @@ function attemptProgramStatementSelection(item,statementId){
   if(!strictSequenceEnabled())return selected.id===expected.id
     ?{applied:true,statement:selected}:{applied:false,ignored:true,reason:'non-current-statement'};
 
+  if(!strictProgramStatementSelectable(item,selected))
+    return {applied:false,ignored:true,reason:'statement-already-passed'};
+
   // A completed selection has already advanced the semantic cursor to its
   // correct target. In Strict Sequence, the following source-line click is
   // the learner's branch decision. Any real branch target is executable;
   // choosing a different target continues that path but forfeits this
   // selection's commit credit. Unrelated lines remain invalid jumps.
-  const history=Array.isArray(program.executionHistory)?program.executionHistory:[];
-  const previousId=history.length?history[history.length-1]:null;
-  const previous=previousId&&program.statements.find(candidate=>candidate.id===previousId);
+  const previous=strictPendingBranchSelection(program);
   const previousRuntime=previous&&previous.runtime;
-  const pendingSelection=previous&&previous.kind==='selection'&&previousRuntime&&previousRuntime.checked
-    &&previousRuntime.studentSelectedTargetStatementId==null?previous:null;
+  const pendingSelection=previous;
   const chosenBranch=pendingSelection&&Array.isArray(pendingSelection.branches)
     ?pendingSelection.branches.find(branch=>branch.targetStatementId===selected.id
       ||branch.nextStatementId===selected.id):null;
@@ -804,8 +858,12 @@ function handleUndo(){
   }
   if(state.mode==='practice'&&item.practiceInvalidExecution){
     item.practiceInvalidExecution=null;
+    undoStrictBranchChoice(item);
     render();
     return;
+  }
+  if(undoStrictBranchChoice(item)){
+    recordExamAction(item,{type:'undo-branch-choice'});render();return;
   }
   if(state.mode==='exam'){
     const statement=currentProgramStatement(item);

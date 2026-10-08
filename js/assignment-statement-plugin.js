@@ -244,7 +244,7 @@ registerStatementPlugin({
     for(let i=ctx.program.events.length-1;i>=0;i--){
       if(ctx.program.events[i].statementId===ctx.statement.id){ctx.program.events.splice(i,1);break;}
     }
-    return {applied:true};
+    return {applied:true,reopenFocus:'expression'};
   },
 
   reset(ctx){
@@ -270,6 +270,7 @@ registerStatementPlugin({
     runtime.totalOpSteps=0;
     runtime.beforeEffectMemory=null;
     runtime.expressionEffects=[];
+    delete runtime.rollbackReviewFocus;
     return {applied:changed};
   },
 

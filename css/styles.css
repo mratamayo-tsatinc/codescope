@@ -2307,6 +2307,10 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
 .program-source-file-line.strict-sequence-statement-candidate:focus-visible{
   box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--op) 72%,transparent);
 }
+.program-source-file-line.strict-sequence-candidate-paused{cursor:default;opacity:.72;}
+.program-source-file-line.strict-sequence-candidate-paused:hover{
+  background:transparent;
+}
 .program-source-file-line.is-flow-origin{background:color-mix(in srgb,var(--good) 9%,transparent);box-shadow:inset 3px 0 0 var(--good);}
 .program-source-file-line.is-flow-origin .program-source-file-number{color:var(--good);font-weight:800;}
 .program-source-file-line.is-flow-origin .program-source-file-state{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--good) 9%,var(--panel-alt)) 24%);}
@@ -2541,6 +2545,11 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   color:#ff8195;
   border-color:rgba(255,107,129,.62);
   background:rgba(255,107,129,.12);
+}
+/* The active statement modal owns its execution feedback. Keep the source
+   panel copy as a fallback that becomes visible when the modal is closed. */
+.statement-trace-open .program-source-file-panel>.invalid-execution-alert{
+  display:none;
 }
 .invalid-execution-icon{font-size:19px;line-height:1;margin-top:1px;}
 .invalid-execution-title{font-size:13px;font-weight:800;letter-spacing:.015em;}

@@ -186,7 +186,7 @@ registerStatementPlugin({
     if(printIndex>=0) runtime.trace.splice(printIndex,1);
     runtime.checked=false;runtime.assignedValue=null;runtime.wasCorrectAssignment=null;
     runtime.correctSteps=0;runtime.totalOpSteps=0;
-    return {applied:true};
+    return {applied:true,reopenFocus:'output-values'};
   },
 
   reset(ctx){
@@ -197,6 +197,7 @@ registerStatementPlugin({
       part.resolvedValue=null;});
     runtime.trace=[];runtime.checked=false;runtime.assignedValue=null;
     runtime.wasCorrectAssignment=null;runtime.correctSteps=0;runtime.totalOpSteps=0;
+    delete runtime.rollbackReviewFocus;
     return {applied:changed};
   },
 

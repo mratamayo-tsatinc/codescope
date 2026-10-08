@@ -3743,6 +3743,30 @@ int main() {
     printf("Total: %d\\n", total);
     return 0;
 }`;
+  ctx.csStrictPrecedenceFixture=`#include <stdio.h>
+int main() {
+    int a = 2;
+    int b = 3;
+    int c;
+    c = a + b * 2;
+    return 0;
+}`;
+  ctx.csStrictBooleanFixture=`#include <stdio.h>
+int main() {
+    int score = 80;
+    int absences = 2;
+    if (score >= 75 && absences < 5) {
+        printf("Qualified.\\n");
+    }
+    printf("Done.\\n");
+    return 0;
+}`;
+  ctx.csStrictJavaOutputFixture=`public class StrictJavaOutput {
+    public static void main(String[] args) {
+        int total = 7;
+        System.out.println("total = " + total);
+    }
+}`;
   ctx.csOutputOnlyFixture=`#include <stdio.h>
 int main() {
     puts("This unsupported call remains visible.");
@@ -3891,6 +3915,9 @@ int main() {
     const strictWrongSelection=attemptProgramStatementSelection(strictProbe,strictWrongStatement.id);
     const strictPracticePaused=strictWrongSelection.invalid
       &&strictProbe.practiceInvalidExecution.reason==='statement-out-of-sequence';
+    const strictPausedHost=h('div',{});renderProgramItem(strictPausedHost,strictProbe,{});
+    const strictPausedCandidates=countNodesWithClass(strictPausedHost,'strict-sequence-statement-candidate');
+    const strictPausedMarkers=countNodesWithClass(strictPausedHost,'strict-sequence-candidate-paused');
     handleUndo();const strictPracticeRecovered=!strictProbe.practiceInvalidExecution;
     const strictCorrectSelection=attemptProgramStatementSelection(strictProbe,
       strictProbe.program.statements[strictProbe.program.cursor].id).applied;
@@ -3910,6 +3937,16 @@ int main() {
       &&strictIncorrectIfChoice.wasCorrect===false&&!strictBranchProbe.practiceInvalidExecution
       &&currentProgramStatement(strictBranchProbe).id===strictIncorrectIfBranch.targetStatementId
       &&strictBranchSelection.runtime.branchChoiceCorrect===false;
+    const strictCompletedDeclarationSelection=attemptProgramStatementSelection(strictBranchProbe,
+      strictBranchDeclaration.id);
+    const strictCompletedLineLocked=!strictCompletedDeclarationSelection.applied
+      &&strictCompletedDeclarationSelection.ignored
+      &&strictCompletedDeclarationSelection.reason==='statement-already-passed'
+      &&!strictBranchProbe.practiceInvalidExecution;
+    const strictLockedHost=h('div',{});renderProgramItem(strictLockedHost,strictBranchProbe,{});
+    const strictEligibleAfterBranch=strictBranchProbe.program.statements
+      .filter(candidate=>strictProgramStatementSelectable(strictBranchProbe,candidate)).length;
+    const strictCandidateAfterBranch=countNodesWithClass(strictLockedHost,'strict-sequence-statement-candidate');
     const strictSwitchProbe=csBuildItem(profile,{id:'StrictSwitch',filename:'StrictSwitch.c',raw:csSwitchFallthroughFixture},'c',106);
     state.items=[strictSwitchProbe];state.itemIndex=0;
     dispatchProgramAction(strictSwitchProbe,statementInteractionPlan(strictSwitchProbe,
@@ -3925,6 +3962,120 @@ int main() {
       &&strictIncorrectCaseChoice.wasCorrect===false&&!strictSwitchProbe.practiceInvalidExecution
       &&currentProgramStatement(strictSwitchProbe).id===strictIncorrectCase.targetStatementId
       &&strictSwitchSelection.runtime.branchChoiceCorrect===false;
+    const strictPrecedenceProbe=csBuildItem(profile,{id:'StrictPrecedence',filename:'StrictPrecedence.c',
+      raw:csStrictPrecedenceFixture},'c',107);
+    state.items=[strictPrecedenceProbe];state.itemIndex=0;
+    while(currentProgramStatement(strictPrecedenceProbe).kind==='declaration'){
+      const active=currentProgramStatement(strictPrecedenceProbe),plan=statementInteractionPlan(strictPrecedenceProbe,active);
+      dispatchProgramAction(strictPrecedenceProbe,plan.action,{applyExpressionAction});
+    }
+    const strictAssignment=currentProgramStatement(strictPrecedenceProbe);
+    for(const operand of strictAssignment.runtime.workingFlat.operands.slice()){
+      if(operand.kind==='variable')dispatchProgramAction(strictPrecedenceProbe,
+        {type:'substitute',id:operand.id,statementId:strictAssignment.id},{applyExpressionAction});
+    }
+    let strictFlat=strictAssignment.runtime.workingFlat;
+    dispatchProgramAction(strictPrecedenceProbe,{type:'evaluate',leftId:strictFlat.operands[0].id,
+      rightId:strictFlat.operands[1].id,statementId:strictAssignment.id},{applyExpressionAction});
+    strictFlat=strictAssignment.runtime.workingFlat;
+    dispatchProgramAction(strictPrecedenceProbe,{type:'evaluate',leftId:strictFlat.operands[0].id,
+      rightId:strictFlat.operands[1].id,statementId:strictAssignment.id},{applyExpressionAction});
+    const strictWrongPrecedenceRecorded=strictAssignment.runtime.trace.some(step=>step.action==='EVALUATE'&&step.wasCorrect===false);
+    const strictWrongCommit=dispatchProgramAction(strictPrecedenceProbe,
+      statementInteractionPlan(strictPrecedenceProbe,strictAssignment).action,{applyExpressionAction});
+    const strictWrongPrecedenceContinues=strictWrongCommit.applied&&strictWrongCommit.completed
+      &&!strictPrecedenceProbe.practiceInvalidExecution&&currentProgramStatement(strictPrecedenceProbe).kind==='program-return';
+    const strictCompletedUndoHost=h('div',{});renderProgramItem(strictCompletedUndoHost,strictPrecedenceProbe,{});
+    const strictCompletedUndoTarget=completedProgramUndoStatementId(strictPrecedenceProbe,strictPrecedenceProbe.program);
+    const strictCompletedUndoControls=countNodesWithClass(strictCompletedUndoHost,'program-source-completed-undo');
+    const strictRollback=undoProgramAction(strictPrecedenceProbe,{undoExpressionAction});
+    const strictRollbackPlan=statementInteractionPlan(strictPrecedenceProbe,strictAssignment);
+    const strictRollbackReopens=strictRollback.applied&&currentProgramStatement(strictPrecedenceProbe)===strictAssignment
+      &&strictRollbackPlan.mode==='modal'&&strictRollbackPlan.focus==='expression';
+    const strictRollbackHistory=strictAssignment.runtime.history.length;
+    const strictRollbackStep=undoProgramAction(strictPrecedenceProbe,{undoExpressionAction});
+    const strictRollbackCanCorrect=strictRollbackStep.applied
+      &&strictAssignment.runtime.history.length===strictRollbackHistory-1;
+    const strictBooleanProbe=csBuildItem(profile,{id:'StrictBoolean',filename:'StrictBoolean.c',
+      raw:csStrictBooleanFixture},'c',108);
+    state.items=[strictBooleanProbe];state.itemIndex=0;
+    while(currentProgramStatement(strictBooleanProbe).kind==='declaration'){
+      const active=currentProgramStatement(strictBooleanProbe),plan=statementInteractionPlan(strictBooleanProbe,active);
+      dispatchProgramAction(strictBooleanProbe,plan.action,{applyExpressionAction});
+    }
+    const strictBoolean=currentProgramStatement(strictBooleanProbe);
+    const unresolvedBooleanFlat=strictBoolean.runtime.workingFlat;
+    handleTokenClick(flatExpressionAction('evaluate',{
+      leftId:unresolvedBooleanFlat.operands[0].id,rightId:unresolvedBooleanFlat.operands[1].id},strictBoolean.id));
+    const strictConditionPaused=!!strictBooleanProbe.practiceInvalidExecution
+      &&strictBooleanProbe.practiceInvalidExecution.reason==='operands-unresolved';
+    const strictConditionModalHost=h('div',{});
+    renderSelectionStatement({container:strictConditionModalHost,item:strictBooleanProbe,
+      program:strictBooleanProbe.program,statement:strictBoolean,
+      statementIndex:strictBooleanProbe.program.cursor,isActive:true,
+      services:{statementTraceModal:true,expressionOnly:true}});
+    const strictConditionSourceHost=h('div',{});renderProgramItem(strictConditionSourceHost,strictBooleanProbe,{});
+    const strictConditionModalWarning=countNodesWithClass(strictConditionModalHost,'invalid-execution-alert');
+    const strictConditionSourceWarning=countNodesWithClass(strictConditionSourceHost,'invalid-execution-alert');
+    handleUndo();
+    const strictConditionRecovered=!strictBooleanProbe.practiceInvalidExecution;
+    for(const operand of strictBoolean.runtime.workingFlat.operands.slice()){
+      if(operand.kind==='variable')dispatchProgramAction(strictBooleanProbe,
+        {type:'substitute',id:operand.id,statementId:strictBoolean.id},{applyExpressionAction});
+    }
+    let strictBooleanFlat=strictBoolean.runtime.workingFlat;
+    const logicalIndex=strictBooleanFlat.operators.indexOf('&&');
+    const strictLogicalFirst=dispatchProgramAction(strictBooleanProbe,{type:'evaluate',
+      leftId:strictBooleanFlat.operands[logicalIndex].id,rightId:strictBooleanFlat.operands[logicalIndex+1].id,
+      statementId:strictBoolean.id},{applyExpressionAction});
+    while(!strictBoolean.runtime.checked){
+      strictBooleanFlat=strictBoolean.runtime.workingFlat;
+      const candidate=collectReadyOperatorsFlat(strictBooleanFlat,[])[0];
+      if(!candidate)break;
+      dispatchProgramAction(strictBooleanProbe,{type:'evaluate',leftId:candidate.leftId,
+        rightId:candidate.rightId,statementId:strictBoolean.id},{applyExpressionAction});
+    }
+    const strictWrongBooleanContinues=strictLogicalFirst.applied&&strictBoolean.runtime.checked
+      &&strictBoolean.runtime.trace.some(step=>step.action==='EVALUATE'&&step.target.operator==='&&'&&step.wasCorrect===false)
+      &&!strictBooleanProbe.practiceInvalidExecution&&strictBooleanProbe.program.status==='running';
+    const strictBooleanNext=currentProgramStatement(strictBooleanProbe);
+    const strictStaleAction=flatExpressionAction('evaluate',{leftId:'stale-left',rightId:'stale-right'},strictBoolean.id);
+    const strictStaleResult=dispatchProgramAction(strictBooleanProbe,strictStaleAction,{applyExpressionAction});
+    const strictStaleProtected=strictStaleResult.ignored===true
+      &&strictStaleAction.statementId===strictBoolean.id
+      &&currentProgramStatement(strictBooleanProbe)===strictBooleanNext
+      &&!strictBooleanProbe.practiceInvalidExecution;
+    const strictBooleanRollback=undoProgramAction(strictBooleanProbe,{undoExpressionAction});
+    const strictBooleanRollbackPlan=statementInteractionPlan(strictBooleanProbe,strictBoolean);
+    const strictBooleanCanCorrect=strictBooleanRollback.applied&&strictBooleanRollbackPlan.mode==='modal'
+      &&strictBooleanRollbackPlan.focus==='condition-expression'
+      &&undoProgramAction(strictBooleanProbe,{undoExpressionAction}).applied;
+    const strictJavaOutputProbe=csBuildItem(sourceOutputProfile,{id:'StrictJavaOutput',
+      filename:'StrictJavaOutput.java',raw:csStrictJavaOutputFixture},'java',109);
+    state.items=[strictJavaOutputProbe];state.itemIndex=0;
+    const strictJavaDeclaration=currentProgramStatement(strictJavaOutputProbe);
+    dispatchProgramAction(strictJavaOutputProbe,statementInteractionPlan(strictJavaOutputProbe,
+      strictJavaDeclaration).action,{applyExpressionAction});
+    const strictJavaOutput=currentProgramStatement(strictJavaOutputProbe);
+    handleTokenClick({type:'emit-output',statementId:strictJavaOutput.id});
+    const strictPrintPaused=!!strictJavaOutputProbe.practiceInvalidExecution
+      &&strictJavaOutputProbe.practiceInvalidExecution.reason==='output-unresolved';
+    const strictPrintModalHost=h('div',{});
+    renderOutputStatement({container:strictPrintModalHost,item:strictJavaOutputProbe,
+      program:strictJavaOutputProbe.program,statement:strictJavaOutput,statementIndex:1,isActive:true,
+      services:{statementTraceModal:true}});
+    const strictPrintModalWarning=countNodesWithClass(strictPrintModalHost,'invalid-execution-alert');
+    const strictPrintModalReset=countNodesWithClass(strictPrintModalHost,'item-reset-control');
+    const strictPrintSourceHost=h('div',{});renderProgramItem(strictPrintSourceHost,strictJavaOutputProbe,{});
+    const strictPrintSourceWarning=countNodesWithClass(strictPrintSourceHost,'invalid-execution-alert');
+    handleUndo();
+    const strictJavaPart=programOutputDynamicParts(strictJavaOutput)[0];
+    handleTokenClick({type:'resolve-output-part',partIndex:strictJavaPart.index,statementId:strictJavaOutput.id});
+    const strictConcatPaused=!!strictJavaOutputProbe.practiceInvalidExecution
+      &&strictJavaOutputProbe.practiceInvalidExecution.reason==='output-value-unread';
+    handleUndo();
+    const strictJavaOutputRecovered=!strictJavaOutputProbe.practiceInvalidExecution
+      &&currentProgramStatement(strictJavaOutputProbe)===strictJavaOutput;
     strictProbe.program.statements[0].status='complete';strictProbe.program.cursor=1;
     strictProbe.program.statements[1].status='active';
     const strictTransitionSuppressed=stageSourceFlowTransition(strictProbe,strictProbe.program.statements[0])===null;
@@ -4012,6 +4163,11 @@ int main() {
     const elseIfAdvanced=elseIf.program.statements[elseIf.program.cursor].selectionKind;
     const branchUndo=undoProgramAction(elseIf,{undoExpressionAction});
     const branchUndoStatement=elseIf.program.statements[elseIf.program.cursor];
+    const branchUndoPlan=statementInteractionPlan(elseIf,branchUndoStatement);
+    const branchUndoClean=branchUndoStatement.runtime.studentSelectedTargetStatementId==null
+      &&branchUndoStatement.runtime.branchChoiceCorrect==null
+      &&!elseIf.program.events.some(event=>event.statementId===branchUndoStatement.id
+        &&(event.type==='BRANCH'||event.type==='BRANCH_CHOICE'));
     state.language='c';const migratedSourceOutputItems=generateItemsForProfile('program-output-source-flow');
     const typedItem=migratedSourceOutputItems.find(candidate=>candidate.filename==='TypedValues.c');
     initializeSeededRandom(77);const authoredRetry=regenerateProfileContentItem(sourceOutputProfile,typedItem);
@@ -4067,8 +4223,16 @@ int main() {
       sourceValueMode:profileVariableValueMode(profile),timelinePresentation:profileTimelineMode(profile),
       profileItemCount:profile.scoring.itemCount,profileSelectionCount:profile.content.selection.count,
       strictExpectedCandidates,strictStatementCandidates,strictActiveRows,strictCurrentDots,strictBlockedMarkers,
-      strictPracticePaused,strictPracticeRecovered,strictCorrectSelection,strictIfBranchContinues,
-      strictCaseBranchContinues,strictTransitionSuppressed,strictExamTerminated,
+      strictPracticePaused,strictPausedCandidates,strictPausedMarkers,strictPracticeRecovered,strictCorrectSelection,
+      strictIfBranchContinues,strictCompletedLineLocked,strictEligibleAfterBranch,strictCandidateAfterBranch,
+      strictCaseBranchContinues,strictWrongPrecedenceRecorded,
+      strictWrongPrecedenceContinues,strictCompletedUndoTarget,strictCompletedUndoControls,
+      strictRollbackReopens,strictRollbackCanCorrect,
+      strictWrongBooleanContinues,strictStaleProtected,strictBooleanCanCorrect,
+      strictConditionPaused,strictConditionModalWarning,strictConditionSourceWarning,strictConditionRecovered,
+      strictPrintPaused,strictPrintModalWarning,strictPrintModalReset,strictPrintSourceWarning,
+      strictConcatPaused,strictJavaOutputRecovered,
+      strictTransitionSuppressed,strictExamTerminated,
       manifestVersion:CODE_SIMULATOR_PLUGIN_MANIFEST.version,sourcePanels,sourceRows,firstMemoryNames,
       sourceLineCount:first.sourceDisplay.lines.length,sourceActions,directActions,modalActions,activeSourceRows,oldTimelineRows,inlinePanels,
       contextDocks,contextTabs,memoryDockHosts,
@@ -4131,6 +4295,7 @@ int main() {
       firstTrueContinues:first.program.statements.find(candidate=>candidate.id===statement.branches.find(row=>row.when===true).targetStatementId).nextStatementId,
       selectedBranchTarget:statement.branches.find(row=>row.when===Boolean(statement.runtime.expectedValue)).targetStatementId,
       elseIfAdvanced,branchUndo:branchUndo.applied,branchUndoId:branchUndoStatement.id,
+      branchUndoPlan:[branchUndoPlan.mode,branchUndoPlan.focus],branchUndoClean,
       switchCases:items[3].program.statements.find(candidate=>candidate.kind==='selection').branches.length,
       switchBreakCount:switchBreaks.length,
       switchBreakSources:switchItem.sourceDisplay.lines.filter(line=>line.text.trim()==='break;'),
@@ -4198,7 +4363,23 @@ int main() {
   assert.strictEqual(result.strictCurrentDots,0);
   assert.strictEqual(result.strictBlockedMarkers,0);
   assert(result.strictPracticePaused&&result.strictPracticeRecovered&&result.strictCorrectSelection);
+  assert.strictEqual(result.strictPausedCandidates,result.strictExpectedCandidates);
+  assert.strictEqual(result.strictPausedMarkers,result.strictExpectedCandidates);
   assert(result.strictIfBranchContinues&&result.strictCaseBranchContinues);
+  assert(result.strictCompletedLineLocked);
+  assert.strictEqual(result.strictCandidateAfterBranch,result.strictEligibleAfterBranch);
+  assert(result.strictWrongPrecedenceRecorded&&result.strictWrongPrecedenceContinues
+    &&result.strictRollbackReopens&&result.strictRollbackCanCorrect);
+  assert.strictEqual(result.strictCompletedUndoTarget,'assignment-1');
+  assert.strictEqual(result.strictCompletedUndoControls,1);
+  assert(result.strictWrongBooleanContinues&&result.strictStaleProtected&&result.strictBooleanCanCorrect);
+  assert(result.strictConditionPaused&&result.strictConditionRecovered);
+  assert.strictEqual(result.strictConditionModalWarning,1);
+  assert.strictEqual(result.strictConditionSourceWarning,1);
+  assert(result.strictPrintPaused&&result.strictConcatPaused&&result.strictJavaOutputRecovered);
+  assert.strictEqual(result.strictPrintModalWarning,1);
+  assert.strictEqual(result.strictPrintModalReset,0);
+  assert.strictEqual(result.strictPrintSourceWarning,1);
   assert(result.strictTransitionSuppressed&&result.strictExamTerminated);
   assert.deepStrictEqual(result.firstMemoryNames,['score','absences']);
   assert.strictEqual(new Set(result.firstMemoryNames).size,result.firstMemoryNames.length);
@@ -4328,6 +4509,8 @@ int main() {
   assert.deepStrictEqual(result.liveEdges['selection-2'],['output-3','output-4']);
   assert.strictEqual(result.liveEdges['output-3'],'output-4');
   assert.strictEqual(result.liveEdges['output-4'],'program-return');
+  assert(result.branchUndo&&result.branchUndoClean);
+  assert.deepStrictEqual(result.branchUndoPlan,['modal','condition-expression']);
   assert(result.undeclaredError.includes("undeclared binding 'missing'"));
   assert(result.derivedError.includes("requires an integer literal initializer"));
   assert(result.badRangeError.includes("invalid @seed range for 'x'"));
