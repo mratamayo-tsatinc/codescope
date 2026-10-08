@@ -14,8 +14,7 @@ public class TaskHotel
         boolean eligible;
 
         roomTotal = nights * roomRate + mealCost / 3 * 2;
-        eligible = (nights >= 3 && roomRate >= 500) ||
-                   (mealCost > 500 && !((nights < 2)));
+        eligible = (nights >= 3 && roomRate >= 500) || (mealCost > 500 && !((nights < 2)));
 
         if (eligible && roomTotal >= 2000) {
             discount = discount + 50;

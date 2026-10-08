@@ -14,23 +14,17 @@ public class TaskEcho
         int points = 5;
         int status = 0;
 
-        if (age >= 18)
-        {
+        if (age >= 18) {
             points = points + 5;
 
-            if (score >= 80)
-            {
+            if (score >= 80) {
                 points = points + 10;
                 status = 1;
-            }
-            else
-            {
+            } else {
                 points = points + 2;
                 status = 2;
             }
-        }
-        else
-        {
+        } else {
             points = points - 1;
             status = 3;
         }

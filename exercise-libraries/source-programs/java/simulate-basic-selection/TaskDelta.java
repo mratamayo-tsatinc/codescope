@@ -12,23 +12,16 @@ public class TaskDelta
         int grade;
         int bonus = 3;
 
-        if (score >= 90)
-        {
+        if (score >= 90) {
             grade = 1;
             bonus = bonus + 5;
-        }
-        else if (score >= 75)
-        {
+        } else if (score >= 75) {
             grade = 2;
             bonus = bonus + 2;
-        }
-        else if (score >= 60)
-        {
+        } else if (score >= 60) {
             grade = 3;
             bonus = bonus - 1;
-        }
-        else
-        {
+        } else {
             grade = 4;
             bonus = 0;
         }

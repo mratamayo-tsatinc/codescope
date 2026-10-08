@@ -17,34 +17,23 @@ public class TaskIndia
 
         score = x + y * 3;
 
-        if (score >= 30)
-        {
+        if (score >= 30) {
             category = 3;
-        }
-        else if (score >= 20)
-        {
+        } else if (score >= 20) {
             category = 2;
-        }
-        else
-        {
+        } else {
             category = 1;
         }
 
-        if (category == 3)
-        {
+        if (category == 3) {
             points = points + 10;
-        }
-        else if (category == 2)
-        {
+        } else if (category == 2) {
             points = points + 5;
-        }
-        else
-        {
+        } else {
             points = points + 2;
         }
 
-        switch (category)
-        {
+        switch (category) {
             case 1:
                 score = score + points;
                 break;

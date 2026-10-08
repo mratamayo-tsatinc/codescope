@@ -14,8 +14,7 @@ public class TaskGolf
         int finalBalance;
         boolean status = false;
 
-        switch (choice)
-        {
+        switch (choice) {
             case 1:
                 finalBalance = balance + amount - fee;
                 status = amount > 0 && balance >= 0;

@@ -13,8 +13,7 @@ public class TaskGolf
         int points = 10;
         int value = 4;
 
-        switch (option)
-        {
+        switch (option) {
             case 1:
                 points = points + 5;
                 break;

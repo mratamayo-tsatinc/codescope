@@ -14,8 +14,7 @@ public class TaskIndia
         boolean qualified;
 
         finalPoints = basePoints + score / 10 * 2 - activities * 3;
-        qualified = (score >= 75 && activities >= 2) ||
-                    (score >= 90 && !((activities < 1)));
+        qualified = (score >= 75 && activities >= 2) || (score >= 90 && !((activities < 1)));
 
         if (qualified && score >= 85) {
             bonus = bonus + 10;

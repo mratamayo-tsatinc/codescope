@@ -16,8 +16,7 @@ public class TaskAlpha
         c = a + b * 2;
         total = c - a;
 
-        if (total > 10)
-        {
+        if (total > 10) {
             total = total + 3;
             c = c - 2;
         }

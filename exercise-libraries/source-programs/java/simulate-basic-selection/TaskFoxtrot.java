@@ -12,8 +12,7 @@ public class TaskFoxtrot
         int value = 10;
         int result;
 
-        switch (choice)
-        {
+        switch (choice) {
             case 1:
                 result = value + 5;
                 break;

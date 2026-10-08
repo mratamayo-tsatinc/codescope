@@ -15,17 +15,13 @@ public class TaskHotel
 
         result = a * 2 + b;
 
-        if (result > 20)
-        {
+        if (result > 20) {
             choice = 2;
-        }
-        else
-        {
+        } else {
             choice = 1;
         }
 
-        switch (choice)
-        {
+        switch (choice) {
             case 1:
                 result = result + 5;
                 a = a + 1;

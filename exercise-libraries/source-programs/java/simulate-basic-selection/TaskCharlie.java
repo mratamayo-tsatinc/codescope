@@ -13,19 +13,16 @@ public class TaskCharlie
         int points = 10;
         int level = 2;
 
-        if (score >= 60)
-        {
+        if (score >= 60) {
             points = points + 5;
         }
 
-        if (score >= 70)
-        {
+        if (score >= 70) {
             points = points + 10;
             level = level + 1;
         }
 
-        if (points > 12)
-        {
+        if (points > 12) {
             score = score + 4;
         }
 

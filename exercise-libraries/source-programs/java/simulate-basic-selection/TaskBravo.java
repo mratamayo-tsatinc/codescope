@@ -16,13 +16,10 @@ public class TaskBravo
 
         result = x - y * 2;
 
-        if (result > 5)
-        {
+        if (result > 5) {
             result = result + bonus;
             bonus = bonus + 2;
-        }
-        else
-        {
+        } else {
             result = result + 10;
             bonus = bonus - 1;
         }

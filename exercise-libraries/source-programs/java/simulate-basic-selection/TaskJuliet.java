@@ -20,43 +20,30 @@ public class TaskJuliet
 
         total = a * b + c;
 
-        if (total > 30)
-        {
+        if (total > 30) {
             total = total - 5;
             bonus = bonus + 2;
         }
 
-        if (total >= 25)
-        {
+        if (total >= 25) {
             level = 3;
-        }
-        else if (total >= 20)
-        {
+        } else if (total >= 20) {
             level = 2;
-        }
-        else
-        {
+        } else {
             level = 1;
         }
 
-        if (level == 3)
-        {
-            if (bonus >= 7)
-            {
+        if (level == 3) {
+            if (bonus >= 7) {
                 result = total + bonus;
-            }
-            else
-            {
+            } else {
                 result = total - bonus;
             }
-        }
-        else
-        {
+        } else {
             result = total + level;
         }
 
-        switch (level)
-        {
+        switch (level) {
             case 1:
                 result = result + 2;
                 a = a + 1;
