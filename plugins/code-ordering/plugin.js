@@ -2,6 +2,7 @@ const CODE_ORDERING_MANIFEST=Object.freeze({id:'code-ordering',version:'1.0.0',s
   responsibilities:Object.freeze(['interaction','presentation','feedback','scoring']),
   dependencies:Object.freeze(['language-core:program-semantics','simulate-output:source-answer-adapter'])});
 let coPlaybackTimer=null;
+let coPendingSourceViewport=null;
 function coWhitespaceLineNumbers(text,anchors){
   if(!anchors.length)return [];
   let first=Math.min(...anchors),last=Math.max(...anchors);
@@ -55,14 +56,7 @@ function coSource(item){
   item.orderLines.forEach((slot,i)=>{lines[slot.slotLine-1]=byId.get(item.order[i]).text;});
   return lines.join('\n');
 }
-function coPartial(parsed){
-  const core=parsed.coreProgramResult||{},output=(core.effects||[]).filter(v=>v.kind==='output').map(v=>v.text||'').join('');
-  const expectedLines=sourceProgramTerminalScreen(output);if(output.endsWith('\n'))expectedLines.pop();
-  const memory=core.ir&&core.ir.metadata&&core.ir.metadata.expectedMemory||{};
-  const variables=Object.values(memory).filter(v=>v&&v.mutable!==false&&v.kind!=='constant'&&v.initialized!==false&&v.value!==undefined)
-    .map(v=>({name:v.name,dataType:v.dataType||null,expected:sourceProgramAnswerValue(v)}));
-  return {output,expectedLines,variables};
-}
+
 function coPlaybackVariables(memory){
   return Object.values(memory||{}).filter(binding=>binding&&binding.mutable!==false&&binding.kind!=='constant'
     &&binding.initialized!==false&&binding.value!==undefined)
@@ -97,16 +91,38 @@ function coPlaybackFrames(parsed){
       answer:{output,expectedLines:sourceProgramTerminalScreen(output),variables:coPlaybackVariables(frame.memoryAfter)}};
   });
 }
+function coDiagnosticPlayback(source,frames,diagnostic){
+  const start=diagnostic&&diagnostic.location&&diagnostic.location.start||{},end=diagnostic&&diagnostic.location&&diagnostic.location.end||{};
+  const line=Number(start.line)||1,message=diagnostic.message||diagnostic.code||'Execution stopped';
+  const existing=frames.findIndex(frame=>frame.line===line&&frame.error);
+  if(existing>=0){
+    const visible=frames.slice(0,existing+1);
+    return {frames:visible,answer:visible[visible.length-1].answer,line,message};
+  }
+  const visible=frames.filter(frame=>frame.line<line);
+  const answer=visible.length?visible[visible.length-1].answer:{output:'',expectedLines:[],variables:[]};
+  visible.push({index:visible.length,line,endLine:Number(end.line)||line,
+    statementId:'diagnostic-line-'+line,statementKind:'diagnostic',
+    sourceText:String(source||'').split('\n')[line-1]||'',error:message,
+    reads:[],writes:[],consoleActive:false,outputBefore:answer.output||'',printedText:'',answer});
+  return {frames:visible,answer,line,message};
+}
 function coRun(item){
   const source=coSource(item);
   try{
     const parsed=sourceProgramParseExercise({details:sourceProgramMetadataAndSource(source,item.filename),
       filename:item.filename,language:item.language,sourceValueMode:'authored',
       inputValues:Object.fromEntries((item.inputs||[]).map(v=>[v.target,{value:v.value,raw:String(v.value)}]))});
-    const frames=coPlaybackFrames(parsed),diagnostic=(parsed.coreProgramResult.diagnostics||[])[0];
-    if(diagnostic)return {ok:false,source,frames,answer:coPartial(parsed),
-      line:diagnostic.location&&diagnostic.location.start&&diagnostic.location.start.line,
-      message:diagnostic.message||diagnostic.code};
+    const frames=coPlaybackFrames(parsed),diagnostics=parsed.coreProgramResult.diagnostics||[];
+    const diagnostic=diagnostics.slice().sort((left,right)=>{
+      const leftLine=left.location&&left.location.start&&left.location.start.line||Number.MAX_SAFE_INTEGER;
+      const rightLine=right.location&&right.location.start&&right.location.start.line||Number.MAX_SAFE_INTEGER;
+      return leftLine-rightLine;
+    })[0];
+    if(diagnostic){
+      const stopped=coDiagnosticPlayback(source,frames,diagnostic);
+      return {ok:false,source,frames:stopped.frames,answer:stopped.answer,line:stopped.line,message:stopped.message};
+    }
     return {ok:true,source,frames,answer:sourceProgramGenerateAnswer(parsed,item.filename)};
   }catch(error){const m=String(error.message||error).match(/(?:line\s+|:)(\d+)/i);
     return {ok:false,source,frames:[],answer:{output:'',expectedLines:[],variables:[]},line:m?Number(m[1]):null,message:String(error.message||error)};}
@@ -119,7 +135,7 @@ function coVisibleRunAnswer(item){
   const frame=coCurrentPlaybackFrame(item);
   return frame?frame.answer:(item.runResult&&item.runResult.answer||{output:'',variables:[]});
 }
-const CO_PLAYBACK_SEQUENCE_VERSION=1;
+const CO_PLAYBACK_SEQUENCE_VERSION=2;
 function coCreatePlayback(item){
   const finalRun=coRun(item);
   return {index:0,playing:false,speed:item._coPlaybackSpeed==null?.6:item._coPlaybackSpeed,
@@ -378,19 +394,56 @@ function coClearDragVisuals(root){
   if(!host)return;host.classList.remove('is-reordering');
   host.querySelectorAll('.co-order-line').forEach(row=>row.classList.remove('is-dragging','drop-before','drop-after'));
 }
+function coSourceViewportRowKey(row,index){
+  return row&&row.dataset&&(row.dataset.lineId||'source-line-'+row.dataset.sourceLine)||'source-row-'+index;
+}
+function coCaptureSourceViewport(){
+  if(typeof document==='undefined')return null;
+  const scaffold=document.querySelector('.code-ordering-workspace .co-source-scaffold');if(!scaffold)return null;
+  const rows=[...scaffold.querySelectorAll('.co-order-line')];
+  return {scrollTop:scaffold.scrollTop||0,scrollLeft:scaffold.scrollLeft||0,
+    lineScrolls:new Map(rows.map((row,index)=>{
+      const code=row.querySelector('.co-order-code');
+      return [coSourceViewportRowKey(row,index),code?code.scrollLeft||0:0];
+    }))};
+}
+function coRevealSourceRow(scaffold,row){
+  if(!scaffold||!row)return;
+  const viewport=scaffold.getBoundingClientRect(),bounds=row.getBoundingClientRect();
+  if(bounds.top<viewport.top)scaffold.scrollTop-=viewport.top-bounds.top;
+  else if(bounds.bottom>viewport.bottom)scaffold.scrollTop+=bounds.bottom-viewport.bottom;
+}
+function coRestoreSourceViewport(item,flow){
+  const pending=coPendingSourceViewport;
+  if(!pending||pending.item!==item)return;
+  coPendingSourceViewport=null;
+  if(!pending.viewport||typeof requestAnimationFrame!=='function')return;
+  requestAnimationFrame(()=>{
+    if(!flow.isConnected)return;
+    const scaffold=flow.querySelector('.co-source-scaffold');if(!scaffold)return;
+    const viewport=pending.viewport;
+    scaffold.scrollTop=viewport.scrollTop;scaffold.scrollLeft=viewport.scrollLeft;
+    [...scaffold.querySelectorAll('.co-order-line')].forEach((row,index)=>{
+      const saved=viewport.lineScrolls.get(coSourceViewportRowKey(row,index));
+      const code=row.querySelector('.co-order-code');if(code&&saved!==undefined)code.scrollLeft=saved;
+    });
+    if(pending.revealCurrent)coRevealSourceRow(scaffold,scaffold.querySelector('.co-order-line.is-playback-current'));
+  });
+}
 function coCaptureLineLayout(){
   if(typeof document==='undefined')return null;
-  const scaffold=document.querySelector('.code-ordering-workspace .co-source-scaffold');
+  const viewport=coCaptureSourceViewport();
   const rows=document.querySelectorAll('.code-ordering-workspace .co-order-line[data-line-id]');
   if(!rows.length)return null;
-  return {scrollTop:scaffold?scaffold.scrollTop:0,positions:new Map([...rows].map(row=>{
-    const box=row.getBoundingClientRect();return [row.dataset.lineId,{top:box.top,left:box.left}];
-  }))};
+  return {scrollTop:viewport?viewport.scrollTop:0,scrollLeft:viewport?viewport.scrollLeft:0,
+    positions:new Map([...rows].map(row=>{
+      const box=row.getBoundingClientRect();return [row.dataset.lineId,{top:box.top,left:box.left}];
+    }))};
 }
 function coAnimateLineSwitch(snapshot,movedId){
   if(!snapshot||typeof document==='undefined')return;
   const scaffold=document.querySelector('.code-ordering-workspace .co-source-scaffold');
-  if(scaffold)scaffold.scrollTop=snapshot.scrollTop;
+  if(scaffold){scaffold.scrollTop=snapshot.scrollTop;scaffold.scrollLeft=snapshot.scrollLeft||0;}
   const reduced=typeof window!=='undefined'&&window.matchMedia
     &&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(reduced||typeof requestAnimationFrame!=='function')return;
@@ -412,11 +465,13 @@ function coAnimateLineSwitch(snapshot,movedId){
 }
 function coDo(item,action){
   const moving=action&&action.type==='MOVE',movedId=moving?item.order[action.from]:null;
-  const layout=moving?coCaptureLineLayout():null;
+  const viewport=coCaptureSourceViewport(),layout=moving?coCaptureLineLayout():null;
   const result=applyActivityAction(item,action);
   if(result.applied){
     if(movedId&&action.focus){item._coFocusId=movedId;item._coFocusMove=action.focus;}
-    if(action.type!=='PLAYBACK_TICK')saveSessionProgress();render();if(movedId)coAnimateLineSwitch(layout,movedId);
+    if(action.type!=='PLAYBACK_TICK')saveSessionProgress();
+    coPendingSourceViewport={item,viewport,revealCurrent:/^PLAYBACK_(?:PLAY|NEXT|TICK|PREV)$/.test(action.type||'')};
+    render();if(movedId)coAnimateLineSwitch(layout,movedId);
   }
 }
 function coLineHasExecutionError(item,lineNumber){
@@ -616,6 +671,7 @@ function coRender({container,item,profile}){
   flow.parentNode.classList.add('code-ordering-workspace');
   flow.appendChild(h('div',{class:'so-instruction'},h('i',{class:'fa-solid fa-circle-info'}),profile.activity.instructions));
   flow.appendChild(coMainWorkspace(item));
+  coRestoreSourceViewport(item,flow);
   coSchedulePlaybackTrail(item,flow);
 
   const tabFocus=item._coTabFocus;delete item._coTabFocus;
