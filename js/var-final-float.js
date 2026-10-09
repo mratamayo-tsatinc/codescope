@@ -709,7 +709,7 @@ function varFinalCometCurve(start,end,viewportWidth,viewportHeight){
 // Shared source→destination travel cue used in both directions. The comet
 // head and its source-anchored fading trail are sampled from the exact same
 // SVG cubic path, matching the visual vocabulary of connector-lines.js.
-function runVarFinalComet(originRect,destRect,color,onArrival){
+function runVarFinalComet(originRect,destRect,color,onArrival,durationOverrideMs){
   const start={x:originRect.left+originRect.width/2,y:originRect.top+originRect.height/2};
   const end={x:destRect.left+destRect.width/2,y:destRect.top+destRect.height/2};
   const svgNS='http://www.w3.org/2000/svg';
@@ -765,7 +765,9 @@ function runVarFinalComet(originRect,destRect,color,onArrival){
   const pathLength=trail.getTotalLength();
   trail.style.strokeDasharray=`0 ${pathLength}`;
 
-  const durationMs=flightDurationMs;
+  const requestedDuration=Number(durationOverrideMs);
+  const durationMs=Number.isFinite(requestedDuration)&&requestedDuration>0
+    ?Math.max(80,requestedDuration):flightDurationMs;
   const started=(typeof performance!=='undefined'&&performance.now)?performance.now():Date.now();
   let done=false;
   const finish=()=>{

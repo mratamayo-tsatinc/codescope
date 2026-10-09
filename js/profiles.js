@@ -791,6 +791,28 @@ const PROFILES_RAW = [
     presentation:{workspace:'source-program',timeline:'statement-modal'},
     feedback:{showCorrectSolution:{practice:false,exam:false}},
   },
+  {
+    enabled:true,
+    meta:{id:'order-basic-output',name:'Order Basic Output',
+      description:'Arrange seeded output statements so the program produces the target screen state.'},
+    scoring:{itemCount:'manifest',pointsPerItem:'generated-answer'},
+    content:{values:{variables:'seeded',input:'seeded'}},
+    activity:{kind:'code-ordering',
+      instructions:'Arrange the executable statements, run the program, and match the target output.',
+      generator:{library:'source-programs',exerciseSet:'simulate-basic-output',shuffle:false}},
+    feedback:{showCorrectSolution:{practice:false,exam:false}},
+  },
+  {
+    enabled:true,
+    meta:{id:'order-output-variables',name:'Order Output + Variables',
+      description:'Arrange seeded statements so both the screen output and final variable state match the source program.'},
+    scoring:{itemCount:'manifest',pointsPerItem:'generated-answer'},
+    content:{values:{variables:'seeded',input:'seeded'}},
+    activity:{kind:'code-ordering',
+      instructions:'Arrange the executable statements, run the program, and reproduce its target output and final variable state.',
+      generator:{library:'source-programs',exerciseSet:'simulate-output-variables',shuffle:false}},
+    feedback:{showCorrectSolution:{practice:false,exam:false}},
+  },
 ];
 
 // Categories are authored here alongside the profiles. A profile belongs to
@@ -808,7 +830,12 @@ const PROFILE_CATEGORIES = [
       'trace-basic-output',
       'trace-output-variables',
   ]},
-  {id:'input-statements',name:'Trace Input Statements',enabled:true,
+  {
+    id:'order-output-statements',name:'Order Output Statements',enabled:true,
+    profileIds:[
+      'order-basic-output',
+      'order-output-variables',
+  ]},  {id:'input-statements',name:'Trace Input Statements',enabled:true,
     profileIds:[
       'program-input-source-flow', 
       'trace-multiple-inputs']},

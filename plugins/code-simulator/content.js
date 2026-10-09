@@ -19,6 +19,24 @@ function csSourceValueMode(profile){
 
 function csInputValueMode(profile){return programInputValueMode(profile);}
 
+// Interactive trace expectations must begin at the memory state reached by
+// canonical control flow. A skipped branch must not alter a later statement's operands.
+function csRuntimeMemoryValues(snapshot){
+  return Object.fromEntries(Object.entries(snapshot||{}).map(([name,binding])=>{
+    if(binding&&typeof binding==='object'&&!Array.isArray(binding)
+      &&Object.prototype.hasOwnProperty.call(binding,'value')){
+      const value=binding.initialized===false?undefined:binding.value;
+      return [name,Array.isArray(value)?value.slice():value];
+    }
+    return [name,Array.isArray(binding)?binding.slice():binding];
+  }));
+}
+
+function csStatementRuntimeMemory(statement,executionMemoryBefore,fallback){
+  const snapshots=statement&&executionMemoryBefore[statement.id]||[];
+  return snapshots.length?csRuntimeMemoryValues(snapshots[0]):Object.assign({},fallback);
+}
+
 function csBuildSelection(id,kind,statement,lineIndex,lines,memory,kinds,branches,dataTypes,language){
   if(!statement||statement.kind!=='selection'||statement.selectionKind!==kind)
     throw new Error(`selection source:${lineIndex+1}: unsupported selection header`);
@@ -139,6 +157,8 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
     const sharedStatement=sharedStatements.find(statement=>statement.kind!=='declaration')
       ||coreStatementsByLine.get(index+1);
     const coreStatement=sharedStatement||null;
+    const runtimeMemory=coreStatement
+      ?csStatementRuntimeMemory(coreStatement,executionMemoryBefore,executionMemory):executionMemory;
     if(!coreStatement&&!trimmed.endsWith(';')) return;
     if(coreStatement&&coreStatement.kind==='program-break'){
       const statement=coreStatement;statement.id=`program-break-${++breakIndex}`;
@@ -160,7 +180,7 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
       input.sourceIndent=(raw.match(/^\s*/)||[''])[0];input.nextStatementId='$end';mark(input);statements.push(input);return;
     }
     const output=coreStatement&&coreStatement.kind==='output'
-      ?buildOutputStatementRuntime(coreStatement,outputIndex,executionMemory):null;
+      ?buildOutputStatementRuntime(coreStatement,outputIndex,runtimeMemory):null;
     if(output&&coreStatement&&coreStatement.kind==='output')output.sourceSpan=coreStatement.sourceSpan;
     if(output){
       outputIndex++;output.sourceLine=index+1;output.sourceEndLine=index+1;output.sourceText=raw;
@@ -168,14 +188,18 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
     }
     if(coreStatement&&coreStatement.kind==='unary-update'){
       const statement=buildUnaryUpdateStatementRuntime(coreStatement.target,coreStatement.operator,
-        coreStatement.form,executionMemory,unaryIndex++);
+        coreStatement.form,runtimeMemory,unaryIndex++);
+      evaluateAndApplyCoreStatement(coreStatement,executionMemory,language,
+        'unary-preview-'+(index+1),'raw');
       statement.sourceSpan=coreStatement.sourceSpan;
       statement.sourceLine=index+1;statement.sourceEndLine=index+1;statement.sourceText=raw;
       statement.sourceIndent=(raw.match(/^\s*/)||[''])[0];mark(statement);statements.push(statement);return;
     }
     if(coreStatement&&coreStatement.kind==='assignment'){
-      const tree=coreExpressionIrToEngineTree(coreStatement.value,poExpressionSymbols(executionMemory,kinds,dataTypes));
-      const statement=buildAssignmentStatementRuntime(coreStatement.target,coreStatement.operator,tree,executionMemory,assignmentIndex++);
+      const tree=coreExpressionIrToEngineTree(coreStatement.value,poExpressionSymbols(runtimeMemory,kinds,dataTypes));
+      const statement=buildAssignmentStatementRuntime(coreStatement.target,coreStatement.operator,tree,runtimeMemory,assignmentIndex++);
+      evaluateAndApplyCoreStatement(coreStatement,executionMemory,language,
+        'assignment-preview-'+(index+1),'raw');
       statement.sourceSpan=coreStatement.sourceSpan;
       statement.targetDataType=dataTypes[coreStatement.target];
       statement.sourceLine=index+1;statement.sourceEndLine=index+1;statement.sourceText=raw;
@@ -183,7 +207,8 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
     }
   });
   programInputValidateDefinitions(inputDefinitions,exercise.filename);
-  Object.keys(memory).forEach(name=>delete memory[name]);Object.assign(memory,executionMemory);
+  const expectedMemory=coreProgramResult.ir.metadata&&coreProgramResult.ir.metadata.expectedMemory||{};
+  Object.keys(memory).forEach(name=>delete memory[name]);Object.assign(memory,csRuntimeMemoryValues(expectedMemory));
   statements.sort((left,right)=>left.sourceLine-right.sourceLine);
   if(!statements.length) throw new Error(`${exercise.filename}: no supported executable statements were found`);
   const controlFlow=coreBuildProgramControlFlow({source:details.source,lines,language,

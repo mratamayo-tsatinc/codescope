@@ -92,7 +92,7 @@ function soParseExercise(exercise,language,sourceValueMode='authored',inputValue
   sourceProgramValidateInputDefinitions(inputDefinitions,exercise.filename);
   const answer=sourceProgramGenerateAnswer(parsedSource,exercise.filename);
   return {id:exercise.id,filename:exercise.filename,source:parsedSource.source,
-    expectedLines:answer.expectedLines,variables:answer.variables,
+    output:answer.output,expectedLines:answer.expectedLines,variables:answer.variables,
     inputs:inputDefinitions.map(definition=>({target:definition.target,value:definition.materializedValue})),
     sourceValueMode,inputValueMode,seedValues:parsedSource.seedValues,
     coreProgram:parsedSource.coreProgramResult.ir,coreDiagnostics:parsedSource.coreProgramResult.diagnostics};

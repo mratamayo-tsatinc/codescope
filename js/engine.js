@@ -123,13 +123,13 @@ function numericValue(node){
   return node.declaredValue;
 }
 function deepClone(node){
-  if(node.kind==='binop') return {id:node.id, kind:'binop', op:node.op, left:deepClone(node.left), right:deepClone(node.right)};
+  if(node.kind==='binop') return Object.assign({},node,{left:deepClone(node.left),right:deepClone(node.right)});
   if(node.kind==='unary') return Object.assign({}, node, {inner:deepClone(node.inner)});
   return Object.assign({}, node);
 }
 function replaceNode(node,targetId,replacement){
   if(node.id===targetId) return replacement;
-  if(node.kind==='binop') return {id:node.id, kind:'binop', op:node.op, left:replaceNode(node.left,targetId,replacement), right:replaceNode(node.right,targetId,replacement)};
+  if(node.kind==='binop') return Object.assign({},node,{left:replaceNode(node.left,targetId,replacement),right:replaceNode(node.right,targetId,replacement)});
   if(node.kind==='unary') return Object.assign({},node,{inner:replaceNode(node.inner,targetId,replacement)});
   return node;
 }
@@ -138,7 +138,7 @@ function resolveNode(node,targetId){
     if(node.kind==='unary') return Object.assign({}, node, {resolved:true, resultValue: unaryComputedValue(node)});
     return Object.assign({}, node, {resolved:true});
   }
-  if(node.kind==='binop') return {id:node.id, kind:'binop', op:node.op, left:resolveNode(node.left,targetId), right:resolveNode(node.right,targetId)};
+  if(node.kind==='binop') return Object.assign({},node,{left:resolveNode(node.left,targetId),right:resolveNode(node.right,targetId)});
   if(node.kind==='unary') return Object.assign({},node,{inner:resolveNode(node.inner,targetId)});
   return node;
 }
@@ -152,7 +152,7 @@ function substituteNode(node,targetId){
     if(node.kind==='unary') return Object.assign({}, node, {substituted:true});
     return node;
   }
-  if(node.kind==='binop') return {id:node.id, kind:'binop', op:node.op, left:substituteNode(node.left,targetId), right:substituteNode(node.right,targetId)};
+  if(node.kind==='binop') return Object.assign({},node,{left:substituteNode(node.left,targetId),right:substituteNode(node.right,targetId)});
   if(node.kind==='unary') return Object.assign({},node,{inner:substituteNode(node.inner,targetId)});
   return node;
 }
@@ -265,19 +265,25 @@ function buildCanonicalTrace(originalTree){
 }
 function renderString(node,minPrec){
   minPrec = minPrec || 0;
-  if(node.kind==='literal') return formatLiteralNode(node);
-  if(node.kind==='variable'||node.kind==='constant') return node.resolved ? formatValue(node.declaredValue,node.dataType) : node.name;
+  const authored=Math.max(0,Number(node.authoredParentheses)||0);
+  const wrapAuthored=text=>authored?'('.repeat(authored)+text+')'.repeat(authored):text;
+  if(node.kind==='literal') return wrapAuthored(formatLiteralNode(node));
+  if(node.kind==='variable'||node.kind==='constant') return wrapAuthored(node.resolved ? formatValue(node.declaredValue,node.dataType) : node.name);
   if(node.kind==='unary'){
-    if(node.resolved) return formatValue(node.resultValue);
-    if(node.inner.kind==='binop')return node.op+'('+renderString(node.inner,0)+')';
-    const nm = node.substituted ? String(unaryBaseValue(node)) : (node.inner.kind==='literal' ? String(node.inner.value) : node.inner.name);
-    if(node.op==='!') return '!'+nm;
-    return node.form==='prefix' ? node.op+nm : nm+node.op;
+    if(node.resolved) return wrapAuthored(formatValue(node.resultValue));
+    let text;
+    if(node.inner.kind==='binop')text=node.op+(node.inner.authoredParentheses?renderString(node.inner,0):'('+renderString(node.inner,0)+')');
+    else{
+      const inner=renderString(node.inner,0);
+      text=node.op==='!'?'!'+inner:(node.form==='prefix'?node.op+inner:inner+node.op);
+    }
+    return wrapAuthored(text);
   }
   const p = prec(node.op);
   const left = renderString(node.left,p);
   const right = renderString(node.right,p+1);
-  const s = left+' '+node.op+' '+right;
-  return p<minPrec ? '('+s+')' : s;
+  const text = left+' '+node.op+' '+right;
+  const count=Math.max(authored,p<minPrec?1:0);
+  return count?'('.repeat(count)+text+')'.repeat(count):text;
 }
 

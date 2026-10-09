@@ -110,6 +110,7 @@ function parseCoreExpressionSource(request){
       expression=parse(0);
       if(!tokens[cursor]||tokens[cursor].type!==')') throw new Error(`${context.label}: missing ')'`);
       cursor++;
+      expression=Object.assign({},expression,{authoredParentheses:(expression.authoredParentheses||0)+1});
     }else throw new Error(`${context.label}: expected an operand in '${source.trim()}'`);
     if(tokens[cursor]&&(tokens[cursor].type==='++'||tokens[cursor].type==='--')){
       const operator=tokens[cursor++].type;
@@ -135,19 +136,25 @@ function parseCoreExpressionSource(request){
 
 function coreExpressionIrToEngineTree(expression,symbols){
   const table=coreExpressionSymbolTable(symbols);
-  if(expression.kind==='literal') return makeLiteral(expression.value,
-    {dataType:expression.dataType,sourceText:expression.sourceText});
+  if(expression.kind==='literal'){
+    const tree=makeLiteral(expression.value,{dataType:expression.dataType,sourceText:expression.sourceText});
+    if(expression.authoredParentheses)tree.authoredParentheses=expression.authoredParentheses;return tree;
+  }
   if(expression.kind==='identifier'){
     const symbol=table[expression.name];
     if(!symbol||symbol.initialized===false||symbol.value===undefined)
       throw new Error(`Expression identifier '${expression.name}' has no initialized value`);
-    return makeNamed(symbol.kind||expression.bindingKind||'variable',expression.name,symbol.value,
+    const tree=makeNamed(symbol.kind||expression.bindingKind||'variable',expression.name,symbol.value,
       {dataType:symbol.dataType||expression.dataType});
+    if(expression.authoredParentheses)tree.authoredParentheses=expression.authoredParentheses;return tree;
   }
-  if(expression.kind==='unary') return makeUnary(expression.operator,expression.form||'prefix',
-    coreExpressionIrToEngineTree(expression.operand,table));
-  return makeBinOp(expression.operator,coreExpressionIrToEngineTree(expression.left,table),
+  if(expression.kind==='unary'){
+    const tree=makeUnary(expression.operator,expression.form||'prefix',coreExpressionIrToEngineTree(expression.operand,table));
+    if(expression.authoredParentheses)tree.authoredParentheses=expression.authoredParentheses;return tree;
+  }
+  const tree=makeBinOp(expression.operator,coreExpressionIrToEngineTree(expression.left,table),
     coreExpressionIrToEngineTree(expression.right,table));
+  if(expression.authoredParentheses)tree.authoredParentheses=expression.authoredParentheses;return tree;
 }
 
 registerLanguageCoreService('parseExpression',parseCoreExpressionSource);

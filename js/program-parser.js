@@ -231,36 +231,47 @@ function coreBuildProgramControlFlow(spec){
 // activities derive their answer key from the resulting effects and memory.
 function coreExecuteParsedProgram(spec){
   const language=spec.language||'c',filename=spec.filename||null;
-  const memory=coreExpressionMemory(spec.symbols||{}),effects=[],trace=[],diagnostics=[],memoryBeforeByStatementId={};
+  const memory=coreExpressionMemory(spec.symbols||{}),effects=[],trace=[],diagnostics=[],memoryBeforeByStatementId={},executionFrames=[];
   const statements=spec.statements||[],byId=new Map(statements.map(statement=>[statement.id,statement]));
   const rowFor=statement=>({text:statement.sourceText||'',startLine:statement.sourceLine||1,
     endLine:statement.sourceEndLine||statement.sourceLine||1});
+  const snapshotMemory=()=>Object.fromEntries(Object.entries(memory).map(([name,binding])=>[name,
+    binding&&typeof binding==='object'&&!Array.isArray(binding)
+      ?Object.assign({},binding,{value:Array.isArray(binding.value)?binding.value.slice():binding.value})
+      :binding]));
   let current=statements[0]||null,steps=0;
   while(current&&current.id!=='$end'){
     if(++steps>10000){
       diagnostics.push(coreProgramDiagnostic('Program execution exceeded the supported step limit',rowFor(current),filename,'PROGRAM_STEP_LIMIT'));
       break;
     }
+    const before=snapshotMemory();
     try{
       if(!memoryBeforeByStatementId[current.id])memoryBeforeByStatementId[current.id]=[];
-      memoryBeforeByStatementId[current.id].push(Object.fromEntries(Object.entries(memory).map(([name,binding])=>[name,
-        binding&&typeof binding==='object'&&!Array.isArray(binding)
-          ?Object.assign({},binding,{value:Array.isArray(binding.value)?binding.value.slice():binding.value})
-          :binding])));
+      memoryBeforeByStatementId[current.id].push(before);
       const executed=evaluateAndApplyCoreStatement(current,memory,language,current.id,'bindings');
-      effects.push(...executed.effects.map(effect=>Object.assign({statementId:current.id},effect)));
-      trace.push(...executed.trace.map(step=>Object.assign({statementId:current.id},step)));
-      const flow=executed.effects.find(effect=>effect.kind==='flow');
+      const statementEffects=executed.effects.map(effect=>Object.assign({statementId:current.id},effect));
+      const statementTrace=executed.trace.map(step=>Object.assign({statementId:current.id},step));
+      effects.push(...statementEffects);trace.push(...statementTrace);
+      const flow=statementEffects.find(effect=>effect.kind==='flow');
       const nextId=flow&&flow.nextStatementId!==undefined?flow.nextStatementId:current.nextStatementId;
+      executionFrames.push({index:executionFrames.length,statementId:current.id,statementKind:current.kind,
+        sourceLine:current.sourceLine||1,sourceEndLine:current.sourceEndLine||current.sourceLine||1,
+        sourceText:current.sourceText||'',memoryBefore:before,memoryAfter:snapshotMemory(),
+        effects:statementEffects,trace:statementTrace,nextStatementId:nextId,error:null});
       current=nextId==='$end'?null:(byId.get(nextId)||null);
     }catch(error){
-      diagnostics.push(coreProgramDiagnostic(error,rowFor(current),filename,'PROGRAM_STATE_UNAVAILABLE'));
+      const diagnostic=coreProgramDiagnostic(error,rowFor(current),filename,'PROGRAM_STATE_UNAVAILABLE');
+      diagnostics.push(diagnostic);
+      executionFrames.push({index:executionFrames.length,statementId:current.id,statementKind:current.kind,
+        sourceLine:current.sourceLine||1,sourceEndLine:current.sourceEndLine||current.sourceLine||1,
+        sourceText:current.sourceText||'',memoryBefore:before,memoryAfter:snapshotMemory(),effects:[],trace:[],
+        nextStatementId:null,error:diagnostic.message||String(error&&error.message||error)});
       break;
     }
   }
-  return {memory,effects,trace,diagnostics,memoryBeforeByStatementId};
+  return {memory,effects,trace,diagnostics,memoryBeforeByStatementId,executionFrames};
 }
-
 function parseCoreProgram(request){
   const source=String(request.source||''),language=String(request.language||'c').toLowerCase();
   const filename=request.filename||(request.location&&request.location.filename)||null;
@@ -306,7 +317,7 @@ function parseCoreProgram(request){
   const dependencies=[...new Set(statements.flatMap(statement=>statement.dependencies||[]))];
   return {ir:languageCoreProgramIr({language,source,statements,metadata:{filename,
       statementRows:rows.map(row=>Object.assign({},row)),expectedMemory:executed.memory,
-      executionMemoryBefore:executed.memoryBeforeByStatementId}}),
+      executionMemoryBefore:executed.memoryBeforeByStatementId,executionFrames:executed.executionFrames}}),
     diagnostics:[...diagnostics,...controlFlow.diagnostics,...executed.diagnostics],
     dependencies,effects:executed.effects,trace:executed.trace};
 }

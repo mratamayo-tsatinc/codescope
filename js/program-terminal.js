@@ -11,7 +11,7 @@ let pendingProgramTerminalAnimation=null;
 let programTerminalAnimationActive=false;
 let programTerminalAnimationTimer=null;
 
-function programTerminalInteractionLocked(){return programTerminalAnimationActive;}
+function programTerminalInteractionLocked(){return programTerminalAnimationActive||!!pendingProgramTerminalAnimation;}
 
 function queueProgramTerminalAnimation(item,event,onComplete){
   if(!item||!event||event.type!=='OUTPUT') return;
@@ -123,6 +123,13 @@ function renderProgramTerminalPanel(item,program,options){
   return panel;
 }
 
+function programTerminalEscapeCue(character){
+  if(character==='\n')return {symbol:'↵',label:'newline (\\n)'};
+  if(character==='\r')return {symbol:'↤',label:'carriage return (\\r)'};
+  if(character==='\t')return {symbol:'⇥',label:'tab (\\t)'};
+  if(character==='\b')return {symbol:'⌫',label:'backspace (\\b)'};
+  return null;
+}
 function startProgramTerminalAnimation(panel,pre,escape,cursor,pending){
   if(!panel||!panel.isConnected||pendingProgramTerminalAnimation!==pending)return;
   pendingProgramTerminalAnimation=null;
@@ -148,20 +155,26 @@ function startProgramTerminalAnimation(panel,pre,escape,cursor,pending){
     const step=()=>{
       if(!panel.isConnected){finish();return;}
       if(index>=text.length){finish();return;}
-      const character=text[index++];
-      if(character==='\n'){
+      const character=text[index++],cue=programTerminalEscapeCue(character);
+      if(cue){
+        escape.textContent=cue.symbol;escape.title=cue.label;
         escape.classList.add('is-visible');cursor.classList.add('is-hidden');
+        const delay=Number.isFinite(Number(pending.event.escapeDelayMs))
+          ?Math.max(0,Number(pending.event.escapeDelayMs)):PROGRAM_TERMINAL_SETTINGS.escapeDelayMs;
         programTerminalAnimationTimer=setTimeout(()=>{
           terminalStream+=character;paint();escape.classList.remove('is-visible');cursor.classList.remove('is-hidden');step();
-        },PROGRAM_TERMINAL_SETTINGS.escapeDelayMs);
+        },delay);
       }else{
         terminalStream+=character;paint();
-        programTerminalAnimationTimer=setTimeout(step,PROGRAM_TERMINAL_SETTINGS.characterDelayMs);
+        const delay=Number.isFinite(Number(pending.event.characterDelayMs))
+          ?Math.max(0,Number(pending.event.characterDelayMs)):PROGRAM_TERMINAL_SETTINGS.characterDelayMs;
+        programTerminalAnimationTimer=setTimeout(step,delay);
       }
     };
     step();
   };
   if(source&&typeof runVarFinalComet==='function')
-    runVarFinalComet(source.getBoundingClientRect(),panel.getBoundingClientRect(),'#67e8c1',begin);
+    runVarFinalComet(source.getBoundingClientRect(),panel.getBoundingClientRect(),'#67e8c1',begin,
+      Number.isFinite(Number(pending.event.trailDurationMs))?Number(pending.event.trailDurationMs):undefined);
   else begin();
 }

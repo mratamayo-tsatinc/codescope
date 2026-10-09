@@ -57,7 +57,7 @@ function tagParenGroups(node, ctxMinPrec, groupId){
     return;
   }
   const p = prec(node.op);
-  if(p < ctxMinPrec){
+  if(node.authoredParentheses||p < ctxMinPrec){
     // This subtree would be printed with explicit parentheses (renderString
     // would wrap it) — a real required-parens region. Tag every leaf beneath
     // it with a shared group id (reusing an enclosing group id if this is
