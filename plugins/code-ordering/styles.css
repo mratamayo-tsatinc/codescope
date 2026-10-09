@@ -26,7 +26,7 @@
 .co-line-actions button{cursor:pointer;transition:border-color .15s ease,color .15s ease,background-color .15s ease}
 .co-line-actions button:hover:not(:disabled),.co-line-actions button:focus-visible{outline:0;border-color:color-mix(in srgb,var(--op) 65%,var(--line));background:color-mix(in srgb,var(--op) 8%,var(--panel-alt));color:var(--op)}
 @media(pointer:coarse){.co-line-actions button{width:34px;height:34px}}
-@media(prefers-reduced-motion:reduce){.co-order-line{transition:none}}
+@media(prefers-reduced-motion:reduce){.co-order-line{transition:none}.co-order-list.is-reordering .co-order-line.is-dragging{transform:none}}
 
 .co-order-line.is-active-move{z-index:2;border-color:color-mix(in srgb,var(--op) 55%,var(--line));box-shadow:0 4px 14px color-mix(in srgb,var(--op) 13%,transparent)}
 .co-order-line.is-displaced-move{z-index:1}
@@ -47,6 +47,31 @@
 .co-order-code{align-self:center;padding-left:12px}
 .co-line-actions-placeholder{visibility:hidden;pointer-events:none}
 .co-order-line.drop-before::before,.co-order-line.drop-after::after{left:0;right:10px}
+/* Drag feedback stays within the existing orange interaction language. The
+   source row reads as lifted, and the destination reads as an insertion target. */
+.co-order-list.is-reordering .co-order-line:not(.is-dragging):not(.drop-before):not(.drop-after){opacity:.58}
+.co-order-list.is-reordering .co-order-line.is-dragging{
+  z-index:5;
+  opacity:.86;
+  border-color:color-mix(in srgb,var(--op) 72%,var(--line));
+  background:color-mix(in srgb,var(--op) 14%,var(--panel));
+  box-shadow:inset 3px 0 0 var(--op),0 8px 22px color-mix(in srgb,var(--op) 24%,transparent);
+  transform:scale(1.012);
+}
+.co-order-list.is-reordering .co-order-line.is-dragging .co-order-number{color:var(--op)}
+.co-order-list.is-reordering .co-order-line.drop-before,
+.co-order-list.is-reordering .co-order-line.drop-after{
+  opacity:1;
+  background:color-mix(in srgb,var(--op) 9%,var(--panel));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--op) 38%,transparent);
+}
+.co-order-list.is-reordering .co-order-line.drop-before::before,
+.co-order-list.is-reordering .co-order-line.drop-after::after{
+  left:6px;
+  right:10px;
+  height:3px;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--op) 28%,transparent),0 0 11px color-mix(in srgb,var(--op) 55%,transparent);
+}
 @media(max-width:560px){.co-order-list{margin:0;padding:6px 0}.co-order-line{grid-template-columns:38px minmax(0,1fr) auto;padding-right:6px}.co-order-number{display:flex;padding-right:8px}.co-order-code{padding-left:9px}}
 
 /* Main ordering workspace: simultaneous comparison on wide screens and the

@@ -392,7 +392,10 @@ function coSyncFeedback(item){
 function coClearDragVisuals(root){
   const host=root&&root.closest?root.closest('.co-order-list'):document.querySelector('.co-order-list');
   if(!host)return;host.classList.remove('is-reordering');
-  host.querySelectorAll('.co-order-line').forEach(row=>row.classList.remove('is-dragging','drop-before','drop-after'));
+  host.querySelectorAll('.co-order-line').forEach(row=>{
+    row.classList.remove('is-dragging','drop-before','drop-after');
+    row.removeAttribute('aria-grabbed');
+  });
 }
 function coSourceViewportRowKey(row,index){
   return row&&row.dataset&&(row.dataset.lineId||'source-line-'+row.dataset.sourceLine)||'source-row-'+index;
@@ -497,8 +500,11 @@ function coDragStart(event,index){
   if(event.target.closest&&event.target.closest('.co-line-actions')){event.preventDefault();return;}
   const row=event.currentTarget.closest('.co-order-line');
   event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',String(index));
-  if(row&&event.dataTransfer.setDragImage)event.dataTransfer.setDragImage(row,24,row.offsetHeight/2);
-  requestAnimationFrame(()=>{if(row){row.classList.add('is-dragging');row.closest('.co-order-list').classList.add('is-reordering');}});
+  if(row){
+    row.classList.add('is-dragging');row.setAttribute('aria-grabbed','true');
+    row.closest('.co-order-list').classList.add('is-reordering');
+    if(event.dataTransfer.setDragImage)event.dataTransfer.setDragImage(row,24,row.offsetHeight/2);
+  }
 }
 function coDragOver(event){
   event.preventDefault();event.dataTransfer.dropEffect='move';
