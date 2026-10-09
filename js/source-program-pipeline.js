@@ -354,10 +354,31 @@ function sourceProgramAnswerValue(binding){
   return String(value==null?'':value);
 }
 
-function sourceProgramGenerateAnswer(parsed,filename){
+function sourceProgramScreenStateText(stream){
+  const raw=String(stream||'');
+  const lines=coreTerminalScreen(raw).lines.slice();
+  if(raw.endsWith('\n'))lines.pop();
+  return lines.join('\n');
+}
+
+function sourceProgramStateMatchesAnswer(item){
+  const answer=item&&item.programAnswerKey,program=item&&item.program;
+  if(!answer||!program)return null;
+  const memoryMatches=(answer.variables||[]).every(variable=>{
+    const binding=program.memory&&program.memory[variable.name];
+    if(!binding||typeof binding!=='object'||binding.initialized===false||binding.value===undefined)return false;
+    if(Array.isArray(variable.value)||Array.isArray(binding.value))
+      return JSON.stringify(binding.value)===JSON.stringify(variable.value);
+    return binding.value===variable.value;
+  });
+  const studentOutput=typeof programOutputText==='function'?programOutputText(program)
+    :(program.events||[]).filter(event=>event&&event.type==='OUTPUT').map(event=>event.text||'').join('');
+  return memoryMatches&&sourceProgramScreenStateText(studentOutput)===sourceProgramScreenStateText(answer.output);
+}
+function sourceProgramGenerateAnswer(parsed,filename,options){
   const result=parsed&&parsed.coreProgramResult;
   if(!result||!result.ir)throw new Error(`${filename||'source'}: no executable program was parsed`);
-  if(result.diagnostics&&result.diagnostics.length){
+  if(result.diagnostics&&result.diagnostics.length&&!(options&&options.allowDiagnostics)){
     const details=result.diagnostics.map(diagnostic=>{
       const line=diagnostic.location&&diagnostic.location.start&&diagnostic.location.start.line;
       return `${line?`line ${line}: `:''}${diagnostic.message||diagnostic.code}`;

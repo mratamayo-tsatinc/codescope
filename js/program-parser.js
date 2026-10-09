@@ -231,7 +231,7 @@ function coreBuildProgramControlFlow(spec){
 // activities derive their answer key from the resulting effects and memory.
 function coreExecuteParsedProgram(spec){
   const language=spec.language||'c',filename=spec.filename||null;
-  const memory=coreExpressionMemory(spec.symbols||{}),effects=[],trace=[],diagnostics=[];
+  const memory=coreExpressionMemory(spec.symbols||{}),effects=[],trace=[],diagnostics=[],memoryBeforeByStatementId={};
   const statements=spec.statements||[],byId=new Map(statements.map(statement=>[statement.id,statement]));
   const rowFor=statement=>({text:statement.sourceText||'',startLine:statement.sourceLine||1,
     endLine:statement.sourceEndLine||statement.sourceLine||1});
@@ -242,6 +242,11 @@ function coreExecuteParsedProgram(spec){
       break;
     }
     try{
+      if(!memoryBeforeByStatementId[current.id])memoryBeforeByStatementId[current.id]=[];
+      memoryBeforeByStatementId[current.id].push(Object.fromEntries(Object.entries(memory).map(([name,binding])=>[name,
+        binding&&typeof binding==='object'&&!Array.isArray(binding)
+          ?Object.assign({},binding,{value:Array.isArray(binding.value)?binding.value.slice():binding.value})
+          :binding])));
       const executed=evaluateAndApplyCoreStatement(current,memory,language,current.id,'bindings');
       effects.push(...executed.effects.map(effect=>Object.assign({statementId:current.id},effect)));
       trace.push(...executed.trace.map(step=>Object.assign({statementId:current.id},step)));
@@ -253,7 +258,7 @@ function coreExecuteParsedProgram(spec){
       break;
     }
   }
-  return {memory,effects,trace,diagnostics};
+  return {memory,effects,trace,diagnostics,memoryBeforeByStatementId};
 }
 
 function parseCoreProgram(request){
@@ -300,7 +305,8 @@ function parseCoreProgram(request){
   const executed=coreExecuteParsedProgram({source,language,filename,statements,symbols:request.symbols});
   const dependencies=[...new Set(statements.flatMap(statement=>statement.dependencies||[]))];
   return {ir:languageCoreProgramIr({language,source,statements,metadata:{filename,
-      statementRows:rows.map(row=>Object.assign({},row)),expectedMemory:executed.memory}}),
+      statementRows:rows.map(row=>Object.assign({},row)),expectedMemory:executed.memory,
+      executionMemoryBefore:executed.memoryBeforeByStatementId}}),
     diagnostics:[...diagnostics,...controlFlow.diagnostics,...executed.diagnostics],
     dependencies,effects:executed.effects,trace:executed.trace};
 }

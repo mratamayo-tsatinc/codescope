@@ -2142,7 +2142,8 @@ function testAssignmentOperatorProfiles(){
     let allCorrect=true, allFullPoints=true, constantWriteRejected=false,sharedRendererVisible=false,
       assignmentSourceVisible=false,compoundRequiresTarget=true,targetRevealVisible=false,
       compoundResultVisible=false,plainEqualsUnchanged=false,compoundUndoWorks=false,
-      targetReadCreatesStep=false,targetReadCreatesRow=false,targetUndoRemovesStep=false;
+      targetReadCreatesStep=false,targetReadCreatesRow=false,targetUndoRemovesStep=false,
+      finalStatementIdsCorrect=true,finalRenderedActionAccepted=true;
     const statementCounts=[];
     profiles.forEach(profile=>{
       const item=generateItemsForProfile(profile.id)[0];
@@ -2218,6 +2219,23 @@ function testAssignmentOperatorProfiles(){
             completedStatement.target+String(completedStatement.runtime.assignedValue));
         }
       }
+      const finalHost=new FakeNode('div');renderProgramItem(finalHost,item);
+      const findActiveFinal=node=>{
+        if(!node)return null;
+        const classes=String(node.className||'').split(/\\s+/);
+        if(classes.includes('legacy-program-statement')&&classes.includes('active'))return node;
+        for(const child of node.children||[]){const found=findActiveFinal(child);if(found)return found;}
+        return null;
+      };
+      const renderedFinal=findActiveFinal(finalHost);
+      const renderedStatementId=renderedFinal&&renderedFinal.attributes['data-statement-id'];
+      finalStatementIdsCorrect=finalStatementIdsCorrect
+        &&renderedStatementId===currentProgramStatement(item).id
+        &&renderedStatementId==='final-expression';
+      const firstFinalOperand=collectUnresolvedFlat(item.workingFlat,[])[0];
+      const finalTraceBefore=item.trace.length;
+      handleTokenClick({type:'substitute',id:firstFinalOperand.id,statementId:renderedStatementId});
+      finalRenderedActionAccepted=finalRenderedActionAccepted&&item.trace.length===finalTraceBefore+1;
       while(collectUnresolvedFlat(item.workingFlat,[]).length){
         const node=collectUnresolvedFlat(item.workingFlat,[])[0];
         handleTokenClick({type:'substitute',id:node.id});
@@ -2236,7 +2254,8 @@ function testAssignmentOperatorProfiles(){
       constantWriteRejected,sharedRendererVisible,assignmentSourceVisible,compoundRequiresTarget,
       targetRevealVisible,compoundResultVisible,plainEqualsUnchanged,compoundUndoWorks,
       targetReadCreatesStep,targetReadCreatesRow,targetUndoRemovesStep,
-      operationCuesCorrect,mergeSymbolsCorrect,mergeTimingIsDeliberate,statementCounts});
+      operationCuesCorrect,mergeSymbolsCorrect,mergeTimingIsDeliberate,statementCounts,
+      finalStatementIdsCorrect,finalRenderedActionAccepted});
   })()`));
   assert.deepStrictEqual(result,{
     profileCount:8,operators:['%=','*=','+=','-=','/=','='],allCorrect:true,allFullPoints:true,
@@ -2245,7 +2264,7 @@ function testAssignmentOperatorProfiles(){
     compoundUndoWorks:true,
     targetReadCreatesStep:true,targetReadCreatesRow:true,targetUndoRemovesStep:true,
     operationCuesCorrect:true,mergeSymbolsCorrect:true,mergeTimingIsDeliberate:true,
-    statementCounts:[1,2,1,2,1,3,2,3]
+    statementCounts:[1,2,1,2,1,3,2,3],finalStatementIdsCorrect:true,finalRenderedActionAccepted:true
   });
 }
 
@@ -3359,7 +3378,7 @@ function testProgramOutputStatementPlugin(){
     'plugins/program-input/manifest.js','plugins/program-input/parser.js','plugins/program-input/statement.js']);
   load(ctx,['program-item-builder.js']);
   loadRelative(ctx,['plugins/program-output/content.js']);
-  load(ctx,['state.js','dom-helpers.js','program-terminal.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
+  load(ctx,['state.js','manual-response.js','dom-helpers.js','program-terminal.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
     'render-assignment.js','render-unary-update.js','render-session.js']);
   loadRelative(ctx,['plugins/program-output/renderer.js']);
   const installBank=(language)=>{
@@ -3384,6 +3403,27 @@ function testProgramOutputStatementPlugin(){
     state.language='c';initializeSeededRandom(73129);
     const sourceItems=generateItemsForProfile('program-output-basics');
     const item=sourceItems[0];resetRandomGenerator();
+    const studentItem=JSON.parse(JSON.stringify(sourceItems[0]));
+    studentItem.program.memory={};
+    studentItem.decls.forEach(declaration=>{studentItem.program.memory[declaration.name]={
+      name:declaration.name,kind:declaration.kind,initialized:true,value:declaration.value};});
+    const studentOutputIndex=studentItem.program.statements.findIndex(statement=>statement.kind==='output');
+    studentItem.program.statements.forEach((statement,index)=>{
+      statement.status=index<studentOutputIndex?'complete':(index===studentOutputIndex?'active':'locked');
+    });
+    studentItem.program.cursor=studentOutputIndex;
+    const studentOutputStatement=studentItem.program.statements[studentOutputIndex];
+    studentItem.manualResponsePlan={enabled:true,outputMode:'complete-emission',namedKeys:{},operatorKeys:{},
+      outputKeys:{[studentOutputStatement.id]:true}};
+    const studentExpectedText=programOutputStatementText(studentOutputStatement,true);
+    const studentEnteredText=studentExpectedText+'wrong\\n';
+    const studentOutputPlan=statementInteractionPlan(studentItem,studentOutputStatement);
+    const studentOutputBegan=dispatchProgramAction(studentItem,studentOutputPlan.action,{applyExpressionAction});
+    const studentOutputForm=renderProgramOutputInlineResponse(studentItem,studentItem.program,studentOutputStatement);
+    const studentOutputSubmitted=dispatchProgramAction(studentItem,{type:'emit-student-output',
+      statementId:studentOutputStatement.id,text:studentEnteredText},{applyExpressionAction});
+    const studentOutputEvent=studentItem.program.events[studentItem.program.events.length-1];
+
     const kinds=item.program.statements.map(statement=>statement.kind);
     item.program.memory={};
     item.decls.forEach(declaration=>{item.program.memory[declaration.name]={name:declaration.name,
@@ -3512,6 +3552,15 @@ function testProgramOutputStatementPlugin(){
     const tolerant=poParseSourceExercise({filename:'MutedUnsupported.c',raw:testTolerantProgram},'c');
     return JSON.stringify({
       manifest:PROGRAM_OUTPUT_PLUGIN_MANIFEST.id,
+      studentOutputPlanMode:studentOutputPlan.mode,
+      studentOutputBegan:studentOutputBegan.applied,
+      studentOutputForm:countNodesWithClass(studentOutputForm,'program-output-prediction'),
+      studentOutputSubmitted:studentOutputSubmitted.applied,
+      studentOutputRendered:programOutputText(studentItem.program)===studentEnteredText,
+      studentOutputExpectedPreserved:studentOutputEvent.expectedText===studentExpectedText,
+      studentOutputMarkedWrong:studentOutputEvent.wasCorrect===false,
+      studentOutputAdvanced:studentItem.program.cursor>studentOutputIndex,
+
       sourceProfileItemCount:sourceProfile.scoring.itemCount,
       sourceProfileSelectionCount:sourceProfile.content.selection.count,
       sourceFlowItemCount:sourceFlowProfile.scoring.itemCount,
@@ -3576,6 +3625,12 @@ function testProgramOutputStatementPlugin(){
     });
   })()`));
   assert.strictEqual(result.manifest,'program-output');
+  assert.strictEqual(result.studentOutputPlanMode,'direct');
+  assert(result.studentOutputBegan&&result.studentOutputSubmitted);
+  assert.strictEqual(result.studentOutputForm,1);
+  assert(result.studentOutputRendered&&result.studentOutputExpectedPreserved);
+  assert(result.studentOutputMarkedWrong&&result.studentOutputAdvanced);
+
   assert.strictEqual(result.sourceProfileItemCount,'manifest');
   assert.strictEqual(result.sourceProfileSelectionCount,'all');
   assert.strictEqual(result.sourceFlowItemCount,'manifest');
@@ -3693,7 +3748,7 @@ function testCodeSimulatorPlugin(){
   load(ctx,['program-item-builder.js']);
   loadRelative(ctx,['plugins/program-output/content.js','plugins/code-simulator/manifest.js',
     'plugins/code-simulator/statement.js','plugins/code-simulator/content.js']);
-  load(ctx,['state.js','dom-helpers.js','program-terminal.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
+  load(ctx,['state.js','manual-response.js','dom-helpers.js','program-terminal.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
     'render-assignment.js','render-unary-update.js','render-session.js']);
   loadRelative(ctx,['plugins/program-output/renderer.js','plugins/program-input/renderer.js','plugins/code-simulator/renderer.js']);
   const selectionStatementSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','statement.js'),'utf8');
@@ -4562,7 +4617,8 @@ int main() {
   assert(selectionStyles.includes('font-variant-ligatures:none'));
   assert(selectionStyles.includes('font-feature-settings:"liga" 0,"calt" 0'));
   assert(selectionStyles.includes('.statement-trace-modal-content{width:min(1180px'));
-  assert(selectionStyles.includes('.statement-trace-layout{display:grid;grid-template-columns:minmax(0,1fr)'));
+  assert(selectionStyles.includes('.statement-trace-layout{display:grid;grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)'));
+  assert(selectionStyles.includes('.statement-trace-context{position:sticky;top:0;z-index:35;display:grid;grid-template-columns:repeat(2'));
   assert(selectionStyles.includes('.statement-trace-memory-list{display:grid;'));
   assert(selectionStyles.includes('.statement-trace-actions{display:flex;'));
   assert(sharedStyles.includes('.program-source-file-panel{'));
@@ -4602,7 +4658,7 @@ function testProgramInputPlugin(){
   load(ctx,['program-item-builder.js']);
   loadRelative(ctx,['plugins/program-output/content.js','plugins/code-simulator/manifest.js',
     'plugins/code-simulator/statement.js','plugins/code-simulator/content.js']);
-  load(ctx,['state.js','dom-helpers.js','program-terminal.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
+  load(ctx,['state.js','manual-response.js','dom-helpers.js','program-terminal.js','var-final-state.js','render-tree.js','render-flat.js','render-declaration.js',
     'render-assignment.js','render-unary-update.js','render-session.js']);
   loadRelative(ctx,['plugins/program-output/renderer.js','plugins/program-input/renderer.js','plugins/code-simulator/renderer.js']);
   for(const language of ['c','java']){

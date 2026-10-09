@@ -5,13 +5,21 @@
 function effectiveManualResponseConfig(profile){
   const policy=state.mode==='exam'?activeExamPolicy():activePracticePolicy();
   const modeConfig=(policy&&policy.manualResponses)||{mode:'profile'};
-  if(modeConfig.mode==='off') return {enabled:false,namedValueRate:0,operatorRate:0};
+  const profileConfig=profile&&profile.manualResponses||{};
+  const profileOutput=profileConfig.output&&profileConfig.output.enabled
+    ?Object.assign({mode:'complete-emission',rate:100},profileConfig.output)
+    :{enabled:false,mode:'complete-emission',rate:0};
+  if(modeConfig.mode==='off') return {enabled:false,namedValueRate:0,operatorRate:0,
+    output:{enabled:false,mode:profileOutput.mode,rate:0}};
   if(modeConfig.mode==='custom') return {enabled:true,
-    namedValueRate:modeConfig.namedValueRate,operatorRate:modeConfig.operatorRate};
-  return profile&&profile.manualResponses&&profile.manualResponses.enabled
-    ? Object.assign({namedValueRate:0,operatorRate:0},profile.manualResponses)
-    : {enabled:false,namedValueRate:0,operatorRate:0};
+    namedValueRate:modeConfig.namedValueRate,operatorRate:modeConfig.operatorRate,
+    output:profileOutput};
+  return profileConfig.enabled
+    ?Object.assign({namedValueRate:0,operatorRate:0,output:profileOutput},profileConfig,{output:profileOutput})
+    :{enabled:false,namedValueRate:0,operatorRate:0,
+      output:{enabled:false,mode:'complete-emission',rate:0}};
 }
+
 
 function manualStatementEntries(item){
   if(item.program&&Array.isArray(item.program.statements)) return item.program.statements.map(statement=>({
@@ -65,25 +73,40 @@ function selectExactManualQuota(entries,rate){
 
 function assignManualResponsePlans(profile,items){
   const config=effectiveManualResponseConfig(profile);
-  const named=[],operators=[];
+  const named=[],operators=[],outputs=[];
   items.forEach((item,itemIndex)=>{
     namedManualKeys(item).forEach(key=>named.push({key:`${itemIndex}|${key}`,itemIndex,local:key}));
     operatorManualKeys(item).forEach(key=>operators.push({key:`${itemIndex}|${key}`,itemIndex,local:key}));
+    (item.program&&item.program.statements||[]).filter(statement=>statement.kind==='output')
+      .forEach(statement=>outputs.push({key:`${itemIndex}|${statement.id}`,itemIndex,local:statement.id}));
   });
   const selectedNamed=config.enabled?selectExactManualQuota(named,config.namedValueRate):new Set();
   const selectedOperators=config.enabled?selectExactManualQuota(operators,config.operatorRate):new Set();
+  const selectedOutputs=config.enabled&&config.output&&config.output.enabled
+    ?selectExactManualQuota(outputs,config.output.rate):new Set();
   items.forEach((item,itemIndex)=>{
     item.manualResponsePlan={enabled:!!config.enabled,
       namedValueRate:config.namedValueRate||0,operatorRate:config.operatorRate||0,
-      namedKeys:{},operatorKeys:{}};
+      outputMode:config.output&&config.output.mode||'complete-emission',
+      namedKeys:{},operatorKeys:{},outputKeys:{}};
     named.filter(entry=>entry.itemIndex===itemIndex).forEach(entry=>{
       if(selectedNamed.has(entry.key)) item.manualResponsePlan.namedKeys[entry.local]=true;
     });
     operators.filter(entry=>entry.itemIndex===itemIndex).forEach(entry=>{
       if(selectedOperators.has(entry.key)) item.manualResponsePlan.operatorKeys[entry.local]=true;
     });
+    outputs.filter(entry=>entry.itemIndex===itemIndex).forEach(entry=>{
+      if(selectedOutputs.has(entry.key)) item.manualResponsePlan.outputKeys[entry.local]=true;
+    });
   });
 }
+
+function manualOutputResponsePlanned(item,statement){
+  const plan=item&&item.manualResponsePlan;
+  return !!(plan&&plan.enabled&&plan.outputMode==='complete-emission'
+    &&statement&&statement.kind==='output'&&plan.outputKeys&&plan.outputKeys[statement.id]);
+}
+
 
 function manualOperatorOrdinal(runtime){
   return (runtime&&runtime.trace||[]).filter(step=>step.action==='EVALUATE'||step.action==='UNARY').length;

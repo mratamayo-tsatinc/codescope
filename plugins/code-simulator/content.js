@@ -107,10 +107,13 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
     }
   });
   let selectionIndex=0;
+  const executionMemoryBefore=coreProgramResult.ir.metadata&&coreProgramResult.ir.metadata.executionMemoryBefore||{};
   coreProgramResult.ir.statements.filter(statement=>statement.kind==='selection').forEach(coreStatement=>{
     const index=coreStatement.sourceLine-1;
+    const snapshots=executionMemoryBefore[coreStatement.id]||[];
+    const conditionMemory=snapshots[0]||memory;
     const statement=csBuildSelection(`selection-${++selectionIndex}`,coreStatement.selectionKind,
-      coreStatement,index,lines,memory,kinds,[],dataTypes,language);
+      coreStatement,index,lines,conditionMemory,kinds,[],dataTypes,language);
     mark(statement);statements.push(statement);
   });
   const executionMemory={};
@@ -197,11 +200,18 @@ function csBuildItem(profile,exercise,language,itemNumber){
   if(parsed.details.resultName&&!Object.prototype.hasOwnProperty.call(parsed.memory,resultName))
     throw new Error(`${exercise.filename}: @result '${resultName}' is not declared`);
   const resultKind=parsed.kinds[resultName]||'variable',resultValue=parsed.memory[resultName];
+  const generatedAnswer=sourceProgramGenerateAnswer(parsed.details,exercise.filename,{allowDiagnostics:true});
+  const expectedMemory=parsed.details.coreProgramResult.ir.metadata.expectedMemory||{};
+  const programAnswerKey={output:generatedAnswer.output,variables:generatedAnswer.variables.map(variable=>{
+    const binding=expectedMemory[variable.name]||{};
+    return Object.assign({},variable,{value:binding.value,initialized:binding.initialized!==false,
+      kind:binding.kind||'variable',mutable:binding.mutable!==false});
+  })};
   const originalTree=last?makeNamed(resultKind,resultName,resultValue):makeLiteral(0),originalFlat=flattenInstance(originalTree);
   const item={profileId:profile.id,itemNumber,exerciseId:exercise.id,filename:exercise.filename,exerciseTitle:parsed.details.title,
     source:parsed.details.source,sourceTemplate:parsed.details.templateSource,sourceSeedValues:parsed.details.seedValues,
     sourceValueMode:parsed.details.sourceValueMode,sourceInputValues:parsed.details.inputValues,
-    inputValueMode:parsed.details.inputValueMode,sourceDisplay:parsed.sourceDisplay,sourceFlow:true,language,originalTree,originalFlat,
+    inputValueMode:parsed.details.inputValueMode,programAnswerKey,sourceDisplay:parsed.sourceDisplay,sourceFlow:true,language,originalTree,originalFlat,
     decls:parsed.declarations,resultName,correctFinalValue:last?resultValue:0,canonicalTrace:buildCanonicalTrace(originalTree),
     workingFlat:deepCloneFlat(originalFlat),history:[deepCloneFlat(originalFlat)],trace:[],checked:false,itemScore:null,points:null,maxPoints:null,
     correctSteps:0,totalOpSteps:0,wasCorrectFinal:null,showSolution:false,playback:null,flagged:false,lockedAt:null,examActionLog:[],

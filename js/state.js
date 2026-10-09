@@ -318,18 +318,19 @@ function generateGeneratedProfileItems(profile){
     if(!item) throw new EngineError('GENERATION_FAILED');
     items.push(item);
   }
-  if(typeof assignManualResponsePlans==='function') assignManualResponsePlans(profile,items);
   return items;
 }
 
 function generateItemsForProfile(profileId) {
   const profile = PROFILES.find(p => p.id === profileId);
   if (!profileIsEnabled(profile)) return [];
-  if(profile.activity&&typeof generateActivityItems==='function') return generateActivityItems(profile);
-  if(profile.content&&typeof generateProfileContentItems==='function'){
-    return generateProfileContentItems(profile,()=>generateGeneratedProfileItems(profile));
-  }
-  return generateGeneratedProfileItems(profile);
+  let items;
+  if(profile.activity&&typeof generateActivityItems==='function') items=generateActivityItems(profile);
+  else if(profile.content&&typeof generateProfileContentItems==='function'){
+    items=generateProfileContentItems(profile,()=>generateGeneratedProfileItems(profile));
+  } else items=generateGeneratedProfileItems(profile);
+  if(typeof assignManualResponsePlans==='function') assignManualResponsePlans(profile,items);
+  return items;
 }
 
 function startSession(){
@@ -402,17 +403,21 @@ function finalizeSourceProgramItem(item){
   });
   const manualFacts=typeof manualResponseFacts==='function'?manualResponseFacts(item):{correct:0,total:0};
   correctChecks+=manualFacts.correct;totalChecks+=manualFacts.total;
-  const finalCorrect=totalChecks===0||correctChecks===totalChecks;
+  const stateMatch=typeof sourceProgramStateMatchesAnswer==='function'
+    ?sourceProgramStateMatchesAnswer(item):null;
+  const programStateCorrect=stateMatch===null?(totalChecks===0||correctChecks===totalChecks):stateMatch;
+  const allChecksCorrect=(totalChecks===0||correctChecks===totalChecks)&&programStateCorrect;
   const profile=PROFILES.find(candidate=>candidate.id===item.profileId)||currentProfile();
   const score=scoreItem({correctSteps:correctChecks,totalOpSteps:totalChecks,
-    wasCorrectFinal:finalCorrect},profile.pointsPerItem);
+    wasCorrectFinal:programStateCorrect},profile.pointsPerItem);
   item.checked=true;item.studentFinal=item.correctFinalValue;
-  item.correctSteps=0;item.totalOpSteps=0;item.wasCorrectFinal=finalCorrect;
+  item.correctSteps=0;item.totalOpSteps=0;item.wasCorrectFinal=allChecksCorrect;
   item.points=score.points;item.maxPoints=score.maxPoints;
   item.itemScore=score.maxPoints>0?score.points/score.maxPoints:0;
   item.programScoreFacts={programCorrectChecks:correctChecks,programTotalChecks:totalChecks,
     declarationCorrectChecks:correctChecks,declarationTotalChecks:totalChecks,
-    expressionCorrectSteps:0,expressionTotalSteps:0,finalCorrect};
+    expressionCorrectSteps:0,expressionTotalSteps:0,finalCorrect:programStateCorrect,
+    programStateCorrect,allChecksCorrect};
   if(state.mode==='exam'){
     item.lockedAt=Date.now();item.flagged=false;item.showSolution=false;item.playback=null;
   }
@@ -543,7 +548,9 @@ function examCanonicalScoredCheckCount(item){
       if(!plugin||!plugin.scoresCommit||!statement.runtime) return;
       const canonical=statement.runtime.canonicalTrace&&Array.isArray(statement.runtime.canonicalTrace.steps)
         ? statement.runtime.canonicalTrace.steps : [];
-      total+=canonical.filter(step=>step.action==='EVALUATE').length+1;
+      const completeOutputResponse=statement.kind==='output'
+        &&typeof manualOutputResponsePlanned==='function'&&manualOutputResponsePlanned(item,statement);
+      total+=(completeOutputResponse?0:canonical.filter(step=>step.action==='EVALUATE').length)+1;
     });
   }
   if(typeof plannedManualScoredCheckCount==='function') total+=plannedManualScoredCheckCount(item);

@@ -336,6 +336,9 @@ function renderProgramSourceFilePanel(item,program){
       state.appendChild(h('i',{class:`fa-solid ${icon} program-source-file-action ${plan.mode}-action`,'aria-hidden':'true'}));
     }
     row.appendChild(state);source.appendChild(row);
+    const inlineResponse=typeof renderProgramOutputInlineResponse==='function'
+      ?renderProgramOutputInlineResponse(item,program,statement):null;
+    if(inlineResponse)source.appendChild(inlineResponse);
   });
   if(transition&&transition.phase==='moving'&&transition.destinationId){
     source.appendChild(h('span',{class:'program-source-flow-highlight','aria-hidden':'true'}));
@@ -656,7 +659,9 @@ function syncStatementTraceModal(item,moveFocus=false){
     ?renderStatementTraceOutput(item):null;
   const context=renderProgramContextShell(renderStatementTraceMemory(item),modalOutput,'modal');
   if(context&&context.classList) context.classList.add('statement-trace-context');
-  const layout=h('div',{class:'statement-trace-layout'},trace,context);
+  const layout=h('div',{class:'statement-trace-layout'});
+  if(context) layout.appendChild(context);
+  layout.appendChild(trace);
   if(typeof applyActivityZoomToElement==='function') applyActivityZoomToElement(layout);
   body.appendChild(layout);
   const line=programStatementDisplayNumber(statement,statementIndex);
@@ -753,6 +758,8 @@ function renderProgramWorkspaceShell(container,item,program){
       if(resetControl){resetControl.classList.add('source-program-item-reset');container.appendChild(resetControl);}
     }
   }
+  if(item.checked&&typeof publishTraceProgramFeedback==='function')
+    publishTraceProgramFeedback(item,currentProfile());
   return flow;
 }
 
@@ -872,6 +879,223 @@ function playbackRestart(){
   render();
 }
 
+function traceProgramFeedbackEnabled(profile,item){
+  if(!profile||!item||!item.sourceFlow||!item.program||!item.programAnswerKey)return false;
+  const category=typeof PROFILE_CATEGORIES==='undefined'?null
+    :PROFILE_CATEGORIES.find(candidate=>candidate.id===profile.categoryId);
+  return /^trace-/i.test(profile.id||'')||!!(category&&/^Trace\b/i.test(category.name||''));
+}
+
+function traceProgramFeedbackScreenText(stream){
+  if(typeof sourceProgramScreenStateText==='function')return sourceProgramScreenStateText(stream);
+  return String(stream||'');
+}
+
+function traceFeedbackValuesEqual(actual,expected){
+  if(Array.isArray(actual)||Array.isArray(expected))return JSON.stringify(actual)===JSON.stringify(expected);
+  return actual===expected;
+}
+
+function traceProgramFeedbackValueCard(variable,binding,mismatch){
+  const initialized=binding!=null&&(typeof binding!=='object'||binding.initialized!==false)
+    &&(typeof binding!=='object'||binding.value!==undefined);
+  let card;
+  if(!initialized){
+    card=h('span',{class:'tok-card binding-identity tok-card-var trace-feedback-value-card is-unset',
+      style:bindingIdentityStyle(variable.name,'variable'),title:`${variable.name} is not initialized`},
+      h('span',{class:'tok-card-head'},variable.name),h('span',{class:'tok-card-body'},'—'));
+  }else{
+    const value=typeof binding==='object'?binding.value:binding;
+    card=renderValueCard({id:null,name:variable.name,value,kind:'variable',
+      dataType:variable.dataType||binding&&binding.dataType||null,color:null,isFlash:false});
+  }
+  card.classList.add('trace-feedback-value-card');
+  if(mismatch)card.classList.add('is-mismatch');
+  return card;
+}
+
+function traceFeedbackLineDiffNodes(value,other){
+  if(value===other)return [value];
+  if(value==null)return [h('span',{class:'trace-feedback-text-diff is-missing'},'⟨missing line⟩')];
+  if(other==null)return [h('span',{class:'trace-feedback-text-diff'},value||'⟨empty line⟩')];
+  let prefix=0;
+  while(prefix<value.length&&prefix<other.length&&value[prefix]===other[prefix])prefix++;
+  let suffix=0;
+  while(suffix<value.length-prefix&&suffix<other.length-prefix
+    &&value[value.length-1-suffix]===other[other.length-1-suffix])suffix++;
+  const changeEnd=suffix?value.length-suffix:value.length;
+  const changed=value.slice(prefix,changeEnd);
+  return [value.slice(0,prefix),
+    h('span',{class:`trace-feedback-text-diff${changed?'':' is-missing'}`},changed||'⟨missing⟩'),
+    suffix?value.slice(value.length-suffix):''];
+}
+
+function traceFeedbackScreenDiffNodes(studentScreen,systemScreen,system){
+  const studentLines=studentScreen.split('\n'),systemLines=systemScreen.split('\n');
+  const own=system?systemLines:studentLines,other=system?studentLines:systemLines;
+  const count=Math.max(own.length,other.length),nodes=[];
+  for(let index=0;index<count;index++){
+    nodes.push(...traceFeedbackLineDiffNodes(index<own.length?own[index]:null,
+      index<other.length?other[index]:null));
+    if(index<count-1)nodes.push('\n');
+  }
+  return nodes;
+}
+
+function renderTraceProgramFeedbackState(item,answerKey,system){
+  const studentStream=typeof programOutputText==='function'?programOutputText(item.program):'';
+  const studentScreen=traceProgramFeedbackScreenText(studentStream);
+  const systemScreen=traceProgramFeedbackScreenText(answerKey.output);
+  const screen=system?systemScreen:studentScreen,screenMismatch=studentScreen!==systemScreen;
+  const memory=h('div',{class:'trace-feedback-memory'});
+  answerKey.variables.forEach(variable=>{
+    const studentBinding=item.program.memory&&item.program.memory[variable.name];
+    const studentInitialized=studentBinding!==undefined&&studentBinding!==null
+      &&(typeof studentBinding!=='object'||(studentBinding.initialized!==false&&studentBinding.value!==undefined));
+    const studentValue=studentInitialized
+      ?(typeof studentBinding==='object'?studentBinding.value:studentBinding):undefined;
+    const mismatch=!studentInitialized||!traceFeedbackValuesEqual(studentValue,variable.value);
+    const binding=system
+      ?{value:variable.value,initialized:variable.initialized!==false,dataType:variable.dataType}
+      :studentBinding;
+    memory.appendChild(traceProgramFeedbackValueCard(variable,binding,mismatch));
+  });
+  if(!answerKey.variables.length)memory.appendChild(h('span',{class:'trace-feedback-empty'},'No mutable variables'));
+  const empty=!screen&&!screenMismatch;
+  const screenNodes=empty?['No output']:traceFeedbackScreenDiffNodes(studentScreen,systemScreen,system);
+  return h('section',{class:`trace-feedback-state ${system?'system-state':'student-state'}`},
+    h('h4',{class:'trace-feedback-state-title'},
+      h('i',{class:`fa-solid ${system?'fa-calculator':'fa-user'}`,'aria-hidden':'true'}),
+      system?'System answer key':'Your program flow'),
+    h('div',{class:'trace-feedback-state-section'},
+      h('div',{class:'trace-feedback-section-label'},'Variable state'),memory),
+    h('div',{class:'trace-feedback-state-section'},
+      h('div',{class:'trace-feedback-section-label'},'Screen state'),
+      h('pre',{class:`trace-feedback-screen${empty?' is-empty':''}${screenMismatch?' has-differences':''}`},...screenNodes)));
+}
+function renderTraceProgramFeedbackComparison(item,profile){
+  if(!traceProgramFeedbackEnabled(profile,item))return null;
+  const answerKey=item.programAnswerKey;
+  return h('section',{class:'trace-feedback-comparison'},
+    h('div',{class:'trace-feedback-comparison-title'},'Program state comparison'),
+    h('div',{class:'trace-feedback-comparison-grid'},
+      renderTraceProgramFeedbackState(item,answerKey,false),
+      renderTraceProgramFeedbackState(item,answerKey,true)));
+}
+function traceFeedbackDisplayValue(value,dataType){
+  if(typeof value==='string'&&dataType!=='char')return JSON.stringify(value);
+  if(typeof formatValue==='function')return formatValue(value,dataType);
+  return String(value);
+}
+
+function traceProgramExecutionIssues(item){
+  const issues=[];
+  (item&&item.program&&item.program.statements||[]).forEach(statement=>{
+    const runtime=statement.runtime;
+    if(!runtime)return;
+    const base={line:statement.sourceLine||'?',source:String(statement.sourceText||'').trim()};
+    (runtime.trace||[]).forEach(step=>{
+      if(step&&step.action==='EVALUATE'&&step.wasCorrect===false){
+        const operator=step.target&&step.target.operator||step.operator||'operator';
+        issues.push(Object.assign({},base,{kind:'order',
+          message:`${operator} was evaluated outside the required precedence order.`}));
+      }
+      if(step&&step.manualResponse&&step.manualWasCorrect===false){
+        const actual=step.result!==undefined?step.result
+          :(step.sourceValue!==undefined?step.sourceValue:step.writeValue);
+        issues.push(Object.assign({},base,{kind:'response',
+          message:`Student-derived value ${traceFeedbackDisplayValue(actual)} did not match ${traceFeedbackDisplayValue(step.manualExpectedValue)}.`}));
+      }
+    });
+    if(runtime.branchChoiceCorrect===false){
+      const chosen=runtime.studentSelectedLabel||runtime.studentSelectedTargetStatementId||'selected branch';
+      const expected=runtime.selectedLabel||runtime.selectedTargetText||'the evaluated branch';
+      issues.push(Object.assign({},base,{kind:'branch',
+        message:`Branch ${chosen} was selected; the condition leads to ${expected}.`}));
+    }else if(runtime.wasCorrectAssignment===false){
+      if(statement.kind==='output'){
+        issues.push(Object.assign({},base,{kind:'output',
+          message:`The emitted output differed from ${traceFeedbackDisplayValue(runtime.expectedText||'')}.`}));
+      }else if(statement.kind==='selection'){
+        issues.push(Object.assign({},base,{kind:'condition',
+          message:`The derived condition was ${traceFeedbackDisplayValue(runtime.assignedValue)}; expected ${traceFeedbackDisplayValue(runtime.expectedValue)}.`}));
+      }else{
+        const expected=runtime.expectedAfter!==undefined?runtime.expectedAfter:runtime.expectedValue;
+        issues.push(Object.assign({},base,{kind:'write',
+          message:`The stored value was ${traceFeedbackDisplayValue(runtime.assignedValue)}; expected ${traceFeedbackDisplayValue(expected)}.`}));
+      }
+    }
+  });
+  return issues;
+}
+
+function renderTraceProgramExecutionReview(item){
+  const issues=traceProgramExecutionIssues(item);
+  if(!issues.length)return null;
+  return h('section',{class:'trace-feedback-execution-review'},
+    h('div',{class:'trace-feedback-comparison-title'},'Execution review'),
+    h('div',{class:'trace-feedback-issue-list'},...issues.map(issue=>
+      h('div',{class:`trace-feedback-issue ${issue.kind}`},
+        h('div',{class:'trace-feedback-issue-line'},
+          h('i',{class:'fa-solid fa-triangle-exclamation','aria-hidden':'true'}),`Line ${issue.line}`),
+        h('code',{class:'trace-feedback-issue-source'},issue.source),
+        h('div',{class:'trace-feedback-issue-message'},issue.message)))));
+}
+function publishTraceProgramFeedback(item,profile){
+  if(!traceProgramFeedbackEnabled(profile,item)||!item.checked)return false;
+  if(state.mode==='exam'&&!examFeedbackVisible()){
+    if(typeof clearFeedbackDrawerContent==='function')clearFeedbackDrawerContent();
+    if(typeof hideFeedbackDrawerTab==='function')hideFeedbackDrawerTab();
+    if(typeof closeFeedbackDrawer==='function')closeFeedbackDrawer();
+    return false;
+  }
+  const facts=item.programScoreFacts||{};
+  const correct=facts.allChecksCorrect===undefined?!!item.wasCorrectFinal:!!facts.allChecksCorrect;
+  const stateCorrect=facts.programStateCorrect===undefined
+    ?(typeof sourceProgramStateMatchesAnswer==='function'&&sourceProgramStateMatchesAnswer(item)===true)
+    :!!facts.programStateCorrect;
+  const missed=Math.max(0,(facts.programTotalChecks||0)-(facts.programCorrectChecks||0));
+  const firstShow=!item._feedbackAnimated;
+  const message=correct
+    ?'Your completed program flow matches every assessed execution step.'
+    :(stateCorrect
+      ?`Your final variable and screen states match the answer key, but ${missed||'one or more'} assessed execution ${missed===1?'action needs':'actions need'} review.`
+      :'Compare your program state with the generated answer key to locate where the flow diverged.');
+  const card=h('div',{class:`feedback ${correct?'correct':'incorrect'}${firstShow?' feedback-enter':''}`},
+    h('div',{class:'feedback-head'},
+      h('i',{class:`fa-solid ${correct?'fa-circle-check':'fa-circle-xmark'}`,'aria-hidden':'true'}),
+      correct?' Correct':' Review needed'),
+    h('div',{class:'feedback-body'},message));
+  const executionReview=renderTraceProgramExecutionReview(item);
+  if(executionReview)card.appendChild(executionReview);
+  const comparison=renderTraceProgramFeedbackComparison(item,profile);
+  if(comparison)card.appendChild(comparison);
+  card.appendChild(h('div',{class:'feedback-stats'},
+    h('div',{class:'stat'},
+      h('div',{class:'sv'},`${item.programScoreFacts&&item.programScoreFacts.programCorrectChecks||0}/${item.programScoreFacts&&item.programScoreFacts.programTotalChecks||0}`),
+      h('div',{class:'sl'},'program statement checks')),
+    h('div',{class:'stat'},h('div',{class:'sv'},`${Math.round((item.itemScore||0)*100)}%`),
+      h('div',{class:'sl'},'item score'))));
+  if(typeof renderMomentFeedbackBlock==='function'){
+    let block=null;try{block=renderMomentFeedbackBlock(item);}catch(_error){block=null;}
+    if(block)card.appendChild(block);
+  }
+  if(correctSolutionAvailable(profile,item)){
+    card.appendChild(h('button',{class:'solution-toggle',onclick:toggleSolution},
+      item.showSolution?'Hide correct solution':'Show correct solution'));
+    if(item.showSolution){
+      const label=`int ${item.resultName||'result'}`;
+      card.appendChild(renderCanonicalProgramPlayback(item,label,label.length+1));
+    }
+  }
+  item._feedbackAnimated=true;
+  if(typeof setFeedbackDrawerContent==='function')setFeedbackDrawerContent(card);
+  else return false;
+  if(typeof showFeedbackDrawerTab==='function')showFeedbackDrawerTab();
+  if(typeof setFeedbackDrawerStatus==='function')setFeedbackDrawerStatus(correct);
+  if(firstShow&&typeof openFeedbackDrawer==='function')openFeedbackDrawer();
+  return true;
+}
 function renderSession(container){
   const item = currentItem();
   const profile = currentProfile();
@@ -899,10 +1123,11 @@ function renderSession(container){
   const expressionStatement=item.program&&Array.isArray(item.program.statements)
     ? item.program.statements.find(statement=>statement.kind==='legacy-expression')
     : null;
+  const embeddedStatementId=embeddedProgram&&expressionStatement?expressionStatement.id:null;
   let evaluationHost=container;
   if(embeddedProgram){
     evaluationHost=h('section',{class:'program-statement legacy-program-statement active expanded',
-      'data-statement-id':'expression'});
+      'data-statement-id':embeddedStatementId});
     container.appendChild(evaluationHost);
   }
   if(!hasInteractiveDeclarations){
@@ -918,7 +1143,7 @@ function renderSession(container){
     labelCh:assignLabelCh,
     title:embeddedProgram?null:'Evaluation',
     panelClass:'eval-panel'+(embeddedProgram?' program-expression-panel final-expression-panel':''),
-    statementId:embeddedProgram?'expression':null,
+    statementId:embeddedStatementId,
     statementNumber:embeddedProgram?item.program.cursor+1:null,
     continuationStyle:true,
     interactive:!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked(),
@@ -990,6 +1215,8 @@ function renderSession(container){
           ? h('span',{}, 'Your derived result matches the independently calculated answer: ', h('span',{class:'num'}, String(item.correctFinalValue)), '.')
           : h('span',{}, 'Your derived result was ', h('span',{class:'num'}, String(item.studentFinal)), '. The correct result is ', h('span',{class:'num'}, String(item.correctFinalValue)), '.'))
     ));
+    const traceComparison=renderTraceProgramFeedbackComparison(item,currentProfile());
+    if(traceComparison)fb.appendChild(traceComparison);
     fb.appendChild(h('div',{class:'feedback-stats'},
       item.examSequenceFailure
         ? h('div',{class:'stat'},h('div',{class:'sv'},`${item.examSequenceFailure.correctPrefixChecks}/${item.examSequenceFailure.totalChecks}`),h('div',{class:'sl'},'credited sequence checks'))

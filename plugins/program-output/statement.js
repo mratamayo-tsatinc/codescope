@@ -70,6 +70,15 @@ function programOutputCurrentPart(statement){
     statement.runtime.parts[entry.index].resolvedValue===null)||null;
 }
 
+
+function programOutputStudentResponsePlanned(item,statement){
+  return typeof manualOutputResponsePlanned==='function'&&manualOutputResponsePlanned(item,statement);
+}
+
+function normalizeProgramOutputStudentText(value){
+  return String(value==null?'':value).replace(/\r\n?/g,'\n');
+}
+
 function programOutputPartEntry(statement,partIndex){
   return programOutputDynamicParts(statement).find(entry=>entry.index===partIndex)||null;
 }
@@ -79,6 +88,10 @@ registerStatementPlugin({
   scoresCommit:true,
 
   interactionPlan(ctx){
+    if(programOutputStudentResponsePlanned(ctx.item,ctx.statement)){
+      return {mode:'direct',action:{type:'begin-output-response',statementId:ctx.statement.id},
+        label:ctx.statement.runtime.manualOutputActive?'Enter complete output':'Predict complete output'};
+    }
     return programOutputResolved(ctx.statement)
       ? {mode:'direct',action:{type:'emit-output',statementId:ctx.statement.id},label:'Run output statement'}
       : {mode:'modal',focus:'output-values',label:'Evaluate output statement'};
@@ -107,6 +120,34 @@ registerStatementPlugin({
     const {statement,program,action}=ctx;
     const runtime=statement.runtime;
     if(!runtime||runtime.checked) return {applied:false};
+
+    if(action.type==='begin-output-response'){
+      if(!programOutputStudentResponsePlanned(ctx.item,statement))return {applied:false};
+      runtime.manualOutputActive=true;runtime._focusManualOutput=true;
+      if(runtime.manualOutputDraft==null)runtime.manualOutputDraft='';
+      return {applied:true};
+    }
+
+    if(action.type==='cancel-output-response'){
+      if(!runtime.manualOutputActive)return {applied:false};
+      runtime.manualOutputActive=false;runtime._focusManualOutput=false;
+      return {applied:true};
+    }
+
+    if(action.type==='emit-student-output'){
+      if(!programOutputStudentResponsePlanned(ctx.item,statement)||!runtime.manualOutputActive)
+        return {applied:false};
+      const text=normalizeProgramOutputStudentText(action.text);
+      const semantic=programSemanticsForContext(ctx).execute(statement,program.memory);
+      const expectedText=semantic.value,wasCorrect=text===expectedText;
+      runtime.manualOutputDraft=text;runtime.manualOutputActive=false;runtime._focusManualOutput=false;
+      runtime.checked=true;runtime.assignedValue=text;runtime.wasCorrectAssignment=wasCorrect;
+      runtime.correctSteps=0;runtime.totalOpSteps=0;
+      const event={type:'OUTPUT',action:'PRINT',statementId:statement.id,text,expectedText,
+        effects:semantic.effects,wasCorrect,studentDerived:true};
+      runtime.trace.push(event);
+      return {applied:true,completed:true,event};
+    }
 
     if(action.type==='read-output-value'){
       const entry=programOutputPartEntry(statement,action.partIndex);
@@ -159,12 +200,16 @@ registerStatementPlugin({
   },
 
   canUndo(ctx){
-    return !!(ctx.statement.runtime&&ctx.statement.runtime.trace.length);
+    return !!(ctx.statement.runtime&&(ctx.statement.runtime.trace.length||ctx.statement.runtime.manualOutputActive));
   },
 
   undo(ctx){
     const runtime=ctx.statement.runtime;
-    if(!runtime||!runtime.trace.length) return {applied:false};
+    if(!runtime)return {applied:false};
+    if(runtime.manualOutputActive&&!runtime.trace.length){
+      runtime.manualOutputActive=false;runtime._focusManualOutput=false;return {applied:true};
+    }
+    if(!runtime.trace.length)return {applied:false};
     const step=runtime.trace.pop();
     if(step.action==='PRINT'){
       programOutputRemoveEvent(ctx.program,ctx.statement.id);
@@ -186,7 +231,8 @@ registerStatementPlugin({
     if(printIndex>=0) runtime.trace.splice(printIndex,1);
     runtime.checked=false;runtime.assignedValue=null;runtime.wasCorrectAssignment=null;
     runtime.correctSteps=0;runtime.totalOpSteps=0;
-    return {applied:true,reopenFocus:'output-values'};
+    if(programOutputStudentResponsePlanned(ctx.item,ctx.statement)){runtime.manualOutputActive=true;runtime._focusManualOutput=true;}
+    return {applied:true,reopenFocus:programOutputStudentResponsePlanned(ctx.item,ctx.statement)?null:'output-values'};
   },
 
   reset(ctx){
@@ -197,6 +243,7 @@ registerStatementPlugin({
       part.resolvedValue=null;});
     runtime.trace=[];runtime.checked=false;runtime.assignedValue=null;
     runtime.wasCorrectAssignment=null;runtime.correctSteps=0;runtime.totalOpSteps=0;
+    runtime.manualOutputActive=false;runtime.manualOutputDraft='';runtime._focusManualOutput=false;
     delete runtime.rollbackReviewFocus;
     return {applied:changed};
   },

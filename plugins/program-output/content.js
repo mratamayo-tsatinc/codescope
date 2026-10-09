@@ -35,10 +35,16 @@ function poDecodeString(raw,filename){
 
 function poExpressionSymbols(memory,kinds,dataTypes){
   const names=[...new Set([...Object.keys(memory||{}),...Object.keys(kinds||{})])];
-  return Object.fromEntries(names.map(name=>[name,{
-    name,kind:kinds&&kinds[name]||'variable',value:memory[name],initialized:memory[name]!==undefined,
-    dataType:dataTypes&&dataTypes[name],mutable:!(kinds&&kinds[name]==='constant')
-  }]));
+  return Object.fromEntries(names.map(name=>{
+    const entry=memory&&memory[name];
+    const binding=entry&&typeof entry==='object'&&!Array.isArray(entry)&&Object.prototype.hasOwnProperty.call(entry,'value')
+      ?entry:null;
+    const kind=kinds&&kinds[name]||(binding&&binding.kind)||'variable';
+    return [name,{name,kind,value:binding?binding.value:entry,
+      initialized:binding?binding.initialized!==false:entry!==undefined,
+      dataType:dataTypes&&dataTypes[name]||(binding&&binding.dataType),
+      mutable:binding?binding.mutable!==false:kind!=='constant'}];
+  }));
 }
 
 function poParseSourceExercise(exercise,language){
@@ -217,7 +223,6 @@ function poGenerateContentItems({profile,language,generateDefault}){
   if(profile.itemCount!=='manifest'&&count!==profile.itemCount)
     throw new Error(`${profile.id}: selected item count ${count} must match scoring.itemCount ${profile.itemCount}`);
   const items=ordered.slice(0,count).map((exercise,index)=>poBuildSourceItem(profile,exercise,bank.language,index+1));
-  if(typeof assignManualResponsePlans==='function') assignManualResponsePlans(profile,items);
   return items;
 }
 

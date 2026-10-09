@@ -75,7 +75,9 @@ function generateProfileContentItems(profile,generateDefault){
 function regenerateProfileContentItem(profile,item){
   const provider=profileContentProviderFor(profile);
   if(!provider||typeof provider.regenerateItem!=='function') return null;
-  return provider.regenerateItem({profile,item,language:item&&item.language||state.language});
+  const regenerated=provider.regenerateItem({profile,item,language:item&&item.language||state.language});
+  if(regenerated&&typeof assignManualResponsePlans==='function') assignManualResponsePlans(profile,[regenerated]);
+  return regenerated;
 }
 
 function ensureActivityContentReady(){

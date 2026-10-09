@@ -326,6 +326,7 @@ const PROFILES_RAW = [
     lesson:{focus:'input',variant:'numeric-console'},
     interaction:{declarations:'interactive'},
     presentation:{workspace:'source-program',timeline:'statement-modal'},
+    feedback:{showCorrectSolution:{practice:false,exam:false}},
   },
   {
     enabled:true,
@@ -339,6 +340,7 @@ const PROFILES_RAW = [
     lesson:{focus:'input',variant:'numeric-console'},
     interaction:{declarations:'interactive'},
     presentation:{workspace:'source-program',timeline:'statement-modal'},
+    feedback:{showCorrectSolution:{practice:false,exam:false}},
   },
   {
     enabled:true,
@@ -378,6 +380,7 @@ const PROFILES_RAW = [
     lesson:{focus:'program-flow'},
     interaction:{declarations:'interactive'},
     presentation:{workspace:'source-program',timeline:'statement-modal'},
+    feedback:{showCorrectSolution:{practice:false,exam:false}},
   },
   {
     enabled:false,
@@ -751,7 +754,10 @@ const PROFILES_RAW = [
       values:{variables:'seeded'},selection:{count:'all',shuffle:false}},
     lesson:{focus:'program-flow',constructs:['selection']},
     interaction:{declarations:'interactive'},
+    manualResponses:{enabled:true,namedValueRate:50,operatorRate:50,
+      output:{enabled:true,mode:'complete-emission',rate:100}},
     presentation:{workspace:'source-program',timeline:'statement-modal'},
+    feedback:{showCorrectSolution:{practice:false,exam:false}},
   },
   {
     enabled:true,
@@ -764,12 +770,14 @@ const PROFILES_RAW = [
       values:{variables:'seeded'},selection:{count:'all',shuffle:false}},
     lesson:{focus:'program-flow',constructs:['selection']},
     interaction:{declarations:'interactive'},
+    manualResponses:{enabled:true,namedValueRate:50,operatorRate:50,
+      output:{enabled:true,mode:'complete-emission',rate:100}},
     presentation:{workspace:'source-program',timeline:'statement-modal'},
     feedback: {
       showCorrectSolution: {
-        practice: true,
+        practice: false,
         exam: false
-       }
+      }
     }
   },
   {
@@ -781,6 +789,7 @@ const PROFILES_RAW = [
       values:{variables:'seeded'},selection:{count:'all',shuffle:false}},
     interaction:{declarations:'interactive'},
     presentation:{workspace:'source-program',timeline:'statement-modal'},
+    feedback:{showCorrectSolution:{practice:false,exam:false}},
   },
 ];
 

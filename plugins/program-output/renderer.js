@@ -290,4 +290,65 @@ function renderOutputStatement(ctx){
   container.appendChild(card);
 }
 
+function outputPredictionVisibleText(value){
+  const text=String(value||'');
+  return text?text.replace(/\n/g,'\u21b5\n'):'Your rendered output will appear here.';
+}
+
+function renderProgramOutputInlineResponse(item,program,statement){
+  if(!programOutputStudentResponsePlanned(item,statement)||!statement.runtime.manualOutputActive
+    ||currentProgramStatement(item)!==statement)return null;
+  const runtime=statement.runtime;
+  const textarea=h('textarea',{class:'program-output-prediction-input',rows:'4',
+    spellcheck:'false','aria-label':'Enter the complete output produced by this statement',
+    placeholder:'Type the rendered output here. Press Enter to add a new line.'});
+  textarea.value=runtime.manualOutputDraft||'';
+  const preview=h('pre',{class:'program-output-prediction-preview',
+    'aria-label':'Visible line-break preview'},outputPredictionVisibleText(textarea.value));
+  const count=h('span',{class:'program-output-prediction-count'},
+    `${(textarea.value.match(/\n/g)||[]).length} line break${(textarea.value.match(/\n/g)||[]).length===1?'':'s'}`);
+  const sync=()=>{
+    runtime.manualOutputDraft=textarea.value;
+    preview.textContent=outputPredictionVisibleText(textarea.value);
+    const total=(textarea.value.match(/\n/g)||[]).length;
+    count.textContent=`${total} line break${total===1?'':'s'}`;
+  };
+  textarea.oninput=sync;
+  const form=h('form',{class:'program-output-prediction',
+    'aria-label':'Complete output prediction',
+    onsubmit:event=>{
+      event.preventDefault();sync();
+      handleTokenClick({type:'emit-student-output',statementId:statement.id,text:textarea.value});
+    }},
+    h('div',{class:'program-output-prediction-heading'},
+      h('i',{class:'fa-solid fa-keyboard','aria-hidden':'true'}),
+      h('div',{},h('strong',{},"Enter this statement's complete output"),
+        h('span',{},'Use actual line breaks instead of typing \\n.'))),
+    textarea,
+    h('div',{class:'program-output-prediction-preview-wrap'},
+      h('span',{class:'program-output-prediction-preview-label'},'Line-break preview'),
+      preview),
+    h('div',{class:'program-output-prediction-actions'},
+      count,
+      h('button',{type:'button',class:'program-output-prediction-newline',
+        onclick:()=>{
+          const start=textarea.selectionStart==null?textarea.value.length:textarea.selectionStart;
+          const end=textarea.selectionEnd==null?start:textarea.selectionEnd;
+          textarea.value=textarea.value.slice(0,start)+'\n'+textarea.value.slice(end);
+          textarea.selectionStart=textarea.selectionEnd=start+1;sync();textarea.focus();
+        }},h('i',{class:'fa-solid fa-turn-down','aria-hidden':'true'}),h('span',{},'New line')),
+      h('button',{type:'button',class:'program-output-prediction-cancel',
+        onclick:()=>handleTokenClick({type:'cancel-output-response',statementId:statement.id})},'Cancel'),
+      h('button',{type:'submit',class:'program-output-prediction-submit'},
+        h('i',{class:'fa-solid fa-display','aria-hidden':'true'}),h('span',{},'Send to console'))));
+  textarea.onkeydown=event=>{
+    if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();form.requestSubmit();}
+  };
+  if(runtime._focusManualOutput){
+    runtime._focusManualOutput=false;
+    setTimeout(()=>{if(textarea&&textarea.isConnected!==false)textarea.focus();},0);
+  }
+  return form;
+}
+
 registerStatementRenderer('output',renderOutputStatement);
