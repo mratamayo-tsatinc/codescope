@@ -135,6 +135,7 @@ function poBuildSourceItem(profile,exercise,language,itemNumber){
     profileId:profile.id,itemNumber,exerciseId:exercise.id,filename:exercise.filename,
     exerciseTitle:parsed.details.title,source:parsed.details.source,sourceDisplay:parsed.sourceDisplay,
     sourceFlow,language,
+    canonicalStatementIds:sourceProgramCanonicalStatementIds(programStatements,parsed.coreProgram),
     originalTree,originalFlat,decls:parsed.declarations,resultName:resultTarget,
     correctFinalValue:parsed.memory[parsed.resultName],canonicalTrace:buildCanonicalTrace(originalTree),
     workingFlat:deepCloneFlat(originalFlat),history:[deepCloneFlat(originalFlat)],trace:[],

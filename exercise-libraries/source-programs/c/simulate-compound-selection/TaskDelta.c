@@ -19,8 +19,7 @@ int main(void)
 
     laborCost = hours * rate + 20 / 2;
     totalCost = laborCost + materials;
-    approved = (hours > 0 && rate >= 50) &&
-               (materials <= 200 || !((totalCost > 600)));
+    approved = (hours > 0 && rate >= 50) && (materials <= 200 || !((totalCost > 600)));
 
     if (approved && totalCost <= 500) {
         totalCost = totalCost + 0;

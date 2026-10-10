@@ -252,7 +252,7 @@ function coApplyAction({item,action}){
   const variableResults=expected.variables.map(v=>Array.isArray(v.expected)?v.expected.map((x,i)=>found.has(v.name)&&String(found.get(v.name)[i])===String(x))
     :found.has(v.name)&&String(found.get(v.name))===String(v.expected));
   const variableCorrect=variableResults.reduce((n,v)=>n+(Array.isArray(v)?v.filter(Boolean).length:Number(v)),0);
-  const total=coTotal(expected),correct=run&&run.ok?outputCorrect+variableCorrect:0;
+  const total=coTotal(expected),correct=outputCorrect+variableCorrect;
   return {correct,total,outputResults,variableResults};
 }
 function coCheck({item,state}){if(!item||item.checked)return {applied:false};item.runResult=coRun(item);
@@ -303,6 +303,14 @@ function coWorkspaceOutputPanel(item,system){
       events.push(item._coTerminalEvent);
     }
     const panel=renderProgramTerminalPanel(item,{events,statements:[]},{surface:'main'});
+    if(!system&&item.runResult&&!item._coTerminalEvent){
+      const pre=panel.querySelector('.program-output-screen-text');
+      if(pre){
+        const student=coScreen(output),answer=coScreen(item.answerKey.output);
+        pre.classList.add('co-output-comparison');
+        pre.replaceChildren(...(student===answer?[student]:traceFeedbackScreenDiffNodes(student,answer,false)));
+      }
+    }
     if(frame&&frame.consoleActive)panel.classList.add('co-playback-console-active');return panel;
   }
   return h('aside',{class:'program-output-screen','aria-label':'Program Output'},
@@ -343,8 +351,22 @@ function coExecutionErrorStrip(item){
     h('span',{class:'co-execution-error-message'},failure.message),
     failure.line?h('span',{class:'co-execution-error-action'},'View line ',h('i',{class:'fa-solid fa-arrow-right','aria-hidden':'true'})):null);
 }
+function coStoppedScreenDiffNodes(studentScreen,systemScreen){
+  const studentLines=studentScreen?studentScreen.split('\n'):[],systemLines=systemScreen?systemScreen.split('\n'):[],nodes=[];
+  studentLines.forEach((line,index)=>{
+    nodes.push(...traceFeedbackLineDiffNodes(line,index<systemLines.length?systemLines[index]:null));
+    if(index<studentLines.length-1)nodes.push('\n');
+  });
+  const missing=Math.max(0,systemLines.length-studentLines.length);
+  if(missing){
+    if(nodes.length)nodes.push('\n');
+    nodes.push(h('span',{class:'trace-feedback-missing-summary'},
+      `⟨${missing} remaining output ${missing===1?'line was':'lines were'} not produced⟩`));
+  }
+  return nodes.length?nodes:['No output'];
+}
 function coFeedbackColumn(item,system){
-  const expected=item.answerKey,hasRun=!!item.runResult;
+  const expected=item.answerKey,hasRun=!!item.runResult,failed=hasRun&&!item.runResult.ok;
   const actual=hasRun&&item.runResult.answer||{output:'',variables:[]};
   const actualMap=new Map(actual.variables.map(v=>[v.name,v])),memory=h('div',{class:'trace-feedback-memory'});
   expected.variables.forEach(v=>{const got=actualMap.get(v.name),value=system?v.expected:got&&got.expected;
@@ -355,16 +377,15 @@ function coFeedbackColumn(item,system){
   const student=coScreen(actual.output),answer=coScreen(expected.output),screen=system?answer:student;
   const screenMismatch=hasRun&&student!==answer;
   const screenNodes=!hasRun?(system?[screen||'No output']:['Run the ordered program to see its screen state.'])
-    :(screen||screenMismatch?traceFeedbackScreenDiffNodes(student,answer,system):['No output']);
+    :failed?(system?[screen||'No output']:coStoppedScreenDiffNodes(student,answer))
+      :(screen||screenMismatch?traceFeedbackScreenDiffNodes(student,answer,system):['No output']);
+  const showDifferenceBorder=screenMismatch&&!(failed&&system);
   return h('section',{class:'trace-feedback-state '+(system?'system-state':'student-state')},
     h('h4',{class:'trace-feedback-state-title'},h('i',{class:'fa-solid '+(system?'fa-calculator':'fa-user'),'aria-hidden':'true'}),
       system?'System answer key':'Your run'),
-    !system&&hasRun&&!item.runResult.ok?h('div',{class:'co-state-error',role:'status'},
-      h('i',{class:'fa-solid fa-triangle-exclamation','aria-hidden':'true'}),
-      h('span',{},(item.runResult.line?'Line '+item.runResult.line+': ':'')+item.runResult.message)):null,
     h('div',{class:'trace-feedback-state-section'},h('div',{class:'trace-feedback-section-label'},'Variable state'),memory),
     h('div',{class:'trace-feedback-state-section'},h('div',{class:'trace-feedback-section-label'},'Screen state'),
-      h('pre',{class:'trace-feedback-screen'+(!screen&&!screenMismatch?' is-empty':'')+(screenMismatch?' has-differences':'')},...screenNodes)));
+      h('pre',{class:'trace-feedback-screen'+(!screen&&!screenMismatch?' is-empty':'')+(showDifferenceBorder?' has-differences':'')},...screenNodes)));
 }
 function coFeedback(item){
   const root=h('div',{class:'so-feedback'}),r=item.result,run=item.runResult;
@@ -372,7 +393,8 @@ function coFeedback(item){
     h('div',{class:'feedback-head'},h('i',{class:'fa-solid '+(item.wasCorrectFinal?'fa-circle-check':'fa-circle-xmark'),'aria-hidden':'true'}),
       item.wasCorrectFinal?' Correct':' Review needed'),
     h('div',{class:'feedback-body'},item.wasCorrectFinal?'The ordered program produced the required final state.'
-      :run&&run.ok?'Compare both program states below.':'Execution stopped before a complete final state was produced.'),
+      :run&&run.ok?'Compare both program states below.'
+        :'Execution stopped at the reported line. Matching variable and output records produced before the stop were still credited.'),
     h('div',{class:'feedback-stats'},h('div',{class:'stat'},h('div',{class:'sv'},r.correct+'/'+r.total),h('div',{class:'sl'},'state checks')),
       h('div',{class:'stat'},h('div',{class:'sv'},Math.round(item.itemScore*100)+'%'),h('div',{class:'sl'},'item score')))));
   if(run&&!run.ok)root.appendChild(h('section',{class:'trace-feedback-execution-review'},h('div',{class:'trace-feedback-comparison-title'},'Execution review'),
@@ -503,7 +525,12 @@ function coDragStart(event,index){
   if(row){
     row.classList.add('is-dragging');row.setAttribute('aria-grabbed','true');
     row.closest('.co-order-list').classList.add('is-reordering');
-    if(event.dataTransfer.setDragImage)event.dataTransfer.setDragImage(row,24,row.offsetHeight/2);
+    if(event.dataTransfer.setDragImage){
+      const box=row.getBoundingClientRect();
+      const grabX=Math.max(0,Math.min(box.width,event.clientX-box.left));
+      const grabY=Math.max(0,Math.min(box.height,event.clientY-box.top));
+      event.dataTransfer.setDragImage(row,grabX,grabY);
+    }
   }
 }
 function coDragOver(event){

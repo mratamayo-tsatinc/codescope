@@ -107,9 +107,13 @@ function renderInvalidExecutionAlert(item,statement){
     &&item.examSequenceFailure.terminal;
   if(!practiceFailure&&!examFailure) return null;
   const title=practiceFailure?'Invalid execution':'Invalid execution — item ended';
+  const terminalScore=examFailure&&Number.isFinite(item.points)&&Number.isFinite(item.maxPoints)
+    ?`${item.points} of ${item.maxPoints} points`:null;
   const message=practiceFailure
-    ? strictPracticeInvalidMessage(item)
-    : 'This item can no longer continue. Credit earned before this action has been recorded.';
+    ?strictPracticeInvalidMessage(item)
+    :terminalScore
+      ?`This item can no longer continue. You earned ${terminalScore} from the correct work completed before this action.`
+      :'This item can no longer continue. Credit earned before this action has been recorded.';
   const action=practiceFailure
     ? h('button',{class:'invalid-execution-recovery',type:'button',onclick:handleUndo,
         'aria-label':'Undo invalid action and continue'},

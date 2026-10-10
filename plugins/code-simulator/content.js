@@ -237,6 +237,7 @@ function csBuildItem(profile,exercise,language,itemNumber){
     source:parsed.details.source,sourceTemplate:parsed.details.templateSource,sourceSeedValues:parsed.details.seedValues,
     sourceValueMode:parsed.details.sourceValueMode,sourceInputValues:parsed.details.inputValues,
     inputValueMode:parsed.details.inputValueMode,programAnswerKey,sourceDisplay:parsed.sourceDisplay,sourceFlow:true,language,originalTree,originalFlat,
+    canonicalStatementIds:sourceProgramCanonicalStatementIds(parsed.statements,parsed.coreProgram),
     decls:parsed.declarations,resultName,correctFinalValue:last?resultValue:0,canonicalTrace:buildCanonicalTrace(originalTree),
     workingFlat:deepCloneFlat(originalFlat),history:[deepCloneFlat(originalFlat)],trace:[],checked:false,itemScore:null,points:null,maxPoints:null,
     correctSteps:0,totalOpSteps:0,wasCorrectFinal:null,showSolution:false,playback:null,flagged:false,lockedAt:null,examActionLog:[],

@@ -14,8 +14,7 @@ int main(void)
     int subtotal, total, valid;
 
     subtotal = tickets * ticketPrice + 10 * 2;
-    valid = (tickets > 0 && ticketPrice >= 50) ||
-            (choice == 1 && !((tickets > 10)));
+    valid = (tickets > 0 && ticketPrice >= 50) || (choice == 1 && !((tickets > 10)));
 
     switch (choice)
     {

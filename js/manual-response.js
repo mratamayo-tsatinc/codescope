@@ -348,9 +348,14 @@ function requestManualResponse(descriptor,onConfirm){
   if(number) setTimeout(()=>{number.focus();number.scrollIntoView({block:'nearest',behavior:'smooth'});},80);
 }
 
-function manualResponseFacts(item){
+function manualResponseStatementAllowed(statementId,statementIds){
+  return !statementIds||statementIds.has(statementId);
+}
+
+function manualResponseFacts(item,statementIds){
   let correct=0,total=0;
-  manualStatementEntries(item).forEach(({runtime})=>{
+  manualStatementEntries(item).forEach(({statement,runtime})=>{
+    if(!manualResponseStatementAllowed(statement.id,statementIds))return;
     (runtime&&runtime.trace||[]).forEach(step=>{
       if(step.manualResponse&&!step.manualResponseCountsAsWrite){total++;if(step.manualWasCorrect) correct++;}
     });
@@ -358,13 +363,14 @@ function manualResponseFacts(item){
   return {correct,total};
 }
 
-function plannedManualScoredCheckCount(item){
+function plannedManualScoredCheckCount(item,statementIds){
   if(!item||!item.manualResponsePlan||!item.manualResponsePlan.enabled) return 0;
+  const allowedKey=key=>manualResponseStatementAllowed(key.split(':')[0],statementIds);
   const unaryStatementIds=new Set((item.program&&item.program.statements||[])
     .filter(statement=>statement.kind==='unary-update').map(statement=>statement.id));
-  return Object.keys(item.manualResponsePlan.namedKeys||{}).length+
+  return Object.keys(item.manualResponsePlan.namedKeys||{}).filter(allowedKey).length+
     Object.keys(item.manualResponsePlan.operatorKeys||{}).filter(key=>{
-      if(/:commit$/.test(key)) return false;
+      if(!allowedKey(key)||/:commit$/.test(key)) return false;
       const statementId=key.split(':operator:')[0];
       return !unaryStatementIds.has(statementId);
     }).length;

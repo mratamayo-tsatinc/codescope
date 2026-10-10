@@ -455,6 +455,15 @@ function testStrictExamSequencePolicy(){
       return item;
     }
 
+    const canonicalMap=sourceProgramCanonicalStatementIds([
+      {id:'condition',kind:'selection',sourceLine:3,sourceEndLine:3},
+      {id:'true-branch',kind:'assignment',sourceLine:4,sourceEndLine:4},
+      {id:'skipped-branch-map',kind:'assignment',sourceLine:6,sourceEndLine:6}
+    ],{metadata:{executionFrames:[
+      {statementId:'selection-raw',statementKind:'selection',sourceLine:3},
+      {statementId:'assignment-raw',statementKind:'assignment',sourceLine:4}
+    ]}});
+    const canonicalMapExcludesSkipped=JSON.stringify(canonicalMap)===JSON.stringify(['condition','true-branch']);
     state.mode='exam';
     state.examPolicy=snapshotExamPolicy({exam:{interactionMode:'strict-sequence'}});
     const continuing=itemFor(runtime([2,3,4,20,5],['+','*','-','/'],null));
@@ -495,6 +504,16 @@ function testStrictExamSequencePolicy(){
       &&currentProgramStatement(computableWithPendingValue).runtime.trace[0].wasCorrect===false
       &&!computableWithPendingValue.examSequenceFailure;
 
+    const pendingOtherPartition=itemFor(runtime([2,0,900,500,430,100],['>','&&','>=','||','<'],4));
+    const pendingRuntime=currentProgramStatement(pendingOtherPartition).runtime;
+    pendingRuntime.workingFlat.operands.forEach((operand,index)=>operand.parenGroup=index<4?'left-condition':'right-condition');
+    pendingRuntime.originalFlat=deepCloneFlat(pendingRuntime.workingFlat);
+    pendingRuntime.history=[deepCloneFlat(pendingRuntime.workingFlat)];
+    state.items=[pendingOtherPartition];state.itemIndex=0;state.profileId=pendingOtherPartition.profileId;
+    flat=pendingRuntime.workingFlat;
+    handleTokenClick({type:'evaluate',leftId:flat.operands[0].id,rightId:flat.operands[1].id});
+    const pendingOtherPartitionDoesNotPenalize=pendingRuntime.trace.length===1
+      &&pendingRuntime.trace[0].target.operator==='>'&&pendingRuntime.trace[0].wasCorrect===true;
     const terminal=itemFor(runtime([7,2],['+'],0));
     state.items=[terminal];state.itemIndex=0;state.profileId=terminal.profileId;
     flat=currentProgramStatement(terminal).runtime.workingFlat;
@@ -506,6 +525,29 @@ function testStrictExamSequencePolicy(){
       &&terminal.program.statements[1].status==='blocked'
       &&terminal.points===0&&terminal.examActionLog.some(entry=>entry.terminal===true);
 
+    const creditedRuntime=runtime([2,3],['+'],null);creditedRuntime.expectedValue=5;
+    const blockedRuntime=runtime([7,2],['+'],0);blockedRuntime.expectedValue=9;
+    const skippedRuntime=runtime([9,1],['-'],null);skippedRuntime.expectedValue=8;
+    const partial=itemFor(creditedRuntime),credited=partial.program.statements[0];
+    credited.id='credited';credited.binding.name='a';
+    const blocked={id:'blocked',kind:'declaration',status:'locked',dependencies:[],
+      binding:{name:'b',kind:'variable',dataType:'int',mutable:true},runtime:blockedRuntime};
+    const skipped={id:'skipped-branch',kind:'declaration',status:'locked',dependencies:[],
+      binding:{name:'unused',kind:'variable',dataType:'int',mutable:true},runtime:skippedRuntime};
+    const finalStatement={id:'expression',kind:'legacy-expression',status:'locked'};
+    partial.program=createProgram([credited,blocked,skipped,finalStatement]);
+    partial.program.mode='interactive-declarations';partial.program.scoreAssignments=true;
+    partial.canonicalStatementIds=['credited','blocked','expression'];
+    state.items=[partial];state.itemIndex=0;state.profileId=partial.profileId;
+    flat=credited.runtime.workingFlat;
+    handleTokenClick({type:'evaluate',leftId:flat.operands[0].id,rightId:flat.operands[1].id});
+    handleTokenClick({type:'commit-assignment'});
+    flat=blocked.runtime.workingFlat;
+    handleTokenClick({type:'evaluate',leftId:flat.operands[0].id,rightId:flat.operands[1].id});
+    const terminalPartialCredit=partial.checked&&partial.examSequenceFailure.terminal
+      &&partial.examSequenceFailure.correctPrefixChecks===2
+      &&partial.examSequenceFailure.totalChecks===5
+      &&partial.points===0.4&&partial.maxPoints===1;
     const prematureAssignment=assignmentItem(runtime([4,5],['+'],null));
     state.items=[prematureAssignment];state.itemIndex=0;state.profileId=prematureAssignment.profileId;
     handleTokenClick({type:'commit-assignment'});
@@ -542,13 +584,13 @@ function testStrictExamSequencePolicy(){
     handleTokenClick({type:'evaluate',leftId:flat.operands[0].id,rightId:flat.operands[1].id});
     const guidedPracticeUnchanged=!guidedPractice.practiceInvalidExecution
       &&currentProgramStatement(guidedPractice).runtime.trace.length===0;
-    return JSON.stringify({wrongOrderContinues,chainContinued,independentCredit,localPairContinues,
+    return JSON.stringify({canonicalMapExcludesSkipped,wrongOrderContinues,chainContinued,independentCredit,localPairContinues,pendingOtherPartitionDoesNotPenalize,terminalPartialCredit,
       prematureTerminates,prematureAssignmentTerminates,guidedUnchanged,practicePaused,practiceRecovered,guidedPracticeUnchanged,
       strictDefault:snapshotExamPolicy({exam:{}}).interactionMode===DEFAULT_APP_SETTINGS.exam.interactionMode,
       practiceDefault:snapshotPracticePolicy({practice:{}}).interactionMode===DEFAULT_APP_SETTINGS.practice.interactionMode});
   })()`));
-  assert.deepStrictEqual(result,{wrongOrderContinues:true,chainContinued:true,independentCredit:true,
-    localPairContinues:true,prematureTerminates:true,prematureAssignmentTerminates:true,guidedUnchanged:true,practicePaused:true,
+  assert.deepStrictEqual(result,{canonicalMapExcludesSkipped:true,wrongOrderContinues:true,chainContinued:true,independentCredit:true,
+    localPairContinues:true,pendingOtherPartitionDoesNotPenalize:true,terminalPartialCredit:true,prematureTerminates:true,prematureAssignmentTerminates:true,guidedUnchanged:true,practicePaused:true,
     practiceRecovered:true,guidedPracticeUnchanged:true,strictDefault:true,practiceDefault:true});
 }
 
@@ -691,16 +733,20 @@ function testInvalidExecutionAlertIsStatementScoped(){
     item.practiceInvalidExecution=persistedFallback;
     const fallbackMatchesCurrent=invalidExecutionBelongsToStatement(item,failing)
       &&!invalidExecutionBelongsToStatement(item,item.program.statements[0]);
+    state.mode='exam';
+    const terminalItem={points:0.8,maxPoints:2,examSequenceFailure:{terminal:true,statementId:failing.id}};
+    const terminalAlert=renderInvalidExecutionAlert(terminalItem,failing);
+    const terminalShowsPartialScore=terminalAlert.textContent.includes('0.8 of 2 points');
     return JSON.stringify({
       originRecorded:item.practiceInvalidExecution.reason==='assignment-value-unresolved',
       oneAlert:countNodesWithClass(rendered,'invalid-execution-alert')===1,
       onePausedStatement:countNodesWithClass(rendered,'practice-paused')===1,
       explicitOrigin,
-      fallbackMatchesCurrent
+      fallbackMatchesCurrent,terminalShowsPartialScore
     });
   })()`));
   assert.deepStrictEqual(result,{originRecorded:true,oneAlert:true,onePausedStatement:true,
-    explicitOrigin:true,fallbackMatchesCurrent:true});
+    explicitOrigin:true,fallbackMatchesCurrent:true,terminalShowsPartialScore:true});
 }
 
 function generatedSnapshotHash(){
@@ -832,8 +878,9 @@ function testSharedExpressionParser(){
   const codeSimulatorSource=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','content.js'),'utf8');
   assert(!programOutputSource.includes('function poExpressionTokens'));
   assert(!codeSimulatorSource.includes('function csExpressionTokens'));
-  const ctx=context();
-  load(ctx,['engine.js','flat-model.js','program-ir.js','language-core.js','expression-parser.js','program-item-builder.js']);
+  const ctx=context();installFakeDom(ctx);
+  load(ctx,['engine.js','flat-model.js','program-ir.js','language-core.js','expression-parser.js','program-item-builder.js',
+    'dom-helpers.js','render-tree.js','render-flat.js']);
   const result=JSON.parse(evaluate(ctx,`(()=>{
     const symbols={
       p:{kind:'variable',value:4,initialized:true,dataType:'int'},
@@ -841,7 +888,10 @@ function testSharedExpressionParser(){
       x:{kind:'variable',value:2,initialized:true,dataType:'int'},
       a:{kind:'variable',value:5,initialized:true,dataType:'int'},
       b:{kind:'variable',value:6,initialized:true,dataType:'int'},
-      LIMIT:{kind:'constant',value:10,initialized:true,dataType:'int',mutable:false}
+      LIMIT:{kind:'constant',value:10,initialized:true,dataType:'int',mutable:false},
+      deposit:{kind:'variable',value:350,initialized:true,dataType:'int'},
+      withdrawal:{kind:'variable',value:200,initialized:true,dataType:'int'},
+      balance:{kind:'variable',value:1200,initialized:true,dataType:'int'}
     };
     const normalize=node=>{
       if(node.kind==='literal')return {kind:'literal',value:node.value,dataType:node.dataType||null};
@@ -861,6 +911,25 @@ function testSharedExpressionParser(){
     const decimal=coreParseExpression({language:'c',source:'(a + b) / 2.0',symbols});
     const decimalTree=coreExpressionIrToEngineTree(decimal.ir,symbols);
     const decimalTrace=buildCanonicalTrace(decimalTree);
+    const groupedBooleanSource='(deposit > 0 && withdrawal <= balance) || (withdrawal == 0 && !((deposit < 0)))';
+    const groupedBoolean=coreParseExpression({language:'c',source:groupedBooleanSource,symbols});
+    const groupedBooleanTree=coreExpressionIrToEngineTree(groupedBoolean.ir,symbols);
+    const groupedBooleanFlat=flattenInstance(deepClone(groupedBooleanTree));
+    const groupedBooleanModalText=renderInteractiveFlatExpr(groupedBooleanFlat,new Map(),'#f0a050',null,true).textContent;
+    const groupedBooleanReady=deepCloneFlat(groupedBooleanFlat);
+    groupedBooleanReady.operands.forEach(operand=>{if(operand.kind==='variable'||operand.kind==='constant')operand.resolved=true;});
+    const groupedBooleanCandidates=getMaxPrecCandidatesFlat(groupedBooleanReady).map(candidate=>candidate.op);
+    const independentTree=coreExpressionIrToEngineTree(
+      coreParseExpression({language:'c',source:'(1 + 2) + (3 - 1)',symbols}).ir,symbols);
+    const independentFlat=flattenInstance(deepClone(independentTree));
+    const independentCandidates=getMaxPrecCandidatesFlat(independentFlat).map(candidate=>candidate.op);
+    const nestedTree=coreExpressionIrToEngineTree(
+      coreParseExpression({language:'c',source:'(1 + (2 - 3)) * (3 + 2)',symbols}).ir,symbols);
+    const nestedFlat=flattenInstance(deepClone(nestedTree));
+    const nestedCandidates=getMaxPrecCandidatesFlat(nestedFlat);
+    const rightFirst=nestedCandidates.find(candidate=>candidate.op==='+');
+    const afterRight=evaluateFlatAt(nestedFlat,rightFirst.leftId,rightFirst.rightId).newFlat;
+    const afterRightCandidates=getMaxPrecCandidatesFlat(afterRight).map(candidate=>candidate.op);
     let constantUnaryRejected=false,doublePostfixRejected=false,unknownRejected=false;
     try{coreParseExpression({language:'c',source:'LIMIT++',symbols});}catch(error){constantUnaryRejected=/mutable variable/.test(error.message);}
     try{coreParseExpression({language:'c',source:'p++++',symbols});}catch(error){doublePostfixRejected=/unsupported expression/.test(error.message);}
@@ -871,7 +940,10 @@ function testSharedExpressionParser(){
       precedence:normalize(precedence.ir),character:normalize(character.ir),
       decimalSourceText:decimal.ir.right.sourceText,decimalTreeText:renderString(decimalTree),
       decimalFlatText:flatToString(flattenInstance(deepClone(decimalTree))),decimalValue:evalTree(decimalTree),
-      decimalFinalValue:decimalTrace.finalValue,
+      decimalFinalValue:decimalTrace.finalValue,groupedBooleanSource,
+      groupedBooleanTreeText:renderString(groupedBooleanTree),
+      groupedBooleanFlatText:flatToString(groupedBooleanFlat),groupedBooleanModalText,groupedBooleanCandidates,
+      independentCandidates,nestedCandidateOps:nestedCandidates.map(candidate=>candidate.op),afterRightCandidates,
       constantUnaryRejected,doublePostfixRejected,unknownRejected
     });
   })()`));
@@ -891,6 +963,13 @@ function testSharedExpressionParser(){
   assert.strictEqual(result.decimalFlatText,'(a + b) / 2.0');
   assert.strictEqual(result.decimalValue,5.5);
   assert.strictEqual(result.decimalFinalValue,5.5);
+  assert.strictEqual(result.groupedBooleanTreeText,result.groupedBooleanSource);
+  assert.strictEqual(result.groupedBooleanFlatText,result.groupedBooleanSource);
+  assert.strictEqual(result.groupedBooleanModalText,result.groupedBooleanSource);
+  assert.deepStrictEqual(result.groupedBooleanCandidates.slice().sort(),['<','<=','==','>']);
+  assert.deepStrictEqual(result.independentCandidates.slice().sort(),['+','-']);
+  assert.deepStrictEqual(result.nestedCandidateOps.slice().sort(),['+','-']);
+  assert.deepStrictEqual(result.afterRightCandidates,['-']);
   assert(result.constantUnaryRejected&&result.doublePostfixRejected&&result.unknownRejected);
 }
 
@@ -2554,6 +2633,23 @@ function testExamSettingsAndTimeoutPolicy(){
     timeoutLocks:true,solutionBlocked:true,fullPurge:true});
 }
 
+function testCodeOrderingPartialRecordScoring(){
+  const ctx=context();
+  ctx.registerActivityPlugin=plugin=>{ctx.codeOrderingPlugin=plugin;};
+  ctx.sourceProgramScreenStateText=value=>String(value||'');
+  ctx.coreTerminalScreen=value=>({row:0,column:String(value||'').length});
+  loadRelative(ctx,['plugins/code-ordering/plugin.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const item={answerKey:{output:'Ready',expectedLines:['Ready'],terminalOutput:true,variables:[
+      {name:'x',expected:5},{name:'y',expected:9}
+    ]}};
+    const stopped={ok:false,answer:{output:'Ready',variables:[{name:'x',expected:5}]}};
+    return JSON.stringify(coScore(item,stopped));
+  })()`));
+  assert.strictEqual(result.correct,1);
+  assert.strictEqual(result.total,2);
+  assert.deepStrictEqual(result.variableResults,[true,false]);
+}
 function run(){
   const phaseZeroBaseline=assertPhaseZeroBaseline(ROOT);
   testScriptManifestParses();
@@ -2579,6 +2675,7 @@ function run(){
   testTokenClassificationPlugin();
   testFallingTokenSortMultiple();
   testSimulateOutputPlugin();
+  testCodeOrderingPartialRecordScoring();
   testInlineEvaluationActions();
   testLegacyUnaryMutationCards();
   testInvalidExecutionAlertIsStatementScoped();

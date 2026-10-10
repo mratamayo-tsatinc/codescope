@@ -108,8 +108,8 @@ button.co-state-status{cursor:pointer}button.co-state-status:hover,button.co-sta
 .co-mobile-tab.is-active>i{color:var(--co-tab-accent)}
 .co-tab-status{position:absolute;top:7px;right:calc(50% - 18px);width:6px;height:6px;border-radius:50%;background:var(--good)}
 .co-mobile-tab.has-review .co-tab-status{background:var(--op)}
-.co-state-error{display:flex;align-items:flex-start;gap:7px;margin:0 0 10px;padding:8px 9px;border:1px solid color-mix(in srgb,var(--bad) 35%,var(--line));border-radius:6px;background:color-mix(in srgb,var(--bad) 6%,transparent);color:var(--text-dim);font:500 11px/1.4 var(--ui)}
-.co-state-error i{margin-top:2px;color:var(--bad)}
+.trace-feedback-missing-summary{color:color-mix(in srgb,var(--bad) 62%,var(--text-mute));font-style:italic;font-weight:650;opacity:.9}
+.co-output-comparison .trace-feedback-text-diff{padding:0;border-radius:0;background:transparent;color:color-mix(in srgb,var(--text-mute) 88%,var(--text));font-weight:inherit;text-decoration:none}
 .co-execution-error-strip{box-sizing:border-box;display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:9px;width:100%;margin-top:10px;padding:9px 11px;border:1px solid color-mix(in srgb,var(--bad) 42%,var(--line));border-radius:8px;background:color-mix(in srgb,var(--bad) 6%,var(--panel));color:var(--text-dim);font:500 11px/1.4 var(--ui);text-align:left;cursor:pointer}
 .co-execution-error-strip>i{color:var(--bad)}
 .co-execution-error-line{color:var(--bad);font-weight:800;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}

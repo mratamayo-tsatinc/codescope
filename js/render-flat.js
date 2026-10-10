@@ -118,18 +118,23 @@ function renderInteractiveFlatExpr(flat, colorMap, activeColor, flashId, unresol
   const runs = computeParenRuns(flat);
   const openAt = new Set(runs.map(r=>r.start)), closeAt = new Set(runs.map(r=>r.end));
   const unaryRuns=computeUnaryRuns(flat),unaryOpen=new Map(unaryRuns.map(run=>[run.start,run])),
-    unaryClose=new Set(unaryRuns.map(run=>run.end));
+    unaryClose=new Map(unaryRuns.map(run=>[run.end,run]));
   const parts = [];
+  const validCandidates=getMaxPrecCandidatesFlat(flat);
   for(let i=0;i<flat.operands.length;i++){
-    if(unaryOpen.has(i))parts.push(h('span',{class:'tok tok-op-muted'},unaryOpen.get(i).operator+'('));
-    else if(openAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, '('));
+    if(openAt.has(i))parts.push(h('span',{class:'tok tok-op-muted'},'('));
+    if(unaryOpen.has(i)){
+      const unary=unaryOpen.get(i);
+      parts.push(h('span',{class:'tok tok-op-muted'},unary.operator+'('.repeat(unary.parentheses)));
+    }
     parts.push(renderInteractiveFlatOperand(flat.operands[i], colorMap, activeColor, flashId, statementId));
-    if(unaryClose.has(i))parts.push(h('span',{class:'tok tok-op-muted'},')'));
-    else if(closeAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, ')'));
+    if(unaryClose.has(i))parts.push(h('span',{class:'tok tok-op-muted'},')'.repeat(unaryClose.get(i).parentheses)));
+    if(closeAt.has(i))parts.push(h('span',{class:'tok tok-op-muted'},')'));
     if(i<flat.operators.length){
       const L = flat.operands[i], R = flat.operands[i+1], opStr = flat.operators[i];
       const strictSequence=typeof strictSequenceEnabled==='function'&&strictSequenceEnabled();
-      const ready = !unresolvedAny && pairReady(L,R,opStr);
+      const ready=pairReady(L,R,opStr)&&validCandidates.some(candidate=>
+        candidate.leftId===L.id&&candidate.rightId===R.id);
       const selectable=ready||strictSequence;
       const opCls = 'tok '+(selectable ? 'tok-op-active tok-colored'+(strictSequence?' strict-sequence-candidate':'') : 'tok-op-muted');
       const opAttrs = {class:opCls, tabindex: selectable ? '0' : '-1', role:'button', 'aria-label':`evaluate ${opStr}`,
@@ -210,14 +215,17 @@ function renderStaticFlatExpr(flat, colorMap, flashId, pending){
   const runs = computeParenRuns(flat);
   const openAt = new Set(runs.map(r=>r.start)), closeAt = new Set(runs.map(r=>r.end));
   const unaryRuns=computeUnaryRuns(flat),unaryOpen=new Map(unaryRuns.map(run=>[run.start,run])),
-    unaryClose=new Set(unaryRuns.map(run=>run.end));
+    unaryClose=new Map(unaryRuns.map(run=>[run.end,run]));
   const parts = [];
   for(let i=0;i<flat.operands.length;i++){
-    if(unaryOpen.has(i))parts.push(h('span',{class:'tok tok-op-muted'},unaryOpen.get(i).operator+'('));
-    else if(openAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, '('));
+    if(openAt.has(i))parts.push(h('span',{class:'tok tok-op-muted'},'('));
+    if(unaryOpen.has(i)){
+      const unary=unaryOpen.get(i);
+      parts.push(h('span',{class:'tok tok-op-muted'},unary.operator+'('.repeat(unary.parentheses)));
+    }
     parts.push(renderStaticFlatOperand(flat.operands[i], colorMap, flashId, pending));
-    if(unaryClose.has(i))parts.push(h('span',{class:'tok tok-op-muted'},')'));
-    else if(closeAt.has(i)) parts.push(h('span',{class:'tok tok-op-muted'}, ')'));
+    if(unaryClose.has(i))parts.push(h('span',{class:'tok tok-op-muted'},')'.repeat(unaryClose.get(i).parentheses)));
+    if(closeAt.has(i))parts.push(h('span',{class:'tok tok-op-muted'},')'));
     if(i<flat.operators.length){
       const L = flat.operands[i], R = flat.operands[i+1];
       const isPending = pending && pending.type==='evaluate' && pending.leftId===L.id && pending.rightId===R.id;

@@ -181,6 +181,58 @@ function getMaxPrecCandidates(tree){
   const maxP = Math.max.apply(null, reducible.map(n=>prec(n.op)));
   return reducible.filter(n=>prec(n.op)===maxP);
 }
+// Returns every binary operation whose two complete child subexpressions are
+// represented by adjacent values in the learner's current expression. This
+// is the shared authority for interactive operation validity: sibling
+// subtrees may resolve in either order, while a parent cannot resolve before
+// both of its own children. The flat model supplies presentation/provenance;
+// it does not reinterpret precedence or parentheses.
+function coreExpressionLeafIds(node,out){
+  out=out||[];
+  if(!node)return out;
+  if(node.kind==='binop'){
+    coreExpressionLeafIds(node.left,out);coreExpressionLeafIds(node.right,out);
+  }else if(node.kind==='unary'&&node.inner&&node.inner.kind==='binop'){
+    coreExpressionLeafIds(node.inner,out);
+  }else out.push(String(node.id));
+  return out;
+}
+function coreExpressionBinaryNodes(node,out){
+  out=out||[];
+  if(!node)return out;
+  if(node.kind==='binop'){
+    coreExpressionBinaryNodes(node.left,out);coreExpressionBinaryNodes(node.right,out);out.push(node);
+  }else if(node.kind==='unary'&&node.inner){
+    coreExpressionBinaryNodes(node.inner,out);
+  }
+  return out;
+}
+function coreExpressionSameLeafIds(left,right){
+  if(left.length!==right.length)return false;
+  const expected=new Set(right.map(String));
+  return left.every(id=>expected.has(String(id)));
+}
+function coreExpressionOperandLeafIds(operand){
+  const ids=operand&&Array.isArray(operand.sourceLeafIds)&&operand.sourceLeafIds.length
+    ?operand.sourceLeafIds:[operand&&operand.id];
+  return [...new Set(ids.filter(id=>id!=null).map(String))];
+}
+function coreExpressionOperationCandidates(originalTree,flat){
+  if(!originalTree||!flat||!Array.isArray(flat.operands)||!Array.isArray(flat.operators))return [];
+  const nodes=coreExpressionBinaryNodes(originalTree,[]).map(node=>({
+    node,operator:node.op,left:coreExpressionLeafIds(node.left,[]),right:coreExpressionLeafIds(node.right,[])
+  }));
+  const candidates=[];
+  for(let index=0;index<flat.operators.length;index++){
+    const left=flat.operands[index],right=flat.operands[index+1],operator=flat.operators[index];
+    const leftIds=coreExpressionOperandLeafIds(left),rightIds=coreExpressionOperandLeafIds(right);
+    const match=nodes.find(candidate=>candidate.operator===operator
+      &&coreExpressionSameLeafIds(leftIds,candidate.left)
+      &&coreExpressionSameLeafIds(rightIds,candidate.right));
+    if(match)candidates.push({operator,op:operator,leftId:left.id,rightId:right.id,nodeId:match.node.id,index});
+  }
+  return candidates;
+}
 function collectReadyUnaryNodes(node,out){
   out=out||[];
   if(node.kind==='unary'){

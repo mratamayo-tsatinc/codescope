@@ -6,6 +6,28 @@
 // expression item. Generation remains independent of rendering/evaluation.
 // ============================================================================
 
+// Maps the independently executed answer-key frames back to the interactive
+// statement ids. The parser frames retain source coordinates even when an
+// activity adapter gives a statement a presentation-specific id.
+function sourceProgramCanonicalStatementIds(statements,coreProgram){
+  const frames=coreProgram&&coreProgram.metadata&&coreProgram.metadata.executionFrames;
+  if(!Array.isArray(frames)||!frames.length||!Array.isArray(statements))return null;
+  const mappedByFrameId=new Map(),claimed=new Set(),result=[];
+  frames.filter(frame=>frame&&!frame.error).forEach(frame=>{
+    let statementId=mappedByFrameId.get(frame.statementId)||null;
+    if(!statementId){
+      const candidates=statements.filter(statement=>statement&&!claimed.has(statement.id)
+        &&statement.kind===frame.statementKind
+        &&Number(statement.sourceLine)<=Number(frame.sourceLine)
+        &&Number(statement.sourceEndLine||statement.sourceLine)>=Number(frame.sourceLine));
+      const statement=candidates[0]||statements.find(candidate=>candidate&&candidate.id===frame.statementId);
+      if(!statement)return;
+      statementId=statement.id;mappedByFrameId.set(frame.statementId,statementId);claimed.add(statementId);
+    }
+    result.push(statementId);
+  });
+  return result.length?result:null;
+}
 function engineNodeToProgramIr(node){
   if(node.kind === 'literal') return literalExpression(node.value,
     {id:node.id,dataType:node.dataType,sourceText:node.sourceText});

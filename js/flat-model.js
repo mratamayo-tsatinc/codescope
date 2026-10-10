@@ -1,84 +1,60 @@
 // ============================================================================
 // INTERACTIVE (FLAT) EVALUATION MODEL
 // ----------------------------------------------------------------------------
-// The generator/canonical-trace code above builds a precedence-shaped binary
-// tree, which is exactly right for independently deriving the correct answer
-// and the correct step order. But that tree structure is the WRONG model for
-// student interaction: in a binary tree, an operator can only be evaluated
-// once its two immediate tree-children are values, which silently forces
-// evaluation order onto the student (e.g. in "2 + 3 * 10" the "+" node's
-// right child is the "*" subtree, so "+" is structurally unclickable until
-// "*" fires — the student never actually has a choice). That defeats the
-// brief's explicit requirement that a student be able to pick ANY operator —
-// wrong precedence order, and even an operator that reaches across a
-// parenthesized region — and see the (possibly wrong) result play out, with
-// correctness judged only at the end/per-step, never enforced by disabling
-// "wrong" tokens. Parentheses are real code the student must learn to read,
-// not a hint the interface should force-resolve for them.
+// The core expression tree remains the source of truth for dependencies,
+// precedence, parentheses, and valid next operations. The modal uses a flat
+// left-to-right representation so strict mode can let a learner attempt any
+// locally executable adjacent pair. Each flat operand carries sourceLeafIds,
+// which map reductions back to the original tree.
 //
-// So interaction always uses ONE fully flat run of leaf operands and
-// operators, built straight from the original tree's left-to-right leaf
-// order — no nesting, no opaque "must resolve first" region, ever. EVERY
-// adjacent pair with two ready operands is clickable, including a pair that
-// straddles where a parenthesis originally was.
+// Guided mode enables every operation on the core dependency frontier. Strict
+// mode keeps all locally executable pairs available, while grading the chosen
+// pair against that same frontier. Independent sibling subexpressions can be
+// evaluated in either order; parent operations become valid only after both
+// child subexpressions have resolved.
 //
-// Parentheses are preserved as a non-gating tag only: each leaf that was
-// originally inside a required-parens region carries a `parenGroup` id.
-// This id is used for exactly two things, neither of which blocks a click:
-//   1. Rendering — while 2+ members of a group are still adjacent and
-//      unmerged, they're drawn wrapped in "(" ")" so the expression still
-//      looks like the original source.
-//   2. Scoring — a step that merges two operands from DIFFERENT groups (or
-//      one grouped + one free) reaches across a boundary that programming-
-//      language semantics require to be resolved first, so it's never
-//      counted as "correct order," even though it's fully clickable and
-//      fully computed. A step that merges two members of the SAME
-//      still-open group, or two ungrouped operands, is judged by ordinary
-//      precedence among its own partition.
-// Once a group collapses down to a single surviving value (whether by
-// resolving it properly or by being whittled down via crossing merges),
-// that value becomes ordinary/ungrouped (parenGroup = null) and rejoins
-// normal precedence scoring like any other operand.
-//
-// A FlatExpr is {operands:[...], operators:[...]} with operands.length ===
-// operators.length + 1. Every operand is a literal/variable/constant leaf
-// (same node objects/ids as the original tree, for id continuity), each
-// carrying a `parenGroup` (id or null).
+// Parenthesis tags preserve the authored visual grouping. They are presentation
+// metadata and are not a second semantic or scoring engine.
 // ============================================================================
-function tagParenGroups(node, ctxMinPrec, groupId){
-  ctxMinPrec = ctxMinPrec || 0;
-  groupId = groupId==null ? null : groupId;
+function tagParenGroups(node,ctxMinPrec,groupId,visualGroupId){
+  ctxMinPrec=ctxMinPrec||0;
+  groupId=groupId==null?null:groupId;
+  visualGroupId=visualGroupId===false?false:(visualGroupId==null?null:visualGroupId);
   if(node.kind==='unary'&&node.inner&&node.inner.kind==='binop'){
-    tagParenGroups(node.inner,0,node.id);
+    // The unary operand is its own scoring partition, while an enclosing
+    // authored branch remains one continuous visual parenthesis span.
+    tagParenGroups(node.inner,0,node.id,visualGroupId==null?false:visualGroupId);
     return;
   }
-  if(node.kind !== 'binop'){
-    node.parenGroup = groupId;
+  if(node.kind!=='binop'){
+    node.parenGroup=groupId;
+    node.visualParenGroup=visualGroupId===false?null:visualGroupId;
     return;
   }
-  const p = prec(node.op);
-  if(node.authoredParentheses||p < ctxMinPrec){
-    // This subtree would be printed with explicit parentheses (renderString
-    // would wrap it) — a real required-parens region. Tag every leaf beneath
-    // it with a shared group id (reusing an enclosing group id if this is
-    // itself nested inside one, so nested parens still collapse to one tag).
-    const gid = groupId==null ? nextId() : groupId;
-    tagParenGroups(node.left, 0, gid);
-    tagParenGroups(node.right, 0, gid);
+  const p=prec(node.op);
+  if(node.authoredParentheses||p<ctxMinPrec){
+    const gid=groupId==null?nextId():groupId;
+    const visualGid=visualGroupId===false?false:(visualGroupId==null?gid:visualGroupId);
+    tagParenGroups(node.left,0,gid,visualGid);
+    tagParenGroups(node.right,0,gid,visualGid);
     return;
   }
-  tagParenGroups(node.left, p, groupId);
-  tagParenGroups(node.right, p+1, groupId);
+  tagParenGroups(node.left,p,groupId,visualGroupId);
+  tagParenGroups(node.right,p+1,groupId,visualGroupId);
 }
 function flattenFull(node){
   if(node.kind==='unary'&&node.inner&&node.inner.kind==='binop'){
     const flat=flattenFull(node.inner);
     flat.operands.forEach(operand=>{
       operand.unaryGroup=node.id;operand.unaryGroupOperator=node.op;operand.unaryGroupForm=node.form;
+      operand.unaryGroupParentheses=Math.max(1,Number(node.inner.authoredParentheses)||0);
     });
     return flat;
   }
-  if(node.kind !== 'binop') return {operands:[node], operators:[]};
+  if(node.kind!=='binop'){
+    if(!Array.isArray(node.sourceLeafIds))node.sourceLeafIds=[node.id];
+    return {operands:[node],operators:[]};
+  }
   const l = flattenFull(node.left);
   const r = flattenFull(node.right);
   return {operands: l.operands.concat(r.operands), operators: l.operators.concat([node.op], r.operators)};
@@ -86,13 +62,18 @@ function flattenFull(node){
 // Tags parenGroup on every leaf, then produces the fully flat interaction
 // structure. Call this once per generated instance instead of flattenTree.
 function flattenInstance(tree){
-  tagParenGroups(tree, 0, null);
-  return flattenFull(tree);
+  tagParenGroups(tree,0,null,null);
+  const flat=flattenFull(tree);flat.originalTree=tree;return flat;
 }
 function deepCloneFlat(flat){
   return {
-    operands: flat.operands.map(op=>op.kind==='unary'?deepClone(op):Object.assign({},op)),
-    operators: flat.operators.slice()
+    operands:flat.operands.map(op=>{
+      const clone=op.kind==='unary'?deepClone(op):Object.assign({},op);
+      if(Array.isArray(op.sourceLeafIds))clone.sourceLeafIds=op.sourceLeafIds.slice();
+      return clone;
+    }),
+    operators:flat.operators.slice(),
+    originalTree:flat.originalTree||null
   };
 }
 function isFlatOperandReady(op){
@@ -134,7 +115,8 @@ function resolveFlatById(flat, targetId){
       if(op.kind==='unary') return Object.assign({}, op, {resolved:true, resultValue: unaryComputedValue(op)});
       return op;
     }),
-    operators: flat.operators
+    operators:flat.operators,
+    originalTree:flat.originalTree||null
   };
 }
 // First half of a unary token's two-step resolution: reveals the wrapped
@@ -147,13 +129,12 @@ function substituteFlatById(flat, targetId){
       if(op.id!==targetId || op.kind!=='unary') return op;
       return Object.assign({}, op, {substituted:true});
     }),
-    operators: flat.operators
+    operators:flat.operators,
+    originalTree:flat.originalTree||null
   };
 }
-// Every ready (clickable) operator position, left to right. Each entry also
-// carries the parenGroup of each side, purely so the scoring function below
-// can tell a same-group / free / crossing merge apart — this never affects
-// whether the pair appears here (i.e. never affects clickability).
+// Returns every locally executable adjacent pair. Strict mode uses this list
+// to permit attempts; semantic correctness comes from the core tree below.
 function collectReadyOperatorsFlat(flat, out){
   out = out || [];
   for(let i=0;i<flat.operators.length;i++){
@@ -162,29 +143,36 @@ function collectReadyOperatorsFlat(flat, out){
   }
   return out;
 }
-// Used for the (approximate, non-gating) correctness badge: among all
-// currently ready positions, the highest-precedence one(s) are "correct" —
-// but a step is only ever eligible to be "correct" if it does NOT reach
-// across a parenthesis boundary. A required-parens region is scored as its
-// own independent partition (its own local max-precedence), completely
-// separate from the free/outer partition, and a pair spanning two different
-// partitions is excluded from "correct" entirely — it's still fully
-// clickable via collectReadyOperatorsFlat, just never marked as the right
-// move, since real precedence/parens rules never allow it either.
+// Returns the core tree dependency frontier for real expressions. The fallback
+// only supports legacy or synthetic flat fixtures that have no source tree.
 function getMaxPrecCandidatesFlat(flat){
-  const ready = collectReadyOperatorsFlat(flat, []);
-  const nonCrossing = ready.filter(r => r.leftGroup === r.rightGroup);
-  if(nonCrossing.length===0) return [];
-  const byPartition = new Map();
-  for(const r of nonCrossing){
-    const key = r.leftGroup==null ? '__free__' : r.leftGroup;
-    if(!byPartition.has(key)) byPartition.set(key, []);
-    byPartition.get(key).push(r);
+  if(flat&&flat.originalTree&&typeof coreExpressionOperationCandidates==='function'){
+    return coreExpressionOperationCandidates(flat.originalTree,flat).filter(candidate=>{
+      const index=flat.operands.findIndex(operand=>operand.id===candidate.leftId);
+      return index>=0&&flat.operands[index+1]
+        &&flat.operands[index+1].id===candidate.rightId
+        &&pairReady(flat.operands[index],flat.operands[index+1],candidate.op);
+    }).map(candidate=>{
+      const left=findFlatOperandById(flat,candidate.leftId),right=findFlatOperandById(flat,candidate.rightId);
+      return Object.assign({},candidate,{leftGroup:left&&left.parenGroup==null?null:left.parenGroup,
+        rightGroup:right&&right.parenGroup==null?null:right.parenGroup});
+    });
   }
-  let result = [];
+  // Compatibility for legacy/synthetic expressions that predate provenance.
+  const byPartition=new Map();
+  for(let i=0;i<flat.operators.length;i++){
+    const L=flat.operands[i],R=flat.operands[i+1],op=flat.operators[i];
+    const leftGroup=L.parenGroup==null?null:L.parenGroup;
+    const rightGroup=R.parenGroup==null?null:R.parenGroup;
+    if(leftGroup!==rightGroup)continue;
+    const key=leftGroup==null?'__free__':leftGroup;
+    if(!byPartition.has(key))byPartition.set(key,[]);
+    byPartition.get(key).push({op,leftId:L.id,rightId:R.id,leftGroup,rightGroup,ready:pairReady(L,R,op)});
+  }
+  let result=[];
   for(const arr of byPartition.values()){
-    const maxP = Math.max.apply(null, arr.map(r=>prec(r.op)));
-    result = result.concat(arr.filter(r=>prec(r.op)===maxP));
+    const maxP=Math.max.apply(null,arr.map(candidate=>prec(candidate.op)));
+    result=result.concat(arr.filter(candidate=>candidate.ready&&prec(candidate.op)===maxP));
   }
   return result;
 }
@@ -193,6 +181,14 @@ function countGroupMembers(flat, groupId){
   let n = 0;
   for(const op of flat.operands) if(op.parenGroup===groupId) n++;
   return n;
+}
+function visualParenGroupOf(operand){
+  return Object.prototype.hasOwnProperty.call(operand,'visualParenGroup')
+    ?operand.visualParenGroup:operand.parenGroup;
+}
+function countVisualParenGroupMembers(flat,groupId){
+  if(groupId==null)return 0;
+  return flat.operands.filter(operand=>visualParenGroupOf(operand)===groupId).length;
 }
 function countUnaryGroupMembers(flat,groupId){
   if(groupId==null)return 0;
@@ -216,28 +212,35 @@ function evaluateFlatAt(flat, leftId, rightId, resultOverride){
       const computedResult=result;
       if(arguments.length>=4) result=resultOverride;
       let newLiteral = makeLiteral(result,{dataType:operationResultDataType(op,L.dataType,R.dataType)});
+      newLiteral.sourceLeafIds=[...new Set([...(L.sourceLeafIds||[L.id]),...(R.sourceLeafIds||[R.id])])];
       if(L.parenGroup!=null && L.parenGroup===R.parenGroup){
         const remainingBefore = countGroupMembers(flat, L.parenGroup);
         newLiteral.parenGroup = (remainingBefore - 1) <= 1 ? null : L.parenGroup;
       } else {
         newLiteral.parenGroup = null;
       }
+      const leftVisualGroup=visualParenGroupOf(L),rightVisualGroup=visualParenGroupOf(R);
+      if(leftVisualGroup!=null&&leftVisualGroup===rightVisualGroup){
+        const remainingVisual=countVisualParenGroupMembers(flat,leftVisualGroup)-1;
+        newLiteral.visualParenGroup=remainingVisual<=1?null:leftVisualGroup;
+      }else newLiteral.visualParenGroup=null;
       if(L.unaryGroup!=null&&L.unaryGroup===R.unaryGroup){
         const remaining=countUnaryGroupMembers(flat,L.unaryGroup)-1;
         if(remaining<=1){
           const inner=newLiteral;
           newLiteral=makeUnary(L.unaryGroupOperator,L.unaryGroupForm||'prefix',inner);
-          newLiteral.id=L.unaryGroup;newLiteral.substituted=true;
-          newLiteral.parenGroup=inner.parenGroup;
+          newLiteral.id=L.unaryGroup;newLiteral.substituted=true;newLiteral.sourceLeafIds=inner.sourceLeafIds;
+          newLiteral.parenGroup=inner.parenGroup;newLiteral.visualParenGroup=inner.visualParenGroup;
         }else{
           newLiteral.unaryGroup=L.unaryGroup;
           newLiteral.unaryGroupOperator=L.unaryGroupOperator;
           newLiteral.unaryGroupForm=L.unaryGroupForm;
+          newLiteral.unaryGroupParentheses=L.unaryGroupParentheses;
         }
       }
       const newOperands = flat.operands.slice(0,i).concat([newLiteral], flat.operands.slice(i+2));
       const newOperators = flat.operators.slice(0,i).concat(flat.operators.slice(i+1));
-      return {newFlat:{operands:newOperands, operators:newOperators}, applied:true, op, a, b, result, computedResult, resultId:newLiteral.id};
+      return {newFlat:{operands:newOperands,operators:newOperators,originalTree:flat.originalTree||null}, applied:true, op, a, b, result, computedResult, resultId:newLiteral.id};
     }
   }
   return {applied:false};
@@ -261,10 +264,10 @@ function computeParenRuns(flat){
   const runs = [];
   let i = 0;
   while(i < flat.operands.length){
-    const g = flat.operands[i].parenGroup;
-    if(g==null){ i++; continue; }
-    let j = i;
-    while(j < flat.operands.length && flat.operands[j].parenGroup===g) j++;
+    const g=visualParenGroupOf(flat.operands[i]);
+    if(g==null){i++;continue;}
+    let j=i;
+    while(j<flat.operands.length&&visualParenGroupOf(flat.operands[j])===g)j++;
     if(j - i >= 2) runs.push({start:i, end:j-1});
     i = j;
   }
@@ -277,24 +280,27 @@ function computeUnaryRuns(flat){
     if(group==null){index++;continue;}
     let end=index;
     while(end<flat.operands.length&&flat.operands[end].unaryGroup===group)end++;
-    runs.push({start:index,end:end-1,group,operator:flat.operands[index].unaryGroupOperator||'!'});
+    runs.push({start:index,end:end-1,group,operator:flat.operands[index].unaryGroupOperator||'!',
+      parentheses:Math.max(1,Number(flat.operands[index].unaryGroupParentheses)||0)});
     index=end;
   }
   return runs;
 }
 function flatToString(flat){
-  const runs = computeParenRuns(flat);
-  const openAt = new Set(runs.map(r=>r.start)), closeAt = new Set(runs.map(r=>r.end));
+  const runs=computeParenRuns(flat);
+  const openAt=new Set(runs.map(run=>run.start)),closeAt=new Set(runs.map(run=>run.end));
   const unaryRuns=computeUnaryRuns(flat),unaryOpen=new Map(unaryRuns.map(run=>[run.start,run])),
-    unaryClose=new Set(unaryRuns.map(run=>run.end));
-  let s = '';
+    unaryClose=new Map(unaryRuns.map(run=>[run.end,run]));
+  let s='';
   for(let i=0;i<flat.operands.length;i++){
-    if(unaryOpen.has(i))s+=unaryOpen.get(i).operator+'(';
-    else if(openAt.has(i)) s += '(';
-    s += flatLeafToString(flat.operands[i]);
-    if(unaryClose.has(i))s+=')';
-    else if(closeAt.has(i)) s += ')';
-    if(i<flat.operators.length) s += ' '+flat.operators[i]+' ';
+    if(openAt.has(i))s+='(';
+    if(unaryOpen.has(i)){
+      const unary=unaryOpen.get(i);s+=unary.operator+'('.repeat(unary.parentheses);
+    }
+    s+=flatLeafToString(flat.operands[i]);
+    if(unaryClose.has(i))s+=')'.repeat(unaryClose.get(i).parentheses);
+    if(closeAt.has(i))s+=')';
+    if(i<flat.operators.length)s+=' '+flat.operators[i]+' ';
   }
   return s;
 }

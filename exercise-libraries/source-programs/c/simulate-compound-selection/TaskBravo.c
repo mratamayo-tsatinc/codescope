@@ -14,8 +14,7 @@ int main(void)
     int finalBalance, transactionOK;
 
     finalBalance = balance + deposit - withdrawal - serviceFee;
-    transactionOK = (deposit > 0 && withdrawal <= balance) ||
-                    (withdrawal == 0 && !((deposit < 0)));
+    transactionOK = (deposit > 0 && withdrawal <= balance) || (withdrawal == 0 && !((deposit < 0)));
 
     if (transactionOK && finalBalance >= 1000) {
         serviceFee = serviceFee - 10;

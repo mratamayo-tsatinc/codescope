@@ -14,8 +14,7 @@ int main(void)
 
     roomCost = days * dailyRate + 30 / 2;
     totalCost = roomCost + transport;
-    covered = (days >= 5 && dailyRate <= 100) ||
-              (transport < 20 && !((days > 10)));
+    covered = (days >= 5 && dailyRate <= 100) || (transport < 20 && !((days > 10)));
 
     if (covered && totalCost <= 550) {
         totalCost = totalCost + 0;

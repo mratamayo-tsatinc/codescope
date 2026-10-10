@@ -521,39 +521,51 @@ function handleTokenClick(action){
   commitAction();
 }
 
+function strictExamCanonicalStatementIdSet(item){
+  return item&&Array.isArray(item.canonicalStatementIds)&&item.canonicalStatementIds.length
+    ?new Set(item.canonicalStatementIds):null;
+}
+
+function strictExamScoredStatements(item,statementIds){
+  const statements=item&&item.program&&Array.isArray(item.program.statements)?item.program.statements:[];
+  return statementIds?statements.filter(statement=>statementIds.has(statement.id)):statements;
+}
 function examCurrentCorrectScoredChecks(item){
+  const statementIds=strictExamCanonicalStatementIdSet(item);
   let correct=Array.isArray(item.trace)
-    ? item.trace.filter(step=>step.action==='EVALUATE'&&step.wasCorrect===true).length : 0;
+    ?item.trace.filter(step=>step.action==='EVALUATE'&&step.wasCorrect===true).length:0;
   if(item.program&&item.program.scoreAssignments){
-    item.program.statements.forEach(statement=>{
+    strictExamScoredStatements(item,statementIds).forEach(statement=>{
       const plugin=statementPluginFor(statement);
-      if(!plugin||!plugin.scoresCommit||!statement.runtime) return;
+      if(!plugin||!plugin.scoresCommit||!statement.runtime)return;
       correct+=statement.runtime.trace.filter(step=>step.action==='EVALUATE'&&step.wasCorrect===true).length;
       if(statement.runtime.checked&&statement.runtime.wasCorrectAssignment===true
-        &&statement.runtime.branchChoiceCorrect!==false) correct++;
+        &&statement.runtime.branchChoiceCorrect!==false)correct++;
     });
   }
-  if(typeof manualResponseFacts==='function') correct+=manualResponseFacts(item).correct;
+  if(typeof manualResponseFacts==='function')correct+=manualResponseFacts(item,statementIds).correct;
   return correct;
 }
 
 function examCanonicalScoredCheckCount(item){
-  let total=1; // final derived-value check
+  const statementIds=strictExamCanonicalStatementIdSet(item);
+  let total=1; // final generated program-state check
   const finalSteps=item&&item.canonicalTrace&&Array.isArray(item.canonicalTrace.steps)
-    ? item.canonicalTrace.steps : [];
+    ?item.canonicalTrace.steps:[];
   total+=finalSteps.filter(step=>step.action==='EVALUATE').length;
   if(item&&item.program&&item.program.scoreAssignments){
-    item.program.statements.forEach(statement=>{
+    strictExamScoredStatements(item,statementIds).forEach(statement=>{
       const plugin=statementPluginFor(statement);
-      if(!plugin||!plugin.scoresCommit||!statement.runtime) return;
+      if(!plugin||!plugin.scoresCommit||!statement.runtime)return;
       const canonical=statement.runtime.canonicalTrace&&Array.isArray(statement.runtime.canonicalTrace.steps)
-        ? statement.runtime.canonicalTrace.steps : [];
+        ?statement.runtime.canonicalTrace.steps:[];
       const completeOutputResponse=statement.kind==='output'
         &&typeof manualOutputResponsePlanned==='function'&&manualOutputResponsePlanned(item,statement);
       total+=(completeOutputResponse?0:canonical.filter(step=>step.action==='EVALUATE').length)+1;
     });
   }
-  if(typeof plannedManualScoredCheckCount==='function') total+=plannedManualScoredCheckCount(item);
+  if(typeof plannedManualScoredCheckCount==='function')
+    total+=plannedManualScoredCheckCount(item,statementIds);
   return Math.max(1,total);
 }
 
@@ -817,7 +829,8 @@ function applyExpressionAction(item, action){
     const writeValue=outcome.writeValue;
     const expressionValue=outcome.expressionValue;
     item.workingFlat={operands:item.workingFlat.operands.map(operand=>operand.id===node.id
-      ?Object.assign({},operand,{resolved:true,resultValue:expressionValue}):operand),operators:item.workingFlat.operators};
+      ?Object.assign({},operand,{resolved:true,resultValue:expressionValue}):operand),operators:item.workingFlat.operators,
+      originalTree:item.workingFlat.originalTree||null};
     const after = flatToString(item.workingFlat);
     item.trace.push({action:'UNARY', op:node.op, form:node.form, target:(node.inner.kind==='literal'?String(node.inner.value):node.inner.name), sourceValue:base, result:expressionValue,writeValue,
       expressionBefore:before, expressionAfter:after, resultNodeId:node.id,manualResponse:!!action.manualResponse,
@@ -827,27 +840,23 @@ function applyExpressionAction(item, action){
   }
 
   if(action.type==='evaluate'){
-    const unresolvedAny = collectUnresolvedFlat(item.workingFlat,[]).length>0;
+    const validCandidates=getMaxPrecCandidatesFlat(item.workingFlat);
+    const selectedIsValid=validCandidates.some(candidate=>
+      candidate.leftId===action.leftId&&candidate.rightId===action.rightId);
     if(strictSequenceEnabled()){
       const executable=collectReadyOperatorsFlat(item.workingFlat,[])
         .some(candidate=>candidate.leftId===action.leftId&&candidate.rightId===action.rightId);
       if(!executable) return false;
-    } else if(unresolvedAny) return false;
+    }else if(!selectedIsValid)return false;
     const before = flatToString(item.workingFlat);
-    const maxCands = getMaxPrecCandidatesFlat(item.workingFlat);
-    // In strict mode a locally computable pair may be selected while another
-    // named operand elsewhere is still unresolved. Execute it so the chosen
-    // path can play out, but never award sequence credit: substitution was
-    // still the required next phase before any binary evaluation.
-    const wasCorrect = !unresolvedAny
-      && maxCands.some(c=>c.leftId===action.leftId && c.rightId===action.rightId);
+    const wasCorrect=selectedIsValid;
     const evalResult = action.manualResponse
       ?evaluateFlatAt(item.workingFlat,action.leftId,action.rightId,action.manualResponse.value)
       :evaluateFlatAt(item.workingFlat, action.leftId, action.rightId);
     if(!evalResult.applied) return false;
     item.workingFlat = evalResult.newFlat;
     const after = flatToString(item.workingFlat);
-    item.trace.push({action:'EVALUATE', target:{operator:evalResult.op, operands:[evalResult.a, evalResult.b]}, result:evalResult.result, expressionBefore:before, expressionAfter:after, wasCorrect, expectedOperators:maxCands.map(candidate=>candidate.op), resultNodeId:evalResult.resultId, leftId:action.leftId, rightId:action.rightId,
+    item.trace.push({action:'EVALUATE', target:{operator:evalResult.op, operands:[evalResult.a, evalResult.b]}, result:evalResult.result, expressionBefore:before, expressionAfter:after, wasCorrect, expectedOperators:validCandidates.map(candidate=>candidate.op), resultNodeId:evalResult.resultId, leftId:action.leftId, rightId:action.rightId,
       manualResponse:!!action.manualResponse,manualExpectedValue:action.manualResponse&&action.manualResponse.expectedValue,manualWasCorrect:action.manualResponse&&action.manualResponse.wasCorrect});
     item.history.push(deepCloneFlat(item.workingFlat));
     return true;

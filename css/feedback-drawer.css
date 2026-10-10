@@ -314,11 +314,11 @@
   border-color:color-mix(in srgb,var(--good,#4fd9b0) 48%,var(--line,#262c38));
 }
 .trace-feedback-text-diff{
-  border-radius:3px;padding:1px 2px;font-weight:800;text-decoration:underline;
-  text-decoration-thickness:2px;text-underline-offset:2px;
+  border-radius:3px;padding:1px 2px;font-weight:700;text-decoration:none;
 }
 .trace-feedback-state.student-state .trace-feedback-text-diff{
-  color:var(--bad,#ff7373);background:rgba(255,115,115,.14);
+  color:color-mix(in srgb,var(--text-mute,#737c91) 82%,var(--bad,#ff7373));
+  background:color-mix(in srgb,var(--bad,#ff7373) 5%,transparent);
 }
 .trace-feedback-state.system-state .trace-feedback-text-diff{
   color:var(--good,#4fd9b0);background:rgba(79,217,176,.14);
