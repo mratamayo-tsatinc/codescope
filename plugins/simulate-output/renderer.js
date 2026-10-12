@@ -116,9 +116,11 @@ function soRender({container,item,profile}){
   flow.appendChild(h('div',{class:'so-instruction'},
     h('i',{class:'fa-solid fa-circle-info','aria-hidden':'true'}),
     h('span',{},profile.activity.instructions)));
-  flow.appendChild(soSourcePanel(item));
-  const inputPanel=soInputPanel(item);if(inputPanel)flow.appendChild(inputPanel);
-  flow.appendChild(h('div',{class:'so-answer-grid'},soOutputPanel(item),soVariablesPanel(item)));
+  const sourceColumn=h('div',{class:'so-source-column'},soSourcePanel(item));
+  const inputPanel=soInputPanel(item);if(inputPanel)sourceColumn.appendChild(inputPanel);
+  const answerDock=h('aside',{class:'so-answer-dock','aria-label':'Simulation answers'},
+    soVariablesPanel(item),soOutputPanel(item));
+  flow.appendChild(h('div',{class:'so-workspace-layout'},sourceColumn,answerDock));
   if(item.checked&&state.mode==='exam'&&!state.examExpired){
     flow.appendChild(h('div',{class:'so-recorded',role:'status'},
       h('i',{class:'fa-solid fa-lock','aria-hidden':'true'}),

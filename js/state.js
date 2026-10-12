@@ -482,15 +482,15 @@ function handleTokenClick(action){
           else beginSourceFlowTransition(item);
         });
       }
-      finalizeSourceProgramItem(item);
+      const itemFinalized=finalizeSourceProgramItem(item);
       render();
       if(transition&&!modalOwnsCompletion&&(!event||event.type!=='OUTPUT')){
         if(outboundMemoryDelay>0) setTimeout(()=>beginSourceFlowTransition(item),outboundMemoryDelay);
         else beginSourceFlowTransition(item);
       }
-      if(event&&event.type==='RETURN'&&typeof celebrateProgramCompletion==='function'){
+      if(itemFinalized&&typeof celebrateProgramCompletion==='function'){
         const celebrate=()=>celebrateProgramCompletion(item,
-          document.querySelector(`[data-statement-id="${event.statementId}"]`)||document.body);
+          document.querySelector(`[data-statement-id="${event&&event.statementId||statement&&statement.id}"]`)||document.body);
         if(typeof requestAnimationFrame==='function') requestAnimationFrame(celebrate);
         else celebrate();
       }
@@ -1049,6 +1049,8 @@ function handleCheck(){
     const result=checkActivityItem(item);
     if(result.applied){
       if(state.mode==='exam'){item.flagged=false;item.showSolution=false;recordExamAction(item,{type:'check'},{wasCorrect:item.wasCorrectFinal});}
+      if(typeof celebratePerfectItem==='function')celebratePerfectItem(item,
+        typeof document!=='undefined'?document.body:null);
       render();
     }
     return;
@@ -1062,6 +1064,8 @@ function handleCheck(){
       item.playback=null;
       recordExamAction(item,{type:'check'},{wasCorrect:item.wasCorrectFinal});
     }
+    if(typeof celebratePerfectItem==='function')celebratePerfectItem(item,
+      typeof document!=='undefined'?document.body:null);
     render();
   }
 }

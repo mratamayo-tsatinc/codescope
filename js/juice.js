@@ -1,36 +1,11 @@
 // ============================================================================
 // JUICE / FEEL — fully additive celebratory-moment module
 // ----------------------------------------------------------------------------
-// Same contract as moment-feedback.js: this file never edits engine.js /
-// state.js / render-session.js / render-done.js logic. It only:
-//
-//   1. WRAPS startSession and restart (via the same safeWrap helper pattern
-//      as moment-feedback.js) purely to reset one session-scoped flag
-//      (state._juiceDoneCelebrated) so the end-of-session confetti can fire
-//      again on a later session. The original function always runs first/
-//      unconditionally; this module's own logic is try/caught around it.
-//      If either function doesn't exist, safeWrap no-ops — nothing breaks.
-//
-//   2. DERIVES celebration-worthiness fresh, on every render, purely by
-//      reading item.wasCorrectFinal / item.itemScore / state.items — all
-//      already populated by the existing scoring flow, never mutated here.
-//      A one-time "already played" flag is cached directly on the item
-//      (item._juiceFirstCorrectPlayed, item._juicePerfectPlayed) — the same
-//      technique render-session.js already uses for _feedbackAnimated/
-//      _flashed, so a celebration animation fires exactly once per item,
-//      not on every one of the app's frequent re-renders.
-//
-//   3. EXPOSES two functions:
-//        renderItemCelebration(item, feedbackEl) — call once, right after
-//          the per-item feedback card is built and appended to the live
-//          DOM (needs real layout to position confetti). Returns a DOM
-//          node of celebration badges to append (or null).
-//        renderSessionCelebration(referenceEl) — call once from the
-//          session-summary screen, after it's appended to the live DOM.
-//          Fires a bigger confetti burst if every item in the session was
-//          correct. Returns nothing; it spawns its own overlay.
-//      Both are entirely optional call sites — see the small guarded
-//      insertions in render-session.js / render-done.js.
+// Celebration is governed by one rule across every activity: a completed
+// item with itemScore === 1 produces one confetti burst. The item-owned flag
+// prevents rerenders, navigation, persistence restores, and deferred Exam
+// feedback from replaying it. Feedback badges remain presentational and the
+// session summary never generates another burst.
 //
 // Confetti itself never depends on any ancestor having position:relative
 // (which would mean touching an existing selector in styles.css): each
@@ -40,29 +15,6 @@
 (function(){
   const root = (typeof globalThis !== 'undefined') ? globalThis : window;
   const celebrationSettings = DEFAULT_APP_SETTINGS.shell.celebrations;
-
-  function safeWrap(name, onBefore, onAfter){
-    const original = root[name];
-    if(typeof original !== 'function') return;
-    root[name] = function(){
-      let ctx;
-      try{ ctx = onBefore ? onBefore() : undefined; }catch(e){ ctx = undefined; }
-      const result = original.apply(this, arguments);
-      try{ if(onAfter) onAfter(ctx); }catch(e){ /* swallow: bookkeeping must never surface an error */ }
-      return result;
-    };
-  }
-
-  // Session-scoped: allows the perfect-session confetti to fire again on a
-  // fresh session after the flag was set true by an earlier one. Item-level
-  // flags (_juiceFirstCorrectPlayed / _juicePerfectPlayed) need no such
-  // reset — startSession always rebuilds state.items from scratch, so those
-  // flags simply don't exist yet on the new item objects.
-  function resetSessionJuice(){
-    if(typeof state === 'object' && state) state._juiceDoneCelebrated = false;
-  }
-  safeWrap('startSession', null, resetSessionJuice);
-  safeWrap('restart', null, resetSessionJuice);
 
   // --- confetti ---------------------------------------------------------
   // Fired across the FULL viewport (not scoped to any single container),
@@ -112,6 +64,22 @@
     }catch(e){ /* purely decorative — never let this surface an error */ }
   }
 
+  // One celebration source for every activity. Scoring has already finished
+  // when this is called, so itemScore is the shared definition of a perfect
+  // answer for Trace, Simulate, Order, Bug Catcher, and token activities.
+  // The item-owned flag prevents feedback rerenders, navigation, persistence
+  // restores, and deferred Exam feedback from replaying the burst.
+  function celebratePerfectItem(item,referenceEl){
+    try{
+      if(!item||!item.checked||item.wasCorrectFinal!==true||item._juicePerfectPlayed)return false;
+      const ratio=Number(item.itemScore);
+      if(!Number.isFinite(ratio)||Math.abs(ratio-1)>1e-9)return false;
+      item._juicePerfectPlayed=true;
+      spawnConfetti(referenceEl||document.body,{count:celebrationSettings.perfectItemCount});
+      return true;
+    }catch(e){return false;}
+  }
+
   // --- per-item celebration ----------------------------------------------
   // Called once, right after render-session.js appends the feedback card
   // (fbEl) to the live DOM. Returns a DOM node of badges to append into
@@ -132,18 +100,16 @@
       if(isFirstCorrectSoFar && !item._juiceFirstCorrectPlayed){
         item._juiceFirstCorrectPlayed = true;
         badges.push(h('span',{}, h('i',{class:'fa-solid fa-champagne-glasses'}), ' First one down!'));
-        spawnConfetti(fbEl, {count:celebrationSettings.firstCorrectCount});
       }
 
       // Perfect item score (100%, from whichever ITEM_SCORE_MODELS policy
       // is configured — see state.js's SCORING_CONFIG). Reusing itemScore
       // rather than re-deriving it keeps this in lockstep with whatever
       // scoring policy is active, without this file needing to know it.
-      if(item.itemScore === 1 && !item._juicePerfectPlayed){
-        item._juicePerfectPlayed = true;
+      if(item.itemScore === 1 && !item._juicePerfectBadgeShown){
+        item._juicePerfectBadgeShown = true;
         badges.push(h('span',{}, h('i',{class:'fa-solid fa-star'}),
           item.activityKind ? ' Perfect — every required response correct' : ' Perfect — every step in order'));
-        spawnConfetti(fbEl, {count:celebrationSettings.perfectItemCount});
       }
 
       if(badges.length === 0) return null;
@@ -152,12 +118,7 @@
   }
 
   function celebrateProgramCompletion(item,referenceEl){
-    try{
-      if(!item||item._programCompletionCelebrated) return;
-      item._programCompletionCelebrated=true;
-      if(item._juicePerfectPlayed||item._juiceFirstCorrectPlayed) return;
-      spawnConfetti(referenceEl||document.body,{count:celebrationSettings.perfectItemCount});
-    }catch(e){ /* purely decorative */ }
+    celebratePerfectItem(item,referenceEl);
   }
 
   // --- session-level celebration -------------------------------------------
@@ -165,18 +126,13 @@
   // the live DOM. referenceEl is whichever element the confetti should
   // visually center over (the summary hero, ideally).
   function renderSessionCelebration(referenceEl){
-    try{
-      if(!celebrationSettings.enabled) return;
-      if(typeof state !== 'object' || !state || !Array.isArray(state.items) || state.items.length === 0) return;
-      if(state._juiceDoneCelebrated) return;
-      const allCorrect = state.items.every(it => it.wasCorrectFinal);
-      if(!allCorrect) return;
-      state._juiceDoneCelebrated = true;
-      spawnConfetti(referenceEl, {count:celebrationSettings.perfectSessionCount});
-    }catch(e){ /* purely decorative */ }
+    // Confetti is intentionally item-scoped. The completion screen may still
+    // render its summary, but it never creates an additional session burst.
+    return false;
   }
 
   root.renderItemCelebration = renderItemCelebration;
   root.renderSessionCelebration = renderSessionCelebration;
+  root.celebratePerfectItem = celebratePerfectItem;
   root.celebrateProgramCompletion = celebrateProgramCompletion;
 })();

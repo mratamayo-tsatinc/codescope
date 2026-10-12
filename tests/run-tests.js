@@ -152,7 +152,7 @@ function testScriptManifestParses(){
   const loginSource=fs.readFileSync(path.join(ROOT,'js','login.js'),'utf8');
   const settingsPersistenceSource=fs.readFileSync(path.join(ROOT,'js','settings-persistence.js'),'utf8');
   const sharedStylesSource=fs.readFileSync(path.join(ROOT,'css','styles.css'),'utf8');
-  assert(stateSource.includes("event&&event.type==='RETURN'&&typeof celebrateProgramCompletion==='function'"));
+  assert(stateSource.includes("itemFinalized&&typeof celebrateProgramCompletion==='function'"));
   assert(juiceSource.includes('function celebrateProgramCompletion(item,referenceEl)'));
   assert(stateSource.includes('activityZoom:Object.freeze({'));
   assert(stateSource.includes('minPercent:80')&&stateSource.includes('maxPercent:140'));

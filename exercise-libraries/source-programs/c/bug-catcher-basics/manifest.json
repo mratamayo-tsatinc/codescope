@@ -1,0 +1,22 @@
+{
+  "title": "Bug Catcher Basics",
+  "exercises": [
+    "Basic Structure.c",
+    "Basic Structure and Printing.c",
+    "Declaring Constant.c",
+    "Escape Characters.c",
+    "User Welcome Banner.c",
+    "Starry Ascension.c",
+    "Rainbow Arch.c",
+    "Personal Information Display.c",
+    "Personal Information.c",
+    "Invoice Generation.c",
+    "Book Reservation.c",
+    "Wage Calculator.c",
+    "C to F.c",
+    "Circle Area Calculator.c",
+    "Cube Volume Finder.c",
+    "Product Discount Calculator.c",
+    "Student Grade Averager.c"
+  ]
+}

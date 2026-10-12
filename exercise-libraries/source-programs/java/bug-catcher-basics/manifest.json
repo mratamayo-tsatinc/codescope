@@ -1,0 +1,22 @@
+{
+  "title": "Bug Catcher Basics",
+  "exercises": [
+    "Basic Structure.java",
+    "Basic Structure and Printing.java",
+    "Declaring Constant.java",
+    "Escape Characters.java",
+    "User Welcome Banner.java",
+    "Starry Ascension.java",
+    "Rainbow Arch.java",
+    "Personal Information Display.java",
+    "Personal Information.java",
+    "Invoice Generation.java",
+    "Book Reservation.java",
+    "Wage Calculator.java",
+    "C to F.java",
+    "Circle Area Calculator.java",
+    "Cube Volume Finder.java",
+    "Product Discount Calculator.java",
+    "Student Grade Averager.java"
+  ]
+}

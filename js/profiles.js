@@ -813,6 +813,16 @@ const PROFILES_RAW = [
       generator:{library:'source-programs',exerciseSet:'simulate-output-variables',shuffle:false}},
     feedback:{showCorrectSolution:{practice:false,exam:false}},
   },
+  {
+    enabled:true,
+    meta:{id:'bug-catcher-basics',name:'Bug Catcher',
+      description:'Inspect a corrupted C or Java program and identify the tokens that prevent it from matching its valid source.'},
+    scoring:{itemCount:'manifest',pointsPerItem:'generated-answer'},
+    content:{values:{variables:'authored',input:'authored'},bugs:{mode:'seeded',count:3}},
+    activity:{kind:'bug-catcher',
+      instructions:'Select the corrupted tokens in the source code. The number of faults to find is shown beside the filename.',
+      generator:{library:'source-programs',exerciseSet:'bug-catcher-basics',shuffle:false}},
+  },
 ];
 
 // Categories are authored here alongside the profiles. A profile belongs to
@@ -868,6 +878,8 @@ const PROFILE_CATEGORIES = [
     profileIds:['trace-basic-selection','trace-compound-selection']},
   {id:'simulate-selection-commands',name:'Simulate Selection Commands',enabled:true,
     profileIds:['simulate-basic-selection','simulate-compound-selection']},
+  {id:'bug-catcher-activities',name:'Bug Catcher Activities',enabled:true,
+    profileIds:['bug-catcher-basics']},
 
 ];
 

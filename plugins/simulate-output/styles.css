@@ -14,7 +14,9 @@
 .so-source-text{padding-left:15px;color:var(--text);white-space:pre}
 .so-syntax-prep{color:#73c6d4}.so-syntax-string{color:#a7cf8b}.so-syntax-number{color:var(--op)}
 .so-syntax-type{color:#e5c66e}.so-syntax-keyword{color:#f2a45f}.so-syntax-function{color:#8ebdf0}.so-syntax-comment{color:var(--text-mute);font-style:italic}
-.so-answer-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:12px;margin:12px 16px 0}
+.so-workspace-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,30%);align-items:start}
+.so-source-column{min-width:0}
+.so-answer-dock{position:sticky;top:16px;display:flex;flex-direction:column;gap:12px;min-width:0;margin:16px 16px 0 0}
 .so-answer-panel{display:flex;flex-direction:column}
 .so-answer-hint,.so-no-variables{margin:10px 12px;color:var(--text-dim);font:500 11.5px/1.4 var(--ui)}
 .so-output-input{box-sizing:border-box;display:block;width:calc(100% - 24px);min-height:150px;max-height:340px;margin:0 12px 12px;padding:10px 12px;resize:vertical;border:1px solid var(--line);border-radius:6px;background:var(--panel-alt);color:var(--text);font:600 12px/1.55 var(--mono);white-space:pre;overflow:auto}
@@ -41,5 +43,6 @@
 .so-solution h3{margin:0;color:var(--text);font:700 12px var(--ui)}
 .so-solution-output{max-width:100%;margin:0;padding:10px;border:1px solid var(--line-soft);border-radius:5px;color:var(--text);font:600 11.5px/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .so-solution-variable{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line-soft);color:var(--text);font:11.5px var(--mono)}.so-solution-variable code{overflow-wrap:anywhere}
-@media(max-width:720px){.so-answer-grid{grid-template-columns:1fr}.so-source-code{max-height:48vh}}
-@media(max-width:390px){.so-source-panel{margin:11px 11px 0}.so-input-panel,.so-answer-grid{margin:11px 11px 0}.so-source-code{font-size:11.5px}.so-variable-list{grid-template-columns:repeat(auto-fill,minmax(74px,1fr))}.so-variable-card{min-height:72px}}
+@media(max-width:900px){.so-workspace-layout{grid-template-columns:1fr}.so-answer-dock{position:static;margin:12px 16px 0}}
+@media(max-width:720px){.so-source-code{max-height:48vh}}
+@media(max-width:390px){.so-source-panel{margin:11px 11px 0}.so-input-panel,.so-answer-dock{margin:11px 11px 0}.so-source-code{font-size:11.5px}.so-variable-list{grid-template-columns:repeat(auto-fill,minmax(74px,1fr))}.so-variable-card{min-height:72px}}
