@@ -1,0 +1,11 @@
+{
+  "title": "C Semifinals - Trace Input, Computation, and Output",
+  "exercises": [
+    "ParkingCheckout.c",
+    "PharmacyOrder.c",
+    "WaterRefill.c",
+    "ParcelBooking.c",
+    "SchoolCanteen.c"
+  ]
+}
+

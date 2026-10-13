@@ -326,6 +326,33 @@ function resolvedPointsPerItem(profile){
 // ----------------------------------------------------------------------------
 const DEFAULT_EXTRAS = { unaryWrap: {enabled:false, operators:[], forms:[], fraction:0} };
 const DEFAULT_CORRECT_SOLUTION_VISIBILITY = Object.freeze({practice:true, exam:false});
+const DEFAULT_PROFILE_BEHAVIOR = Object.freeze({
+  interactionMode:'strict-sequence',
+  allowUndo:true,
+  allowRetry:true,
+  allowReviewFlags:false,
+  showNeutralGuidance:true,
+  showScores:true,
+  feedbackRelease:'immediate',
+  lockItemAfterCheck:false,
+  showCorrectSolution:true,
+  manualResponses:Object.freeze({mode:'profile',namedValueRate:50,operatorRate:50})
+});
+
+function finalizeProfileBehavior(rawBehavior,rawFeedback){
+  const source=rawBehavior&&typeof rawBehavior==='object'?rawBehavior:{};
+  const behavior=Object.assign({},DEFAULT_PROFILE_BEHAVIOR,source);
+  behavior.manualResponses=Object.assign({},DEFAULT_PROFILE_BEHAVIOR.manualResponses,source.manualResponses||{});
+  // One-release migration for files produced before profile behavior existed.
+  const legacy=rawFeedback&&rawFeedback.showCorrectSolution;
+  if(source.showCorrectSolution===undefined){
+    if(typeof legacy==='boolean')behavior.showCorrectSolution=legacy;
+    else if(legacy&&typeof legacy.practice==='boolean')behavior.showCorrectSolution=legacy.practice;
+  }
+  if(!['guided','strict-sequence'].includes(behavior.interactionMode))behavior.interactionMode='strict-sequence';
+  if(!['immediate','after-timeout','never'].includes(behavior.feedbackRelease))behavior.feedbackRelease='immediate';
+  return behavior;
+}
 
 function finalizeProfileFeedback(rawFeedback,profileId){
   if(rawFeedback==null)return null;
@@ -342,6 +369,8 @@ function finalizeProfileFeedback(rawFeedback,profileId){
 }
 
 function profileShowsCorrectSolution(profile,mode){
+  if(profile&&profile.behavior&&typeof profile.behavior.showCorrectSolution==='boolean')
+    return profile.behavior.showCorrectSolution;
   const setting=profile&&profile.feedback&&profile.feedback.showCorrectSolution;
   if(typeof setting==='boolean')return setting;
   if(setting&&typeof setting==='object'&&typeof setting[mode]==='boolean')return setting[mode];
@@ -365,6 +394,7 @@ function finalizeProfile(raw){
         selection:raw.content.selection?Object.assign({},raw.content.selection):undefined,
       }) : null,
       feedback: finalizeProfileFeedback(raw.feedback,raw.meta&&raw.meta.id),
+      behavior: finalizeProfileBehavior(raw.behavior,raw.feedback),
       enabled: raw.enabled!==false,
     };
     p.id = p.meta.id;
@@ -386,6 +416,7 @@ function finalizeProfile(raw){
     interaction: raw.interaction ? Object.assign({},raw.interaction) : null,
     presentation: raw.presentation ? Object.assign({},raw.presentation) : null,
     feedback: finalizeProfileFeedback(raw.feedback,raw.meta&&raw.meta.id),
+    behavior: finalizeProfileBehavior(raw.behavior,raw.feedback),
     content: raw.content ? Object.assign({},raw.content,{
       source:raw.content.source?Object.assign({},raw.content.source):undefined,
       values:raw.content.values?Object.assign({},raw.content.values):undefined,

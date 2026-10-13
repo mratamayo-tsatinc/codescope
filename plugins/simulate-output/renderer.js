@@ -121,19 +121,19 @@ function soRender({container,item,profile}){
   const answerDock=h('aside',{class:'so-answer-dock','aria-label':'Simulation answers'},
     soVariablesPanel(item),soOutputPanel(item));
   flow.appendChild(h('div',{class:'so-workspace-layout'},sourceColumn,answerDock));
-  if(item.checked&&state.mode==='exam'&&!state.examExpired){
+  if(item.checked&&!profileFeedbackVisible(item)){
     flow.appendChild(h('div',{class:'so-recorded',role:'status'},
       h('i',{class:'fa-solid fa-lock','aria-hidden':'true'}),
       ' Answer recorded. Results are available after time expires if the exam policy permits.'));
   }
   if(!item.checked&&!state.examExpired){
     const controls=h('div',{class:'so-controls'});
-    if(state.mode==='practice')controls.appendChild(h('button',{
+    if(profileAllowsRetry())controls.appendChild(h('button',{
       class:'item-reset-button so-reset-button',type:'button',disabled:!soHasResponse(item),
       onclick:handleReset},'Reset item'));
     controls.appendChild(renderInlineEvaluationActions({canCheck:true}));
     flow.appendChild(controls);
-  }else if(state.mode==='practice'){
+  }else if(profileAllowsRetry()){
     appendPracticeRetryBar(container);
   }
   soSyncDrawers(item,profile);

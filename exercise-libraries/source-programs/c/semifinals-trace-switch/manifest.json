@@ -1,0 +1,9 @@
+{
+  "title": "C Semifinals - Trace Switch Statements",
+  "exercises": [
+    "MealCounter.c",
+    "SupportQueue.c",
+    "TransitPass.c"
+  ]
+}
+

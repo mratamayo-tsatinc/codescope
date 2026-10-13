@@ -260,7 +260,7 @@ function coCheck({item,state}){if(!item||item.checked)return {applied:false};ite
     sequenceVersion:CO_PLAYBACK_SEQUENCE_VERSION,arrangedSource:item.runResult.source,
     frames:item.runResult.frames,finalRun:item.runResult};item._coMobileTab='run';item.result=coScore(item,item.runResult);
   item.checked=true;item.correctSteps=item.points=item.result.correct;item.totalOpSteps=item.maxPoints=item.result.total;
-  item.itemScore=item.points/item.maxPoints;item.wasCorrectFinal=item.points===item.maxPoints;item.lockedAt=state.mode==='exam'?Date.now():null;
+  item.itemScore=item.points/item.maxPoints;item.wasCorrectFinal=item.points===item.maxPoints;item.lockedAt=profileLocksCheckedItems()?Date.now():null;
   return {applied:true,completed:true};}
 function coReset({item}){if(!item||item.checked)return {applied:false};const changed=!coEqual(item.order,item.initialOrder)||!!item.runResult
     ||!!(item._coPlayback&&item._coPlayback.index);
@@ -404,7 +404,7 @@ function coFeedback(item){
     h('div',{class:'trace-feedback-comparison-grid'},coFeedbackColumn(item,false),coFeedbackColumn(item,true))));return root;
 }
 function coSyncFeedback(item){
-  const show=item.checked&&(state.mode==='practice'||state.examExpired&&activeExamPolicy().feedbackRelease==='after-timeout');
+  const show=profileFeedbackVisible(item);
   if(!show){clearFeedbackDrawerContent();hideFeedbackDrawerTab();closeFeedbackDrawer();return;}
   const first=!item._feedbackAnimated,content=coFeedback(item);item._feedbackAnimated=true;setFeedbackDrawerTitle('Feedback');
   setFeedbackDrawerContent(content);
@@ -725,11 +725,11 @@ function coRender({container,item,profile}){
   if(!item.checked&&!state.examExpired){
     flow.appendChild(coPlaybackControls(item));
     const controls=h('div',{class:'so-controls'});
-    if(state.mode==='practice')controls.appendChild(h('button',{class:'item-reset-button',type:'button',
+    if(profileAllowsRetry())controls.appendChild(h('button',{class:'item-reset-button',type:'button',
       disabled:coEqual(item.order,item.initialOrder)&&!item.runResult&&!(item._coPlayback&&item._coPlayback.index),
       onclick:handleReset},'Reset item'));
     controls.appendChild(renderInlineEvaluationActions({canCheck:true}));flow.appendChild(controls);
-  }else if(state.mode==='practice')appendPracticeRetryBar(container);
+  }else if(profileAllowsRetry())appendPracticeRetryBar(container);
   coSchedulePlayback(item);coSyncFeedback(item);
 }
 function coValidate(profile){

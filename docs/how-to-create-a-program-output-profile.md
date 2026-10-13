@@ -1,7 +1,7 @@
 # How to Create a Program Output Profile
 
 Program Output can obtain its items from authored C or Java source files or
-from the existing seeded generator. The profile stays in `js/profiles.js` and
+from the existing seeded generator. Its entry in the selected Profile Set
 describes the content mode and lesson. The language core owns output-statement
 semantics. Program Output presents statement-oriented lessons, while Code
 Simulator presents complete-source program flow.

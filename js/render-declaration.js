@@ -64,7 +64,7 @@ function renderDeclarationStatement(ctx){
     statementNumber:programStatementDisplayNumber(statement,statementIndex),sourceIndent:statement.sourceIndent||'',
     continuationStyle:true,
     interactive:isActive && !runtime.checked && !item.checked && !item.practiceInvalidExecution&&!examInteractionLocked(),
-    revealCorrectness:runtime.checked&&state.mode!=='exam',
+    revealCorrectness:runtime.checked&&profileFeedbackVisible(item),
     isFullyResolved:()=>declarationInitializerResolved(statement),
     renderEquals:(ready,context)=>renderDeclarationEquals(statement,ready,context,item,isActive),
     renderTrailingActions:()=>isActive
@@ -78,13 +78,13 @@ function renderDeclarationStatement(ctx){
   if(isActive&&!item.checked){
     const unresolved = collectUnresolvedFlat(runtime.workingFlat,[]).length>0;
     const ready = declarationInitializerResolved(statement);
-    if(!item.practiceInvalidExecution&&(state.mode!=='exam'||activeExamPolicy().showNeutralGuidance)){
+    if(!item.practiceInvalidExecution&&activeProfileBehavior().showNeutralGuidance){
       card.appendChild(renderContextHelp(unresolved
         ? 'Substitute the initialized value from program memory before evaluating this initializer.'
         : (ready ? `The initializer is resolved. Click = to assign it to ${statement.binding.name}.`
           : 'Evaluate the highlighted operator.')));
     }
-    const canReset = state.mode==='practice' && (program.cursor>0 || runtime.trace.length>0);
+    const canReset = profileAllowsRetry() && (program.cursor>0 || runtime.trace.length>0);
     const resetControl=renderItemResetControl(canReset&&!(ctx.services&&ctx.services.statementTraceModal));
     if(resetControl) card.appendChild(resetControl);
   }

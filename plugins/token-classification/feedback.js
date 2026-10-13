@@ -65,7 +65,7 @@ function tcSyncDrawers(item,profile){
   if(typeof setConsoleDrawerTitle==='function'){
     setConsoleDrawerTitle(`${tcLanguage(item.language).label} Token Guide`);setConsoleDrawerContent(tcBuildConsoleContent(item,profile),{cursor:false});showConsoleDrawerTab();
   }
-  const deferred=state.mode==='exam'&&!examFeedbackVisible();
+  const deferred=!profileFeedbackVisible(item);
   if(!item.checked||deferred){
     if(typeof clearFeedbackDrawerContent==='function')clearFeedbackDrawerContent();
     if(typeof setFeedbackDrawerStatus==='function')setFeedbackDrawerStatus(null);

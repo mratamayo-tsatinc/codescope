@@ -8,7 +8,8 @@ feedback.
 
 ## Profile configuration
 
-Declare the activity in `js/profiles.js`:
+Add the activity profile with Profile Designer. The underlying profile object
+uses this structure:
 
 ```js
 {

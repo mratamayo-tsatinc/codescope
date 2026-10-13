@@ -58,7 +58,7 @@ function soCheck({item,profile,state}){
   item.points=result.correct;
   item.maxPoints=result.total;
   item.itemScore=item.points/item.maxPoints;
-  item.lockedAt=state.mode==='exam'?Date.now():null;
+  item.lockedAt=profileLocksCheckedItems()?Date.now():null;
   return {applied:true,completed:true};
 }
 

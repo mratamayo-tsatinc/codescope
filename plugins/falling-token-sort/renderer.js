@@ -562,7 +562,7 @@ function ftsRenderControls(item){
   if(item.checked||state.examExpired)return null;
   const canUndo=item.history.length>0&&examAllowsUndo();
   const canCheck=item.cursor>=item.tokens.length;
-  const canReset=state.mode==='practice'&&(item.cursor>0||item.attempts.length);
+  const canReset=profileAllowsRetry()&&(item.cursor>0||item.attempts.length);
   if(!canUndo&&!canCheck&&!canReset)return null;
   const row=h('div',{class:'fts-controls'}),actions=renderInlineEvaluationActions({canUndo,canCheck});
   if(canReset){
@@ -597,11 +597,11 @@ function ftsRender({container,item,profile}){
   const result=ftsRenderPracticeResult(item,profile);if(result)stage.appendChild(result);
   const controls=ftsRenderControls(item);if(controls)stage.appendChild(controls);
   flow.appendChild(stage);
-  if(item.checked&&state.mode==='exam'&&!state.examExpired){
+  if(item.checked&&!profileFeedbackVisible(item)){
     container.appendChild(h('div',{class:'exam-answer-recorded'},h('i',{class:'fa-solid fa-lock'}),
       h('span',{},h('b',{},'Answer recorded and locked.'),' Correctness and score are withheld until time expires.')));
   }
-  if(item.checked&&state.mode==='practice'){
+  if(item.checked&&profileAllowsRetry()){
     appendPracticeRetryBar(container);
   }
   ftsFitStageToApp(middle,stage);

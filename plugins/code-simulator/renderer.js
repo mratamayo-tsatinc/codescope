@@ -29,7 +29,7 @@ function renderSelectionStatement(ctx){
   card.appendChild(renderExpressionEvaluationPanel({runtime,title:null,panelClass:'selection-eval-panel program-expression-panel',statementId:statement.id,
     statementNumber:expressionOnly?null:programStatementDisplayNumber(statement,statementIndex),
     sourceIndent:expressionOnly?'':(statement.sourceIndent||''),continuationStyle:true,
-    interactive:isActive&&!runtime.checked&&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked(),revealCorrectness:runtime.checked&&state.mode!=='exam',
+    interactive:isActive&&!runtime.checked&&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked(),revealCorrectness:runtime.checked&&profileFeedbackVisible(item),
     isFullyResolved:()=>selectionExpressionResolved(statement),
     renderPrefix:expressionOnly?()=>[]:()=>[h('span',{class:'selection-keyword'},keyword),h('span',{class:'selection-paren'},' (')],
     renderTerminator:expressionOnly?()=>null:()=>h('span',{class:'selection-paren'},') {'),

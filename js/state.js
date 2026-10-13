@@ -18,7 +18,7 @@ const DEFAULT_SHELL_SETTINGS = Object.freeze({
     transferAnimation: Object.freeze({
       enabled: true,
       durationMs: 1000,
-      speedLevelsMs: Object.freeze([1000, 2000, 3000]),
+      speedLevelsMs: Object.freeze([500, 1000, 1500]),
       safetyBufferMs: 180
     }),
     entranceDurationMs: 220,
@@ -42,9 +42,9 @@ const DEFAULT_SHELL_SETTINGS = Object.freeze({
     persistPreference:true
   }),
   sourceFlow:Object.freeze({
-    resultHoldMs:900,
+    resultHoldMs:300,
     modalCloseSettleMs:320,
-    movementDurationMs:1100,
+    movementDurationMs:500,
     reducedMotionDurationMs:120
   }),
   compoundAssignment: Object.freeze({
@@ -189,41 +189,67 @@ function snapshotExamPolicy(settings){
 }
 
 function activeExamPolicy(){
-  return state.examPolicy || snapshotExamPolicy(appSettings);
+  const behavior=activeProfileBehavior();
+  return {interactionMode:behavior.interactionMode,allowUndo:behavior.allowUndo,
+    allowReviewFlags:behavior.allowReviewFlags,showNeutralGuidance:behavior.showNeutralGuidance,
+    showScoresDuringExam:behavior.showScores,
+    feedbackRelease:behavior.feedbackRelease==='immediate'?'after-timeout':behavior.feedbackRelease,
+    lockItemAfterCheck:behavior.lockItemAfterCheck,autoLockOnTimeout:true,
+    showCorrectSolution:behavior.showCorrectSolution,
+    manualResponses:Object.assign({},behavior.manualResponses)};
 }
 
 function activePracticePolicy(){
-  return state.practicePolicy || snapshotPracticePolicy(appSettings);
+  const behavior=activeProfileBehavior();
+  return {interactionMode:behavior.interactionMode,manualResponses:Object.assign({},behavior.manualResponses)};
+}
+
+function activeProfileBehavior(profile){
+  profile=profile||currentProfile();
+  return profile&&profile.behavior?profile.behavior:DEFAULT_PROFILE_BEHAVIOR;
+}
+function sessionTimingEnabled(){return !!(ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.timing.enabled);}
+function sessionPersistenceEnabled(){return !!(ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.persistence&&ACTIVE_PROFILE_SESSION.persistence.enabled);}
+function profileAllowsUndo(){return !state.examExpired&&activeProfileBehavior().allowUndo!==false;}
+function profileAllowsRetry(){return !state.examExpired&&activeProfileBehavior().allowRetry!==false;}
+function profileAllowsReviewFlags(){return !state.examExpired&&activeProfileBehavior().allowReviewFlags===true;}
+function profileShowsScores(){return state.examExpired||activeProfileBehavior().showScores!==false;}
+function profileFeedbackVisible(item){
+  if(!item||!item.checked)return false;
+  const release=activeProfileBehavior().feedbackRelease;
+  return release==='immediate'||(release==='after-timeout'&&state.examExpired);
+}
+function profileLocksCheckedItems(){return activeProfileBehavior().lockItemAfterCheck===true;}
+function syncActiveProfileBehavior(){
+  const behavior=activeProfileBehavior();
+  state.mode=(behavior.lockItemAfterCheck||behavior.feedbackRelease!=='immediate'||!behavior.allowRetry)?'exam':'practice';
+  state.practicePolicy=null;state.examPolicy=null;
 }
 
 function examAllowsUndo(){
-  return state.mode!=='exam' || (!state.examExpired && activeExamPolicy().allowUndo);
+  return profileAllowsUndo();
 }
 
 function strictSequenceEnabled(){
-  if(state.mode==='practice') return activePracticePolicy().interactionMode==='strict-sequence';
-  return state.mode==='exam' && !state.examExpired
-    && activeExamPolicy().interactionMode==='strict-sequence';
+  return !state.examExpired&&activeProfileBehavior().interactionMode==='strict-sequence';
 }
 
 // Compatibility name retained for optional modules authored against the
 // first exam-only version of this policy.
 function strictExamSequenceEnabled(){
-  return state.mode==='exam' && strictSequenceEnabled();
+  return profileLocksCheckedItems()&&strictSequenceEnabled();
 }
 
 function examResultsVisible(){
-  if(state.mode!=='exam') return true;
-  return state.examExpired || activeExamPolicy().showScoresDuringExam;
+  return profileShowsScores();
 }
 
 function examFeedbackVisible(){
-  return state.mode!=='exam'
-    || (state.examExpired&&activeExamPolicy().feedbackRelease==='after-timeout');
+  const item=currentItem();return !item||profileFeedbackVisible(item);
 }
 
 function examInteractionLocked(){
-  return state.mode==='exam'&&state.examExpired;
+  return state.examExpired;
 }
 
 function canUndoForCurrentMode(item){
@@ -255,9 +281,7 @@ function currentItem(){ return state.items[state.itemIndex]; }
 
 function correctSolutionAvailable(profile,item){
   if(!profileShowsCorrectSolution(profile,state.mode))return false;
-  if(state.mode==='practice')return !!(item&&item.checked);
-  return !!(item&&item.checked&&state.examExpired
-    &&activeExamPolicy().feedbackRelease==='after-timeout');
+  return profileFeedbackVisible(item);
 }
 
 function itemMaximumPoints(item,profile){
@@ -350,11 +374,13 @@ function startSession(){
   // Initialize seeded random generator
   initializeSeededRandom(state.sessionSeed);
   
-  // Apply settings mode
-  state.mode = appSettings.mode;
-  state.practicePolicy = state.mode==='practice' ? snapshotPracticePolicy(appSettings) : null;
-  state.examPolicy = state.mode==='exam' ? snapshotExamPolicy(appSettings) : null;
-  state.examTimerMinutes = state.mode==='exam' ? appSettings.timerMinutes : null;
+  // Profiles own interaction and feedback behavior. `mode` remains only as
+  // a compatibility value for older activity plugins and is synchronized
+  // whenever a profile becomes active.
+  state.mode = 'practice';
+  state.practicePolicy = null;
+  state.examPolicy = null;
+  state.examTimerMinutes = sessionTimingEnabled() ? ACTIVE_PROFILE_SESSION.timing.minutes : null;
   state.examExpired = false;
   state.examExpiredAt = null;
   state.itemIndexByProfile = {};
@@ -380,8 +406,8 @@ function startSession(){
   state.screen = 'session';
   render();
   
-  // Start timer if exam mode
-  if (appSettings.mode === 'exam') {
+  // The optional timer belongs to the whole session, across every profile.
+  if (sessionTimingEnabled()) {
     startTimer();
   }
 }
@@ -418,7 +444,7 @@ function finalizeSourceProgramItem(item){
     declarationCorrectChecks:correctChecks,declarationTotalChecks:totalChecks,
     expressionCorrectSteps:0,expressionTotalSteps:0,finalCorrect:programStateCorrect,
     programStateCorrect,allChecksCorrect};
-  if(state.mode==='exam'){
+  if(profileLocksCheckedItems()){
     item.lockedAt=Date.now();item.flagged=false;item.showSolution=false;item.playback=null;
   }
   return true;
@@ -904,7 +930,7 @@ function handleReset(){
   // never allows it, even before checking — that's the only real
   // Practice/Exam difference besides the one-check-per-item rule below.
   const item = currentItem();
-  if(state.mode==='exam' || item.checked) return;
+  if(!profileAllowsRetry() || item.checked) return;
   if(item.activityKind){const result=resetActivityItem(item);if(result.applied)render();return;}
   item.practiceInvalidExecution=null;
   const result = resetProgramAction(item, {resetExpressionAction});
@@ -1048,7 +1074,7 @@ function handleCheck(){
   if(item.activityKind){
     const result=checkActivityItem(item);
     if(result.applied){
-      if(state.mode==='exam'){item.flagged=false;item.showSolution=false;recordExamAction(item,{type:'check'},{wasCorrect:item.wasCorrectFinal});}
+      if(profileLocksCheckedItems()){item.flagged=false;item.showSolution=false;recordExamAction(item,{type:'check'},{wasCorrect:item.wasCorrectFinal});}
       if(typeof celebratePerfectItem==='function')celebratePerfectItem(item,
         typeof document!=='undefined'?document.body:null);
       render();
@@ -1057,7 +1083,7 @@ function handleCheck(){
   }
   const result = checkProgramItem(item, {checkExpressionItem});
   if(result.applied){
-    if(state.mode==='exam'){
+    if(profileLocksCheckedItems()){
       item.lockedAt=Date.now();
       item.flagged=false;
       item.showSolution=false;
@@ -1072,7 +1098,7 @@ function handleCheck(){
 
 function toggleCurrentItemFlag(){
   const item=currentItem();
-  if(state.mode!=='exam'||state.examExpired||!activeExamPolicy().allowReviewFlags
+  if(!profileAllowsReviewFlags()
     ||!item||item.checked) return;
   item.flagged=!item.flagged;
   recordExamAction(item,{type:item.flagged?'flag':'unflag'});
@@ -1087,8 +1113,28 @@ function itemHasAttempt(item){
     statement.runtime&&statement.runtime.trace&&statement.runtime.trace.length)));
 }
 
+function finalizeItemAtSessionTimeout(item,profile){
+  if(!item||item.checked||!itemHasAttempt(item))return;
+  if(item.activityKind){
+    const plugin=activityPluginForItem(item);
+    if(plugin&&typeof plugin.check==='function')plugin.check({item,profile,state});
+    return;
+  }
+  const total=examCanonicalScoredCheckCount(item);
+  const correct=examCurrentCorrectScoredChecks(item);
+  const maximum=itemMaximumPoints(item,profile);
+  item.checked=true;item.lockedAt=Date.now();item.flagged=false;item.showSolution=false;item.playback=null;
+  item.correctSteps=correct;item.totalOpSteps=total;item.wasCorrectFinal=false;
+  item.points=roundPoints(total?maximum*(correct/total):0);item.maxPoints=maximum;
+  item.itemScore=maximum?item.points/maximum:0;
+  item.programScoreFacts={programCorrectChecks:correct,programTotalChecks:total,
+    expressionCorrectSteps:correct,expressionTotalSteps:total,finalCorrect:false,timedOut:true};
+}
+
 function expireExam(){
-  if(state.mode!=='exam'||state.examExpired) return false;
+  if(!sessionTimingEnabled()||state.examExpired) return false;
+  enabledProfiles().forEach(profile=>(state.itemsByProfile[profile.id]||[])
+    .forEach(item=>finalizeItemAtSessionTimeout(item,profile)));
   state.examExpired=true;
   state.examExpiredAt=Date.now();
   timeRemaining=0;
@@ -1207,7 +1253,7 @@ function reseedCurrentSourceItem(item){
 
 function handleRetrySameItem(){
   const item = currentItem();
-  if(state.mode==='exam') return;
+  if(!profileAllowsRetry()) return;
   if(item&&item.sourceFlow){
     if(typeof closeProgramStatementTrace==='function'&&typeof statementTraceModalState!=='undefined'&&statementTraceModalState)
       closeProgramStatementTrace(false);

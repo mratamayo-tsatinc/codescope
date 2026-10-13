@@ -133,13 +133,11 @@ function ftsBuildFeedback(item,profile){
 }
 
 function ftsFeedbackReleased(item,profile){
-  if(state.mode==='practice')return item.checked;
-  if(profile.activity.feedback.exam==='never')return false;
-  return item.checked&&state.examExpired&&activeExamPolicy().feedbackRelease==='after-timeout';
+  return profileFeedbackVisible(item);
 }
 
 function ftsSyncDrawers(item,profile){
-  const consoleAllowed=state.mode!=='exam'||state.examExpired||activeExamPolicy().showNeutralGuidance;
+  const consoleAllowed=state.examExpired||activeProfileBehavior().showNeutralGuidance;
   if(consoleAllowed){
     if(typeof setConsoleDrawerTitle==='function')setConsoleDrawerTitle(`${tcLanguage(item.language).label} Token Guide`);
     if(typeof setConsoleDrawerContent==='function')setConsoleDrawerContent(ftsBuildConsoleContent(item,profile),{cursor:false});

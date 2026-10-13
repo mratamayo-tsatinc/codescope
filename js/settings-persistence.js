@@ -86,7 +86,9 @@ function clearAllExamProgressEverywhere(){
     const toRemove = [];
     for(let i=0;i<localStorage.length;i++){
       const key = localStorage.key(i);
-      if(key && key.indexOf('precedifyExamProgress:')===0) toRemove.push(key);
+      if(key && (key.indexOf('precedifyExamProgress:')===0
+        ||key.indexOf('precedifyPracticeProgress:')===0
+        ||key.indexOf('codescopeSessionProgress:')===0)) toRemove.push(key);
     }
     toRemove.forEach(k=>localStorage.removeItem(k));
     return toRemove.length;
@@ -105,9 +107,10 @@ function clearAllPrecedifyLocalData(){
     const keys=[];
     for(let i=0;i<localStorage.length;i++){
       const key=localStorage.key(i);
-      if(key&&(key==='precedifyLogin'||key===APP_SETTINGS_KEY
+      if(key&&(key==='precedifyLogin'||key===APP_SETTINGS_KEY||key==='codescopeSelectedProfileSet'
         ||key.indexOf('precedifyExamProgress:')===0
         ||key.indexOf('precedifyPracticeProgress:')===0
+        ||key.indexOf('codescopeSessionProgress:')===0
         ||key.indexOf('precedifyActivityZoom:')===0)) keys.push(key);
     }
     keys.forEach(key=>{localStorage.removeItem(key);removed++;});

@@ -2,8 +2,10 @@ function tcAllTokens(item){return item.statements.flatMap(statement=>statement.t
 function tcTokenById(item,id){return tcAllTokens(item).find(token=>token.id===id)||null;}
 function tcResponseFor(item,id){return item.responses.find(response=>response.tokenId===id)||null;}
 function tcInteractionKey(state){
-  const interaction=state.mode==='practice'?activePracticePolicy().interactionMode:activeExamPolicy().interactionMode;
-  return `${state.mode}:${interaction}`;
+  const interaction=activeProfileBehavior().interactionMode;
+  // Legacy activity policies are selected from the profile's actual recovery
+  // behavior, rather than from a global student-facing mode.
+  return `${profileAllowsUndo()?'practice':'exam'}:${interaction}`;
 }
 function tcInteractionPolicy(profile,state){
   const policies=profile.activity.interaction.policies||{};
@@ -123,6 +125,6 @@ function tcCheck({item,profile}){
   });
   const score=tcScoreCurrent(item,profile);
   item.checked=true;item.correctSteps=score.correct;item.totalOpSteps=score.total;item.wasCorrectFinal=score.correct===score.total;
-  item.points=score.points;item.maxPoints=score.maxPoints;item.itemScore=score.maxPoints?score.points/score.maxPoints:0;item.lockedAt=state.mode==='exam'?Date.now():null;
+  item.points=score.points;item.maxPoints=score.maxPoints;item.itemScore=score.maxPoints?score.points/score.maxPoints:0;item.lockedAt=profileLocksCheckedItems()?Date.now():null;
   return {applied:true,completed:true};
 }

@@ -12,14 +12,20 @@
 function examProgressKey(email){ return 'precedifyExamProgress:' + email; }
 function practiceProgressKey(email){ return 'precedifyPracticeProgress:' + email; }
 function sessionProgressKey(mode,email){
-  return mode==='exam'?examProgressKey(email):practiceProgressKey(email);
+  return 'codescopeSessionProgress:' + email + ':' + ACTIVE_PROFILE_SET.id;
 }
 
 function loadSessionProgress(mode,email){
-  if(!email||!modePersistenceEnabled(mode)) return null;
+  if(!email||!sessionPersistenceEnabled()) return null;
   try{
     const raw=localStorage.getItem(sessionProgressKey(mode,email));
-    return raw?JSON.parse(raw):null;
+    if(raw)return JSON.parse(raw);
+    // Migrate the most recent record from the former mode-scoped keys.
+    const legacy=ACTIVE_PROFILE_SET.id==='codescope-default'
+      ?[localStorage.getItem(examProgressKey(email)),localStorage.getItem(practiceProgressKey(email))]
+      .filter(Boolean).map(value=>{try{return JSON.parse(value);}catch(error){return null;}}).filter(Boolean)
+      .sort((a,b)=>(b.savedAt||0)-(a.savedAt||0)):[];
+    return legacy[0]||null;
   }catch(e){ return null; }
 }
 
@@ -29,23 +35,25 @@ function loadExamProgress(email){
 
 function clearExamProgress(email){
   if(!email) return;
-  try{ localStorage.removeItem(examProgressKey(email)); }catch(e){ /* ignore */ }
+  try{ localStorage.removeItem(examProgressKey(email));localStorage.removeItem(sessionProgressKey('session',email)); }catch(e){ /* ignore */ }
 }
 function clearPracticeProgress(email){
   if(!email) return;
-  try{ localStorage.removeItem(practiceProgressKey(email)); }catch(e){ /* ignore */ }
+  try{ localStorage.removeItem(practiceProgressKey(email));localStorage.removeItem(sessionProgressKey('session',email)); }catch(e){ /* ignore */ }
 }
 
 // No-op when persistence for the active mode is disabled or no session is
 // active, so render() can call this after every state change.
 function saveSessionProgress(){
-  const mode=state.mode;
-  if(!modePersistenceEnabled(mode)||appSettings.mode!==mode||!state.userEmail) return;
+  const mode='session';
+  if(!sessionPersistenceEnabled()||!state.userEmail) return;
   if(state.screen!=='session') return;
   try{
     const record = {
       schemaVersion: 6,
       mode,
+      profileSetId:ACTIVE_PROFILE_SET.id,
+      profileSetVersion:ACTIVE_PROFILE_SET.version,
       email: state.userEmail,
       studentId: state.userStudentId,
       profileId: state.profileId,
@@ -56,18 +64,16 @@ function saveSessionProgress(){
       // same seeded work, not just its action history or scores.
       itemsByProfile: state.itemsByProfile,
       showConnectors: state.showConnectors,
-      practicePolicy: mode==='practice'?activePracticePolicy():null,
-      timerMinutes: mode==='exam'?(state.examTimerMinutes || appSettings.timerMinutes):null,
-      examPolicy: mode==='exam'?activeExamPolicy():null,
-      expired: mode==='exam'&&!!state.examExpired,
-      expiredAt: mode==='exam'?state.examExpiredAt:null,
-      examEndTimestamp: mode==='exam'?examEndTimestamp:null,
+      timerMinutes:sessionTimingEnabled()?ACTIVE_PROFILE_SESSION.timing.minutes:null,
+      expired:!!state.examExpired,
+      expiredAt:state.examExpiredAt,
+      examEndTimestamp:sessionTimingEnabled()?examEndTimestamp:null,
       savedAt: Date.now()
     };
     localStorage.setItem(sessionProgressKey(mode,state.userEmail), JSON.stringify(record));
   }catch(e){ /* storage full/unavailable — silently skip persistence this time */ }
 }
-function saveExamProgress(){ if(state.mode==='exam') saveSessionProgress(); }
+function saveExamProgress(){ saveSessionProgress(); }
 
 // Generic recursive walk over the restored (plain-JSON) itemsByProfile tree
 // for the highest `id` value anywhere in it. Needed because engine.js's
@@ -95,16 +101,17 @@ function findMaxSerializedId(value, maxSoFar){
 // Restore a saved session for one mode and student. Returns false when its
 // switch is off or no matching snapshot exists, letting login start fresh.
 function tryResumeSession(mode,email){
-  if(!modePersistenceEnabled(mode)) return false;
+  mode='session';
+  if(!sessionPersistenceEnabled()) return false;
   const record=loadSessionProgress(mode,email);
   if(!record||!record.itemsByProfile||typeof record.itemsByProfile!=='object'
-    ||(record.mode&&record.mode!==mode)) return false;
-
-  appSettings.mode = mode;
+    ||(record.profileSetId&&record.profileSetId!==ACTIVE_PROFILE_SET.id)
+    ||(record.profileSetVersion&&String(record.profileSetVersion)!==String(ACTIVE_PROFILE_SET.version))
+    ) return false;
 
   state.userEmail = record.email;
   state.userStudentId = record.studentId;
-  state.mode = mode;
+  state.mode = 'practice';
   const sessionProfiles=enabledProfiles();
   if(!sessionProfiles.length) return false;
   state.profileId = sessionProfiles.some(profile=>profile.id===record.profileId)
@@ -112,17 +119,14 @@ function tryResumeSession(mode,email){
   state.itemIndex = record.itemIndex || 0;
   state.itemIndexByProfile = record.itemIndexByProfile || {};
   state.sessionSeed = record.sessionSeed;
-  state.practicePolicy = mode==='practice'
-    ?snapshotPracticePolicy({practice:record.practicePolicy||appSettings.practice}):null;
-  state.examPolicy = mode==='exam'
-    ?snapshotExamPolicy({exam:record.examPolicy||appSettings.exam}):null;
-  state.examTimerMinutes = mode==='exam'?(record.timerMinutes || appSettings.timerMinutes):null;
+  state.practicePolicy = null;state.examPolicy = null;
+  state.examTimerMinutes = sessionTimingEnabled()?ACTIVE_PROFILE_SESSION.timing.minutes:null;
   // `submitted` is read only as a one-release migration path. Earlier builds
   // used submission as their terminal lock; those attempts now reopen in the
   // same review-only state as a timer-expired attempt.
-  state.examExpired = mode==='exam'&&!!(record.expired||record.submitted);
-  state.examExpiredAt = mode==='exam'?(record.expiredAt||record.submittedAt||null):null;
-  examEndTimestamp = mode==='exam'?(record.examEndTimestamp || null):null;
+  state.examExpired = !!(record.expired||record.submitted);
+  state.examExpiredAt = record.expiredAt||record.submittedAt||null;
+  examEndTimestamp = sessionTimingEnabled()?(record.examEndTimestamp || null):null;
   state.itemsByProfile = Object.fromEntries(sessionProfiles
     .filter(profile=>Array.isArray(record.itemsByProfile[profile.id]))
     .map(profile=>[profile.id,record.itemsByProfile[profile.id]]));
@@ -140,6 +144,7 @@ function tryResumeSession(mode,email){
     resetRandomGenerator();
   }
   state.items = state.profileId ? (state.itemsByProfile[state.profileId] || []) : [];
+  if(state.profileId)syncActiveProfileBehavior();
   state.showConnectors = record.showConnectors !== undefined ? record.showConnectors : state.showConnectors;
   state.screen = 'session';
 
@@ -171,7 +176,7 @@ function tryResumeSession(mode,email){
 
   itemPaginationHandlerAttached = false;
 
-  if(mode==='practice'){
+  if(!sessionTimingEnabled()){
     render();
     return true;
   }

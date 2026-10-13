@@ -1,0 +1,3065 @@
+{
+  "schemaVersion": 1,
+  "id": "codescope-default",
+  "name": "CodeScope Default",
+  "version": "1",
+  "description": "The current CodeScope categories, profiles, activities, and session policy.",
+  "session": {
+    "timing": {
+      "enabled": false,
+      "minutes": 120
+    },
+    "persistence": {
+      "enabled": true
+    }
+  },
+  "categories": [
+    {
+      "id": "identifier-activities",
+      "name": "Identifier Activities",
+      "enabled": true,
+      "profileIds": [
+        "token-identifier-position",
+        "token-declaration-complete",
+        "token-program-chain",
+        "falling-identifier-sort",
+        "falling-operator-sort"
+      ]
+    },
+    {
+      "id": "trace-output-statements",
+      "name": "Trace Output Statements",
+      "enabled": true,
+      "profileIds": [
+        "trace-basic-output",
+        "trace-output-variables"
+      ]
+    },
+    {
+      "id": "order-output-statements",
+      "name": "Order Output Statements",
+      "enabled": true,
+      "profileIds": [
+        "order-basic-output",
+        "order-output-variables"
+      ]
+    },
+    {
+      "id": "input-statements",
+      "name": "Trace Input Statements",
+      "enabled": true,
+      "profileIds": [
+        "program-input-source-flow",
+        "trace-multiple-inputs"
+      ]
+    },
+    {
+      "id": "output-statements",
+      "name": "Output Statements",
+      "enabled": true,
+      "profileIds": [
+        "program-output-basics",
+        "program-output-source-flow",
+        "selection-statements-source",
+        "test-basic-output"
+      ]
+    },
+    {
+      "id": "expressions-arithmetic",
+      "name": "Arithmetic Expressions",
+      "enabled": true,
+      "profileIds": [
+        "direct-ltr",
+        "mult-precedence",
+        "same-precedence-assoc",
+        "full-basic-precedence",
+        "modulus",
+        "parens-override",
+        "parens-override-multi",
+        "parens-override-dual",
+        "variables-arithmetic",
+        "mixed-variables-literals",
+        "variables-constants",
+        "literals-variables-constants",
+        "mixed-mastery",
+        "unary-only",
+        "unary-mix"
+      ]
+    },
+    {
+      "id": "expressions-boolean",
+      "name": "Boolean Expressions",
+      "enabled": true,
+      "profileIds": [
+        "relational-simple-literals",
+        "relational-simple-variables",
+        "relational-arithmetic",
+        "relational-variables",
+        "relational-boolean-mix"
+      ]
+    },
+    {
+      "id": "program-statements",
+      "name": "Program Statements",
+      "enabled": true,
+      "profileIds": [
+        "declaration-chain",
+        "assignment-basic",
+        "assignment-add-sub",
+        "assignment-multiply",
+        "assignment-div-mod",
+        "assignment-rhs-expression",
+        "assignment-sequential",
+        "assignment-dependent",
+        "assignment-advanced-chain",
+        "unary-update-sequence",
+        "assignment-unary-advanced-chain",
+        "relational-logical-student-derived"
+      ]
+    },
+    {
+      "id": "simulate-output-commands",
+      "name": "Simulate Output Commands",
+      "enabled": true,
+      "profileIds": [
+        "simulate-basic-output",
+        "simulate-output-variables"
+      ]
+    },
+    {
+      "id": "trace-selection-commands",
+      "name": "Trace Selection Commands",
+      "enabled": true,
+      "profileIds": [
+        "trace-basic-selection",
+        "trace-compound-selection"
+      ]
+    },
+    {
+      "id": "simulate-selection-commands",
+      "name": "Simulate Selection Commands",
+      "enabled": true,
+      "profileIds": [
+        "simulate-basic-selection",
+        "simulate-compound-selection"
+      ]
+    },
+    {
+      "id": "bug-catcher-activities",
+      "name": "Bug Catcher Activities",
+      "enabled": true,
+      "profileIds": [
+        "bug-catcher-basics"
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "enabled": false,
+      "meta": {
+        "id": "direct-ltr",
+        "name": "Direct Left-to-Right",
+        "description": "Establishes basic sequential evaluation. No precedence reasoning required."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 4
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-"
+        ]
+      },
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "mult-precedence",
+        "name": "Multiplication Precedence",
+        "description": "A higher-precedence operator must be evaluated before a lower one, regardless of position."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 3
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ],
+        "constraints": {
+          "requireMultipleTiers": true
+        }
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "same-precedence-assoc",
+        "name": "Same-Precedence Associativity",
+        "description": "Equal-precedence operators resolve strictly left to right."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 4
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "*",
+          "/"
+        ]
+      },
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "full-basic-precedence",
+        "name": "Full Basic Precedence",
+        "description": "Combines +, -, *, / with genuine precedence and associativity requirements."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 5
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/",
+          "%"
+        ],
+        "constraints": {
+          "requireMultipleTiers": true
+        }
+      },
+      "template": "operand op operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "modulus",
+        "name": "Modulus",
+        "description": "Introduces % and its precedence relationship with the other operators."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 4
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "*",
+          "%"
+        ],
+        "constraints": {
+          "requireMultipleTiers": true
+        }
+      },
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "parens-override",
+        "name": "Parentheses Override",
+        "description": "Shows how explicit grouping overrides the normal precedence order."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 4
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/",
+          "%"
+        ]
+      },
+      "template": "(operand low operand) high operand low operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "parens-override-multi",
+        "name": "Parentheses Override (Multi-Operator)",
+        "description": "The parenthesized region itself contains two operators from different precedence tiers."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 5
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 15
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/",
+          "%"
+        ]
+      },
+      "template": "(operand high (operand low operand)) high operand high operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "parens-override-dual",
+        "name": "Parentheses Override (Two Separate Groups)",
+        "description": "Two independent parenthesized groups appear side by side in the same expression."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 5
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 15
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ]
+      },
+      "template": "(operand low operand) high (operand low operand) high operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "variables-arithmetic",
+        "name": "Variables + Arithmetic",
+        "description": "Introduces variable substitution before evaluation order becomes relevant."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 3
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ],
+        "constraints": {
+          "requireMultipleTiers": true
+        }
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "mixed-variables-literals",
+        "name": "Mixed Variables + Literals",
+        "description": "Combines variable substitution with a mix of literal operands."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 2,
+          "variable": 2
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ],
+        "constraints": {
+          "requireMultipleTiers": true
+        }
+      },
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "variables-constants",
+        "name": "Variables + Constants",
+        "description": "Minimal exposure to declared constants alongside variables."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 2,
+          "constant": 2
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 15
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ],
+        "constraints": {
+          "requireMultipleTiers": true
+        }
+      },
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "literals-variables-constants",
+        "name": "Literals + Variables + Constants",
+        "description": "Minimal exposure to literals with declared constants alongside variables."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 1,
+          "variable": 2,
+          "constant": 2
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 15
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ],
+        "constraints": {
+          "requireMultipleTiers": true
+        }
+      },
+      "template": "operand op operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "mixed-mastery",
+        "name": "Mixed Mastery",
+        "description": "Controlled mixture of variables, literals, constants, multiple precedence levels, and parentheses."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 1,
+          "variable": 2,
+          "constant": 2
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": true
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/",
+          "%",
+          "%"
+        ]
+      },
+      "template": "(operand low operand) high operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "unary-only",
+        "name": "Unary ++ / -- Only",
+        "description": "Every operand is a variable carrying a prefix or postfix ++/-- that must be resolved before the remaining + / - operators run."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 3
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-"
+        ]
+      },
+      "extras": {
+        "unaryWrap": {
+          "enabled": true,
+          "operators": [
+            "++",
+            "--"
+          ],
+          "forms": [
+            "prefix",
+            "postfix"
+          ],
+          "fraction": 1
+        }
+      },
+      "template": "operand:unary op operand:unary op operand:unary",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "unary-mix",
+        "name": "Unary Mixed with Literals, Variables & Constants",
+        "description": "++/-- appear only on some of the variable operands."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 2,
+          "variable": 2,
+          "constant": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ],
+        "constraints": {
+          "requireMultipleTiers": true
+        }
+      },
+      "extras": {
+        "unaryWrap": {
+          "enabled": true,
+          "operators": [
+            "++",
+            "--"
+          ],
+          "forms": [
+            "prefix",
+            "postfix"
+          ],
+          "fraction": 0.6
+        }
+      },
+      "template": "operand:unary op operand:unary op operand:unary op operand:unary op operand:unary",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "relational-simple-literals",
+        "name": "Relational Operators (Literals)",
+        "description": "A comparison produces a boolean result."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 2
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!="
+        ],
+        "constraints": {
+          "maxComparisons": 1
+        }
+      },
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 10,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "relational-simple-variables",
+        "name": "Relational Operators (Variables)",
+        "description": "A comparison produces a boolean result."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 2
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!="
+        ],
+        "constraints": {
+          "maxComparisons": 1
+        }
+      },
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 10,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "relational-arithmetic",
+        "name": "Relational Operators (Arithmetic)",
+        "description": "A comparison produces a boolean result — the arithmetic on either side still resolves first."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 3
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!="
+        ],
+        "constraints": {
+          "requireMultipleTiers": true,
+          "maxComparisons": 1
+        }
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "relational-variables",
+        "name": "Relational Operators with Variables",
+        "description": "A comparison’s operands include variables and constants, not just literals."
+      },
+      "shape": {
+        "operandSources": {
+          "literal": 1,
+          "variable": 1,
+          "constant": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!="
+        ],
+        "constraints": {
+          "requireMultipleTiers": true,
+          "maxComparisons": 1
+        }
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "relational-boolean-mix",
+        "name": "Relational + Boolean Mix (with !)",
+        "description": "A relational comparison is combined with boolean variables using && / ||, including one negated with a leading !."
+      },
+      "shape": {
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "extras": {
+        "unaryWrap": {
+          "enabled": true,
+          "operators": [
+            "!"
+          ],
+          "forms": [
+            "prefix"
+          ],
+          "fraction": 0.5
+        }
+      },
+      "template": "(operand:lit cmp operand:lit or operand:var:bool:unary) and operand:var:bool:unary",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "declaration-chain",
+        "name": "Declaration Chain",
+        "description": "Execute dependent variable and constant declarations before evaluating the final expression."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 3,
+          "constant": 1
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 15
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ],
+        "constraints": {
+          "requireMultipleTiers": true
+        }
+      },
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "lesson": {
+        "focus": "declaration",
+        "variant": "dependency-chain"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "program-output-basics",
+        "name": "Output Statements",
+        "description": "Build values in memory, format or concatenate them, then trace C or Java output one character at a time."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 3
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "formatted-output"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "output",
+        "variant": "formatted-values"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "statement-flow",
+        "timeline": "inline"
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "program-output-source-flow",
+        "name": "Source Program Output",
+        "description": "Trace output inside the complete authored C or Java source file, including contextual lines."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 3
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-"
+        ]
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "formatted-output"
+        },
+        "values": {
+          "variables": "authored"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "output",
+        "variant": "formatted-values"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "program-input-source-flow",
+        "name": "Input Basic",
+        "description": "Trace simulated console input, press Enter to submit it, convert each token, and write its value to memory."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 3
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-"
+        ]
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "input-basics"
+        },
+        "values": {
+          "variables": "authored",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "input",
+        "variant": "numeric-console"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "feedback": {
+        "showCorrectSolution": {
+          "practice": false,
+          "exam": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "trace-multiple-inputs",
+        "name": "Multiple Inputs",
+        "description": "Trace simulated console input, press Enter to submit it, convert each token, and write its value to memory."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 3
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-"
+        ]
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "input-advance"
+        },
+        "values": {
+          "variables": "authored",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "input",
+        "variant": "numeric-console"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "feedback": {
+        "showCorrectSolution": {
+          "practice": false,
+          "exam": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "selection-statements-source",
+        "name": "Code Simulator",
+        "description": "Trigger each supported statement and trace the actual flow through a complete C or Java source program."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "selection-basics"
+        },
+        "values": {
+          "variables": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow",
+        "constructs": [
+          "selection"
+        ]
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "test-basic-output",
+        "name": "Test Basic Output",
+        "description": "Trigger each supported statement and trace the actual flow through a complete C source program."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "output-basics"
+        },
+        "values": {
+          "variables": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "trace-basic-output",
+        "name": "Trace Basic Output",
+        "description": "Trigger each supported statement and trace the actual flow through a complete C source program."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "simulate-basic-output"
+        },
+        "values": {
+          "variables": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "feedback": {
+        "showCorrectSolution": {
+          "practice": false,
+          "exam": false
+        }
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "assignment-basic",
+        "name": "Assignment: Replace with =",
+        "description": "Initialize a variable, replace its value with =, then use the updated value."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 15
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-"
+        ]
+      },
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "lesson": {
+        "focus": "assignment",
+        "variant": "basic-set"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "assignment-add-sub",
+        "name": "Assignment: += and -=",
+        "description": "Trace consecutive addition and subtraction assignments on one variable."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 15
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-"
+        ]
+      },
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "lesson": {
+        "focus": "assignment",
+        "variant": "add-sub"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "assignment-multiply",
+        "name": "Assignment: *=",
+        "description": "Apply multiplication assignment and observe the variable change in memory."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-"
+        ]
+      },
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "lesson": {
+        "focus": "assignment",
+        "variant": "multiply"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "assignment-div-mod",
+        "name": "Assignment: /= and %=",
+        "description": "Compare integer quotient assignment with remainder assignment."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 6,
+          "max": 30
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-"
+        ]
+      },
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "lesson": {
+        "focus": "assignment",
+        "variant": "divide-remainder"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "assignment-rhs-expression",
+        "name": "Assignment: Expression on the Right",
+        "description": "Resolve a multi-step right-hand expression before applying a compound assignment."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 2,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ]
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 3,
+        "pointsPerItem": 5,
+        "statementCommits": true
+      },
+      "lesson": {
+        "focus": "assignment",
+        "variant": "rhs-expression"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-sequential",
+        "name": "Assignment: Sequential Updates",
+        "description": "Follow several compound assignments that repeatedly update the same variable."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-"
+        ]
+      },
+      "template": "operand op operand",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 1,
+        "statementCommits": true
+      },
+      "lesson": {
+        "focus": "assignment",
+        "variant": "sequential"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-dependent",
+        "name": "Assignment: Variables and Constants",
+        "description": "Use an updated variable and an immutable constant in a later assignment."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 2,
+          "constant": 1
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ]
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 2,
+        "pointsPerItem": 5,
+        "statementCommits": true
+      },
+      "lesson": {
+        "focus": "assignment",
+        "variant": "dependent"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-advanced-chain",
+        "name": "Assignment: Advanced Chain",
+        "description": "Combine precedence, multiple variables, and dependent compound assignments."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 3
+        },
+        "operandRange": {
+          "min": 2,
+          "max": 10
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ]
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 2,
+        "pointsPerItem": 5,
+        "statementCommits": true
+      },
+      "lesson": {
+        "focus": "assignment",
+        "variant": "advanced"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "unary-update-sequence",
+        "name": "Unary Updates: ++ and -- Statements",
+        "description": "Apply prefix and postfix increment/decrement as standalone statements, then reuse the changed variables."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 2,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 3,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ],
+        "constraints": {
+          "requireMultipleTiers": true
+        }
+      },
+      "template": "operand op operand op operand",
+      "scoring": {
+        "itemCount": 2,
+        "pointsPerItem": 5,
+        "statementCommits": true
+      },
+      "lesson": {
+        "focus": "unary-update",
+        "variant": "standalone-sequence"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-unary-advanced-chain",
+        "name": "Assignment + Unary: Advanced Chain",
+        "description": "Trace dependent compound assignments and standalone prefix/postfix updates before evaluating the final expression."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 3,
+          "constant": 1
+        },
+        "operandRange": {
+          "min": 3,
+          "max": 12
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/"
+        ],
+        "constraints": {
+          "requireMultipleTiers": true
+        }
+      },
+      "template": "operand op operand op operand op operand",
+      "scoring": {
+        "itemCount": 2,
+        "pointsPerItem": 5,
+        "statementCommits": true
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50
+      },
+      "lesson": {
+        "focus": "assignment-unary",
+        "variant": "advanced-assignment-unary"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "relational-logical-student-derived",
+        "name": "Relational + Logical: Student Derived",
+        "description": "Evaluate one mixed relational/logical expression while supplying selected retrieved and derived values."
+      },
+      "shape": {
+        "operandRange": {
+          "min": 1,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "extras": {
+        "unaryWrap": {
+          "enabled": true,
+          "operators": [
+            "!"
+          ],
+          "forms": [
+            "prefix"
+          ],
+          "fraction": 0.5
+        }
+      },
+      "template": "(operand:lit cmp operand:lit) and operand:var:bool:unary or operand:var:bool:unary",
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 4
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "token-identifier-position",
+        "name": "Identifier Position",
+        "description": "Locate the declaration name and decide whether it is a valid identifier."
+      },
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 3
+      },
+      "activity": {
+        "kind": "token-classification",
+        "generator": {
+          "capability": "statement-generator",
+          "pattern": "declaration",
+          "statementKinds": [
+            "variable",
+            "constant"
+          ],
+          "identifierGeneration": {
+            "templates": [
+              "modifier-measurement",
+              "entity-measurement",
+              "entity-technical"
+            ],
+            "styles": [
+              "camel-case",
+              "snake-case",
+              "constant-case",
+              "pascal-case",
+              "underscore-prefix",
+              "digit-suffix",
+              "dollar-prefix",
+              "case-mutated-reserved"
+            ],
+            "invalidStrategies": [
+              "leading-digit",
+              "illegal-character",
+              "embedded-space",
+              "punctuation",
+              "reserved-as-identifier"
+            ],
+            "weights": {
+              "templates": {
+                "modifier-measurement": 3,
+                "entity-measurement": 3,
+                "entity-technical": 2
+              },
+              "styles": {
+                "camel-case": 3,
+                "snake-case": 2,
+                "constant-case": 2,
+                "pascal-case": 1,
+                "underscore-prefix": 1,
+                "digit-suffix": 2,
+                "dollar-prefix": 1,
+                "case-mutated-reserved": 1
+              },
+              "invalidStrategies": {
+                "leading-digit": 3,
+                "illegal-character": 3,
+                "embedded-space": 2,
+                "punctuation": 2,
+                "reserved-as-identifier": 2
+              }
+            },
+            "length": {
+              "min": 3,
+              "max": 32
+            },
+            "uniqueness": {
+              "scope": "profile-session",
+              "reuse": "avoid-until-exhausted"
+            }
+          }
+        },
+        "instructions": "Tap the name used in the declaration, then classify it as a valid or invalid identifier.",
+        "sets": {
+          "identifierTargets": {
+            "match": {
+              "positions": [
+                "declaration-name"
+              ]
+            }
+          },
+          "everyToken": {
+            "include": [
+              {
+                "source": "all"
+              }
+            ]
+          }
+        },
+        "interaction": {
+          "policies": {
+            "practice:guided": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "identifierTargets"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "ignore"
+            },
+            "practice:strict-sequence": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "everyToken"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "block-until-undo"
+            },
+            "exam:guided": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "identifierTargets"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "ignore"
+            },
+            "exam:strict-sequence": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "everyToken"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "terminate-item"
+            }
+          }
+        },
+        "assessment": {
+          "targets": {
+            "set": "identifierTargets"
+          },
+          "checks": [
+            {
+              "id": "target-selection",
+              "action": "SELECT_TOKEN",
+              "targets": {
+                "set": "identifierTargets"
+              },
+              "cardinality": "once",
+              "weight": 1,
+              "bonus": true
+            },
+            {
+              "id": "identifier-classification",
+              "action": "CLASSIFY_TOKEN",
+              "targets": {
+                "set": "identifierTargets"
+              },
+              "cardinality": "per-target",
+              "answerResolver": "contextual-category",
+              "weight": 2
+            }
+          ]
+        },
+        "response": {
+          "mode": "classify",
+          "categories": [
+            "valid-identifier",
+            "invalid-identifier"
+          ]
+        }
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "token-declaration-complete",
+        "name": "Declaration Token Classification",
+        "description": "Classify every token according to its position in a variable or constant declaration."
+      },
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 6
+      },
+      "activity": {
+        "kind": "token-classification",
+        "generator": {
+          "capability": "statement-generator",
+          "pattern": "declaration",
+          "statementKinds": [
+            "variable",
+            "constant"
+          ],
+          "identifierGeneration": {
+            "templates": [
+              "modifier-measurement",
+              "entity-measurement",
+              "entity-technical"
+            ],
+            "styles": [
+              "camel-case",
+              "snake-case",
+              "constant-case",
+              "pascal-case",
+              "underscore-prefix",
+              "digit-suffix",
+              "dollar-prefix",
+              "case-mutated-reserved"
+            ],
+            "invalidStrategies": [
+              "leading-digit",
+              "illegal-character",
+              "embedded-space",
+              "punctuation",
+              "reserved-as-identifier"
+            ],
+            "weights": {
+              "templates": {
+                "modifier-measurement": 3,
+                "entity-measurement": 3,
+                "entity-technical": 2
+              },
+              "styles": {
+                "camel-case": 3,
+                "snake-case": 2,
+                "constant-case": 2,
+                "pascal-case": 1,
+                "underscore-prefix": 1,
+                "digit-suffix": 2,
+                "dollar-prefix": 1,
+                "case-mutated-reserved": 1
+              },
+              "invalidStrategies": {
+                "leading-digit": 3,
+                "illegal-character": 3,
+                "embedded-space": 2,
+                "punctuation": 2,
+                "reserved-as-identifier": 2
+              }
+            },
+            "length": {
+              "min": 3,
+              "max": 32
+            },
+            "uniqueness": {
+              "scope": "profile-session",
+              "reuse": "avoid-until-exhausted"
+            }
+          }
+        },
+        "instructions": "Tap each token and classify it according to its position in the statement.",
+        "sets": {
+          "classificationTargets": {
+            "match": {
+              "positions": [
+                "modifier",
+                "type",
+                "declaration-name",
+                "operator",
+                "literal",
+                "separator"
+              ]
+            }
+          },
+          "everyToken": {
+            "include": [
+              {
+                "source": "all"
+              }
+            ]
+          }
+        },
+        "interaction": {
+          "policies": {
+            "practice:guided": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "classificationTargets"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "ignore"
+            },
+            "practice:strict-sequence": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "everyToken"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "block-until-undo"
+            },
+            "exam:guided": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "classificationTargets"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "ignore"
+            },
+            "exam:strict-sequence": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "everyToken"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "terminate-item"
+            }
+          }
+        },
+        "assessment": {
+          "targets": {
+            "set": "classificationTargets"
+          },
+          "checks": [
+            {
+              "id": "token-classification",
+              "action": "CLASSIFY_TOKEN",
+              "targets": {
+                "set": "classificationTargets"
+              },
+              "cardinality": "per-target",
+              "answerResolver": "contextual-category",
+              "weight": 1
+            }
+          ]
+        },
+        "response": {
+          "mode": "classify",
+          "categories": [
+            "valid-identifier",
+            "invalid-identifier",
+            "reserved-word",
+            "operator",
+            "literal",
+            "separator"
+          ]
+        }
+      }
+    },
+    {
+      "enabled": false,
+      "meta": {
+        "id": "token-program-chain",
+        "name": "Chained Statement Tokens",
+        "description": "Classify tokens by position across connected declarations and assignments."
+      },
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 12
+      },
+      "activity": {
+        "kind": "token-classification",
+        "generator": {
+          "capability": "statement-generator",
+          "pattern": "statement-chain",
+          "statementKinds": [
+            "declaration",
+            "assignment"
+          ],
+          "identifierGeneration": {
+            "templates": [
+              "modifier-measurement",
+              "entity-measurement",
+              "entity-technical"
+            ],
+            "styles": [
+              "camel-case",
+              "snake-case",
+              "constant-case",
+              "pascal-case",
+              "underscore-prefix",
+              "digit-suffix",
+              "dollar-prefix",
+              "case-mutated-reserved"
+            ],
+            "invalidStrategies": [
+              "leading-digit",
+              "illegal-character",
+              "embedded-space",
+              "punctuation",
+              "reserved-as-identifier"
+            ],
+            "weights": {
+              "templates": {
+                "modifier-measurement": 3,
+                "entity-measurement": 3,
+                "entity-technical": 2
+              },
+              "styles": {
+                "camel-case": 3,
+                "snake-case": 2,
+                "constant-case": 2,
+                "pascal-case": 1,
+                "underscore-prefix": 1,
+                "digit-suffix": 2,
+                "dollar-prefix": 1,
+                "case-mutated-reserved": 1
+              },
+              "invalidStrategies": {
+                "leading-digit": 3,
+                "illegal-character": 3,
+                "embedded-space": 2,
+                "punctuation": 2,
+                "reserved-as-identifier": 2
+              }
+            },
+            "length": {
+              "min": 3,
+              "max": 32
+            },
+            "uniqueness": {
+              "scope": "profile-session",
+              "reuse": "avoid-until-exhausted"
+            }
+          }
+        },
+        "instructions": "Work through each statement and classify every token according to its syntax position.",
+        "sets": {
+          "classificationTargets": {
+            "match": {
+              "positions": [
+                "modifier",
+                "type",
+                "declaration-name",
+                "assignment-target",
+                "assignment-source",
+                "operator",
+                "literal",
+                "separator"
+              ]
+            }
+          },
+          "everyToken": {
+            "include": [
+              {
+                "source": "all"
+              }
+            ]
+          }
+        },
+        "interaction": {
+          "policies": {
+            "practice:guided": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "classificationTargets"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "ignore"
+            },
+            "practice:strict-sequence": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "everyToken"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "block-until-undo"
+            },
+            "exam:guided": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "classificationTargets"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "ignore"
+            },
+            "exam:strict-sequence": {
+              "selectable": {
+                "include": [
+                  {
+                    "set": "everyToken"
+                  }
+                ],
+                "exclude": []
+              },
+              "onOffTarget": "terminate-item"
+            }
+          }
+        },
+        "assessment": {
+          "targets": {
+            "set": "classificationTargets"
+          },
+          "checks": [
+            {
+              "id": "token-classification",
+              "action": "CLASSIFY_TOKEN",
+              "targets": {
+                "set": "classificationTargets"
+              },
+              "cardinality": "per-target",
+              "answerResolver": "contextual-category",
+              "weight": 1
+            }
+          ]
+        },
+        "response": {
+          "mode": "classify",
+          "categories": [
+            "valid-identifier",
+            "invalid-identifier",
+            "reserved-word",
+            "operator",
+            "literal",
+            "separator"
+          ]
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "falling-identifier-sort",
+        "name": "Falling Identifier Sort",
+        "description": "Sort standalone names as valid identifiers, invalid identifiers, or reserved words."
+      },
+      "scoring": {
+        "itemCount": 1,
+        "pointsPerItem": 30
+      },
+      "activity": {
+        "kind": "falling-token-sort",
+        "instructions": "Drag a token into its matching bucket. Keyboard: select a token, then choose a bucket.",
+        "buckets": [
+          {
+            "id": "valid",
+            "category": "valid-identifier",
+            "region": "bottom",
+            "order": 1
+          },
+          {
+            "id": "invalid",
+            "category": "invalid-identifier",
+            "region": "bottom",
+            "order": 2
+          },
+          {
+            "id": "reserved",
+            "category": "reserved-word",
+            "region": "bottom",
+            "order": 3
+          }
+        ],
+        "dropArea": {
+          "visibleTokens": 20,
+          "landingBehavior": "pass-through"
+        },
+        "generator": {
+          "capability": "analyzed-token-generation",
+          "identifierGeneration": {
+            "templates": [
+              "modifier-measurement",
+              "entity-measurement",
+              "entity-technical"
+            ],
+            "styles": [
+              "camel-case",
+              "snake-case",
+              "constant-case",
+              "pascal-case",
+              "underscore-prefix",
+              "digit-suffix",
+              "dollar-prefix",
+              "case-mutated-reserved"
+            ],
+            "invalidStrategies": [
+              "leading-digit",
+              "illegal-character",
+              "embedded-space",
+              "punctuation",
+              "reserved-as-identifier"
+            ],
+            "weights": {
+              "templates": {
+                "modifier-measurement": 3,
+                "entity-measurement": 3,
+                "entity-technical": 2
+              },
+              "styles": {
+                "camel-case": 3,
+                "snake-case": 2,
+                "constant-case": 2,
+                "pascal-case": 1,
+                "underscore-prefix": 1,
+                "digit-suffix": 2,
+                "dollar-prefix": 1,
+                "case-mutated-reserved": 1
+              },
+              "invalidStrategies": {
+                "leading-digit": 3,
+                "illegal-character": 3,
+                "embedded-space": 2,
+                "punctuation": 2,
+                "reserved-as-identifier": 2
+              }
+            },
+            "length": {
+              "min": 3,
+              "max": 32
+            },
+            "uniqueness": {
+              "scope": "profile-session",
+              "reuse": "avoid-until-exhausted"
+            }
+          },
+          "policies": {
+            "practice": {
+              "totalTokens": {
+                "target": 30
+              },
+              "counts": {
+                "valid-identifier": {
+                  "min": 5,
+                  "max": 13
+                },
+                "invalid-identifier": {
+                  "min": 5,
+                  "max": 13
+                },
+                "reserved-word": {
+                  "min": 5,
+                  "max": 13
+                }
+              },
+              "shuffle": true
+            },
+            "exam": {
+              "totalTokens": {
+                "exact": 30
+              },
+              "counts": {
+                "valid-identifier": {
+                  "exact": 10
+                },
+                "invalid-identifier": {
+                  "exact": 10
+                },
+                "reserved-word": {
+                  "exact": 10
+                }
+              },
+              "shuffle": true
+            }
+          }
+        },
+        "assessment": {
+          "action": "SORT_TOKEN",
+          "cardinality": "per-token",
+          "scoreAttempt": "first",
+          "completion": "all-tokens-placed"
+        },
+        "response": {
+          "policies": {
+            "practice": {
+              "incorrectPlacement": "return-token"
+            },
+            "exam": {
+              "incorrectPlacement": "accept"
+            }
+          }
+        },
+        "feedback": {
+          "practice": "immediate-return",
+          "exam": "deferred-until-timeout"
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "falling-operator-sort",
+        "name": "Falling Operator Sort",
+        "description": "Classify C and Java operators as arithmetic, relational, boolean, or assignment while filtering out nonoperators."
+      },
+      "scoring": {
+        "itemCount": 1,
+        "pointsPerItem": 30
+      },
+      "activity": {
+        "kind": "falling-token-sort",
+        "instructions": "Drag each token into its operator family, or into Not an Operator. Keyboard: select a token, then choose a bucket.",
+        "buckets": [
+          {
+            "id": "arithmetic",
+            "category": "arithmetic-operator",
+            "region": "bottom",
+            "order": 1
+          },
+          {
+            "id": "relational",
+            "category": "relational-operator",
+            "region": "bottom",
+            "order": 2
+          },
+          {
+            "id": "boolean",
+            "category": "boolean-operator",
+            "region": "bottom",
+            "order": 3
+          },
+          {
+            "id": "assignment",
+            "category": "assignment-operator",
+            "region": "bottom",
+            "order": 4
+          },
+          {
+            "id": "distractor",
+            "category": "operator-distractor",
+            "region": "bottom",
+            "order": 5
+          }
+        ],
+        "dropArea": {
+          "visibleTokens": 20,
+          "landingBehavior": "pass-through"
+        },
+        "generator": {
+          "capability": "canonical-token-pools",
+          "tokenPools": {
+            "arithmetic-operator": [
+              "+",
+              "-",
+              "*",
+              "/",
+              "%"
+            ],
+            "relational-operator": [
+              "<",
+              ">",
+              "<=",
+              ">=",
+              "==",
+              "!="
+            ],
+            "boolean-operator": [
+              "&&",
+              "||",
+              "!"
+            ],
+            "assignment-operator": [
+              "=",
+              "+=",
+              "-=",
+              "*=",
+              "/=",
+              "%="
+            ],
+            "operator-distractor": [
+              "value",
+              "count",
+              "42",
+              "3.14",
+              "true",
+              "false",
+              ";",
+              ",",
+              "(",
+              ")"
+            ]
+          },
+          "policies": {
+            "practice": {
+              "totalTokens": {
+                "exact": 30
+              },
+              "counts": {
+                "arithmetic-operator": {
+                  "exact": 5
+                },
+                "relational-operator": {
+                  "exact": 6
+                },
+                "boolean-operator": {
+                  "exact": 3
+                },
+                "assignment-operator": {
+                  "exact": 6
+                },
+                "operator-distractor": {
+                  "exact": 10
+                }
+              },
+              "shuffle": true
+            },
+            "exam": {
+              "totalTokens": {
+                "exact": 30
+              },
+              "counts": {
+                "arithmetic-operator": {
+                  "exact": 5
+                },
+                "relational-operator": {
+                  "exact": 6
+                },
+                "boolean-operator": {
+                  "exact": 3
+                },
+                "assignment-operator": {
+                  "exact": 6
+                },
+                "operator-distractor": {
+                  "exact": 10
+                }
+              },
+              "shuffle": true
+            }
+          }
+        },
+        "assessment": {
+          "action": "SORT_TOKEN",
+          "cardinality": "per-token",
+          "scoreAttempt": "first",
+          "completion": "all-tokens-placed"
+        },
+        "response": {
+          "policies": {
+            "practice": {
+              "incorrectPlacement": "return-token"
+            },
+            "exam": {
+              "incorrectPlacement": "accept"
+            }
+          }
+        },
+        "feedback": {
+          "practice": "immediate-return",
+          "exam": "deferred-until-timeout"
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "simulate-basic-output",
+        "name": "Basic Output",
+        "description": "Predict the terminal output of programs that use direct print commands without program variables."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read each source program and predict its terminal output. Check when ready.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "simulate-basic-output",
+          "shuffle": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "simulate-output-variables",
+        "name": "Output + Variable",
+        "description": "Predict printed output and final variable values for programs whose output depends on program state."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read each source program, predict its terminal output, and give its final variable values. Check when ready.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "simulate-output-variables",
+          "shuffle": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "simulate-basic-selection",
+        "name": "Basic Selection",
+        "description": "Predict printed output and final variable values for programs whose output depends on program state."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read each source program, predict its terminal output, and give its final variable values. Check when ready.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "simulate-basic-selection",
+          "shuffle": false
+        }
+      },
+      "feedback": {
+        "showCorrectSolution": {
+          "practice": false,
+          "exam": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "simulate-compound-selection",
+        "name": "Compound Selection",
+        "description": "Predict printed output and final variable values for programs whose output depends on program state."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read each source program, predict its terminal output, and give its final variable values. Check when ready.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "simulate-compound-selection",
+          "shuffle": false
+        }
+      },
+      "feedback": {
+        "showCorrectSolution": {
+          "practice": false,
+          "exam": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "trace-basic-selection",
+        "name": "Basic Selection",
+        "description": "Trigger each supported statement and trace the actual flow through a complete C or Java source program."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "simulate-basic-selection"
+        },
+        "values": {
+          "variables": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow",
+        "constructs": [
+          "selection"
+        ]
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50,
+        "output": {
+          "enabled": true,
+          "mode": "complete-emission",
+          "rate": 100
+        }
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "feedback": {
+        "showCorrectSolution": {
+          "practice": false,
+          "exam": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "trace-compound-selection",
+        "name": "Compound Selection",
+        "description": "Trigger each supported statement and trace compound selection flow through a complete C or Java source program."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "simulate-compound-selection"
+        },
+        "values": {
+          "variables": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow",
+        "constructs": [
+          "selection"
+        ]
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50,
+        "output": {
+          "enabled": true,
+          "mode": "complete-emission",
+          "rate": 100
+        }
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "feedback": {
+        "showCorrectSolution": {
+          "practice": false,
+          "exam": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "trace-output-variables",
+        "name": "Trace Output + Variables",
+        "description": "Trigger each supported statement and trace the actual flow through a complete C or Java source program."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "simulate-output-variables"
+        },
+        "values": {
+          "variables": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "feedback": {
+        "showCorrectSolution": {
+          "practice": false,
+          "exam": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "order-basic-output",
+        "name": "Order Basic Output",
+        "description": "Arrange seeded output statements so the program produces the target screen state."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the executable statements, run the program, and match the target output.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "simulate-basic-output",
+          "shuffle": false
+        }
+      },
+      "feedback": {
+        "showCorrectSolution": {
+          "practice": false,
+          "exam": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "order-output-variables",
+        "name": "Order Output + Variables",
+        "description": "Arrange seeded statements so both the screen output and final variable state match the source program."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the executable statements, run the program, and reproduce its target output and final variable state.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "simulate-output-variables",
+          "shuffle": false
+        }
+      },
+      "feedback": {
+        "showCorrectSolution": {
+          "practice": false,
+          "exam": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "bug-catcher-basics",
+        "name": "Bug Catcher",
+        "description": "Inspect a corrupted C or Java program and identify the tokens that prevent it from matching its valid source."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "authored",
+          "input": "authored"
+        },
+        "bugs": {
+          "mode": "seeded",
+          "count": 3
+        }
+      },
+      "activity": {
+        "kind": "bug-catcher",
+        "instructions": "Select the corrupted tokens in the source code. The number of faults to find is shown beside the filename.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "bug-catcher-basics",
+          "shuffle": false
+        }
+      }
+    }
+  ]
+}

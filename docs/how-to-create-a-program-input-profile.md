@@ -71,7 +71,8 @@ whitespace and does not add a fabricated space before the entered character.
 
 ## 3. Configure the profile
 
-Declare the profile in `js/profiles.js`:
+Add the profile with Profile Designer. The underlying profile object uses this
+structure:
 
 ```js
 {

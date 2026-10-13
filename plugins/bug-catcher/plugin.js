@@ -169,7 +169,7 @@ function bcCheck({item,state}){
   if(!item||item.checked)return {applied:false};const result=bcScore(item);item.result=result;item.checked=true;
   item.points=result.correct.length;item.maxPoints=result.total;item.itemScore=result.total?item.points/result.total:1;
   item.correctSteps=item.points;item.totalOpSteps=result.total;item.wasCorrectFinal=!result.incorrect.length&&!result.missed.length;
-  item.lockedAt=state.mode==='exam'?Date.now():null;return {applied:true,completed:true};
+  item.lockedAt=profileLocksCheckedItems()?Date.now():null;return {applied:true,completed:true};
 }
 function bcClear(item){item.response={selected:[]};item.result=null;item.showSolution=false;item._feedbackAnimated=false;}
 function bcReset({item}){if(!item||item.checked)return {applied:false};const changed=item.response.selected.length>0;bcClear(item);return {applied:changed};}
@@ -237,8 +237,7 @@ function bcSelectionPanel(item){
         :`Select ${total-selected.length} more token${total-selected.length===1?'':'s'}.`)));
 }
 
-function bcFeedbackReleased(item){if(!item.checked)return false;if(state.mode==='practice')return true;
-  return !!(state.examExpired&&activeExamPolicy().feedbackRelease==='after-timeout');}
+function bcFeedbackReleased(item){return profileFeedbackVisible(item);}
 function bcToggleSolution(){const item=currentItem();if(!item||item.activityKind!==BUG_CATCHER_MANIFEST.id||!correctSolutionAvailable(currentProfile(),item))return;
   item.showSolution=!item.showSolution;render();}
 function bcBuildFeedback(item,profile){
@@ -274,10 +273,10 @@ function bcRender({container,item,profile}){
     status:item.checked?'complete':'running',progressMode:'completion'});flow.parentNode.classList.add('bug-catcher-workspace');
   flow.appendChild(h('div',{class:'bc-instruction'},h('i',{class:'fa-solid fa-circle-info','aria-hidden':'true'}),h('span',{},profile.activity.instructions)));
   flow.appendChild(h('div',{class:'bc-workspace-layout'},bcSourcePanel(item),bcSelectionPanel(item)));
-  if(!item.checked&&!state.examExpired){const controls=h('div',{class:'bc-controls'});if(state.mode==='practice')controls.appendChild(h('button',{class:'item-reset-button',
+  if(!item.checked&&!state.examExpired){const controls=h('div',{class:'bc-controls'});if(profileAllowsRetry())controls.appendChild(h('button',{class:'item-reset-button',
     type:'button',disabled:!item.response.selected.length,onclick:handleReset},'Reset item'));
     const actions=renderInlineEvaluationActions({canCheck:item.response.selected.length>0});if(actions)controls.appendChild(actions);flow.appendChild(controls);
-  }else if(state.mode==='practice')appendPracticeRetryBar(container);
+  }else if(profileAllowsRetry())appendPracticeRetryBar(container);
   bcSyncDrawers(item,profile);
 }
 

@@ -95,10 +95,11 @@ async function handleLogin(event) {
   
   localStorage.setItem('precedifyLogin', JSON.stringify(loginData));
   
-  // Update state with app settings mode (set once at login, cannot be changed)
+  // Profile configuration controls activity behavior; login only establishes
+  // the student identity and starts or resumes the shared session.
   state.userEmail = email;
   state.userStudentId = studentNumber;
-  state.mode = appSettings.mode;
+  state.mode = 'practice';
   // startSession() prepares every enabled profile while leaving selection to
   // the student. No profile or category is chosen implicitly.
   
@@ -111,7 +112,7 @@ async function handleLogin(event) {
     // Each mode has its own deployment-controlled persistence switch and
     // storage key. A disabled mode always starts fresh without deleting an
     // existing snapshot from the other mode.
-    if (tryResumeSession(appSettings.mode,email)) {
+    if (tryResumeSession('session',email)) {
       return;
     }
     startSession();
@@ -161,9 +162,11 @@ function openSettingsModal() {
   // returns state.js defaults instead when policy is state-only.
   loadPersistedAppSettings();
 
-  // Set current settings in the modal
-  document.querySelector(`input[name="mode"][value="${appSettings.mode}"]`).checked = true;
-  document.getElementById('timerInput').value = appSettings.timerMinutes;
+  // Activity behavior and the shared timer are authored in Profile Designer.
+  // This modal now contains device data-management actions only.
+  const modeInput=document.querySelector(`input[name="mode"][value="${appSettings.mode}"]`);
+  if(modeInput)modeInput.checked=true;
+  const timerInput=document.getElementById('timerInput');if(timerInput)timerInput.value=appSettings.timerMinutes;
   const exam=appSettings.exam;
   const practice=appSettings.practice;
   const practiceInteractionMode=document.getElementById('practiceInteractionMode');
@@ -184,10 +187,10 @@ function openSettingsModal() {
   const timerSection = document.getElementById('timerSection');
   const practiceSection=document.getElementById('practicePolicySection');
   if (appSettings.mode === 'exam') {
-    timerSection.style.display = 'block';
+    if(timerSection)timerSection.style.display = 'block';
     if(practiceSection) practiceSection.style.display='none';
   } else {
-    timerSection.style.display = 'none';
+    if(timerSection)timerSection.style.display = 'none';
     if(practiceSection) practiceSection.style.display='block';
   }
 
@@ -271,7 +274,9 @@ function validateTimerInput(input) {
 
 function saveSettings() {
   if(typeof settingsAreStateOnly==='function'&&settingsAreStateOnly()) return;
-  const selectedMode = document.querySelector('input[name="mode"]:checked').value;
+  const selected=document.querySelector('input[name="mode"]:checked');
+  if(!selected){closeSettingsModal();return;}
+  const selectedMode = selected.value;
   const timerInput = document.getElementById('timerInput');
   const timerValue = parseInt(timerInput.value, 10);
   
@@ -314,14 +319,14 @@ function saveSettings() {
 // clearAllExamProgressEverywhere's own comment for why this is the only
 // sanctioned way that data disappears outside a timer expiring on its own.
 function handleClearAllExamProgress() {
-  const confirmed = confirm('This will permanently delete every student\'s saved exam progress on this device. This cannot be undone. Continue?');
+  const confirmed = confirm('This will permanently delete every student\'s saved session progress on this device. This cannot be undone. Continue?');
   if (!confirmed) return;
   const count = clearAllExamProgressEverywhere();
   const resultEl = document.getElementById('clearExamProgressResult');
   if (resultEl) {
     resultEl.textContent = count > 0
       ? `Cleared ${count} saved exam session${count===1?'':'s'}.`
-      : 'No saved exam progress was found.';
+      : 'No saved session progress was found.';
     resultEl.style.display = 'block';
   }
 }
@@ -332,7 +337,7 @@ function showDangerResult(id,message){
 }
 
 function handleResetApplicationSettings(){
-  if(!confirm('Reset activity and exam settings to their built-in defaults? Student exam progress will not be deleted.')) return;
+  if(!confirm('Reset device settings to their built-in defaults? Student session progress will not be deleted.')) return;
   resetPersistedAppSettings();
   openSettingsModal();
   showDangerResult('resetSettingsResult','Application settings restored to defaults. Student attempts were preserved.');
@@ -356,7 +361,7 @@ function handleClearAllLocalData(){
 // ============================================================================
 
 function startTimer(resumeSeconds) {
-  if (appSettings.mode !== 'exam') {
+  if (!sessionTimingEnabled()) {
     return;
   }
   // Exam time is allotted once for the ENTIRE session across every
@@ -373,7 +378,7 @@ function startTimer(resumeSeconds) {
     examEndTimestamp = Date.now() + timeRemaining * 1000;
   } else {
     // Initialize timer from the configured duration (appSettings.timerMinutes)
-    timeRemaining = (state.examTimerMinutes || appSettings.timerMinutes) * 60; // Convert to seconds
+    timeRemaining = (state.examTimerMinutes || ACTIVE_PROFILE_SESSION.timing.minutes) * 60;
     examEndTimestamp = Date.now() + timeRemaining * 1000;
   }
   // Persist the deadline immediately, rather than waiting for the next
@@ -430,7 +435,7 @@ function stopTimer() {
 
 function handleTimerExpired() {
   if(!expireExam()) return;
-  alert('Time is up. Your answers are now locked. Use each category’s Score/QR button to view your result.');
+  alert('Time is up. Your current work has been scored and all activities are now locked.');
 }
 
 // ============================================================================
@@ -513,6 +518,7 @@ function selectProfile(profileId) {
 
   // Set profile ID
   state.profileId = profileId;
+  syncActiveProfileBehavior();
   openCategoryIds.add(currentProfile().categoryId);
 
   // startSession() already ran exactly once at login and generated every
@@ -657,7 +663,7 @@ function buildItemPageWindow(total, current) {
 //   ''          — untouched
 function itemPageStatus(item){
   if (!item) return '';
-  if(state.mode==='exam'&&!state.examExpired){
+  if(!state.examExpired&&!activeProfileBehavior().showScores){
     if(item.checked) return 'locked';
     if(item.flagged) return 'flagged';
     if(itemHasAttempt(item)) return 'attempted';

@@ -147,12 +147,12 @@ function renderItemResetControl(show){
 }
 
 function renderExamItemBar(item){
-  if(state.mode!=='exam'||state.examExpired) return null;
-  const status=item.checked?'Answer locked':(item.flagged?'Flagged for review':(itemHasAttempt(item)?'In progress':'Unattempted'));
+  if(state.examExpired||(!profileLocksCheckedItems()&&!profileAllowsReviewFlags())) return null;
+  const status=item.checked?'Answer recorded':(item.flagged?'Flagged for review':(itemHasAttempt(item)?'In progress':'Unattempted'));
   const controls=[h('span',{class:'exam-item-status'+(item.checked?' locked':item.flagged?' flagged':'')},
     item.checked?h('i',{class:'fa-solid fa-lock'}):item.flagged?h('i',{class:'fa-solid fa-flag'}):h('i',{class:'fa-regular fa-circle'}),
     ' ',status)];
-  if(activeExamPolicy().allowReviewFlags&&!item.checked){
+  if(profileAllowsReviewFlags()&&!item.checked){
     controls.push(h('button',{class:'exam-flag-btn'+(item.flagged?' active':''),type:'button',onclick:toggleCurrentItemFlag,
       title:item.flagged?'Remove review flag':'Flag this item for review','aria-pressed':item.flagged?'true':'false'},
       h('i',{class:'fa-solid fa-flag'}),item.flagged?' Unflag':' Flag'));
@@ -430,7 +430,7 @@ function stageSourceFlowTransition(item,originStatement,phase='waiting'){
 
 function sourceFlowTimings(){
   const configured=DEFAULT_APP_SETTINGS&&DEFAULT_APP_SETTINGS.shell&&DEFAULT_APP_SETTINGS.shell.sourceFlow;
-  return configured||{resultHoldMs:900,modalCloseSettleMs:320,movementDurationMs:1100,reducedMotionDurationMs:120};
+  return configured||{resultHoldMs:300,modalCloseSettleMs:320,movementDurationMs:500,reducedMotionDurationMs:120};
 }
 
 function beginSourceFlowTransition(item,settleMs=0){
@@ -755,7 +755,7 @@ function renderProgramWorkspaceShell(container,item,program){
   if(context) workspace.appendChild(h('div',{class:'program-workspace-layout'},flow,context));
   else workspace.appendChild(flow);
   container.appendChild(workspace);
-  if(item.sourceFlow&&state.mode==='practice'){
+  if(item.sourceFlow&&profileAllowsRetry()){
     if(item.checked) appendPracticeRetryBar(container);
     else{
       const resetControl=renderItemResetControl(itemHasAttempt(item));
@@ -1047,7 +1047,7 @@ function renderTraceProgramExecutionReview(item){
 }
 function publishTraceProgramFeedback(item,profile){
   if(!traceProgramFeedbackEnabled(profile,item)||!item.checked)return false;
-  if(state.mode==='exam'&&!examFeedbackVisible()){
+  if(!profileFeedbackVisible(item)){
     if(typeof clearFeedbackDrawerContent==='function')clearFeedbackDrawerContent();
     if(typeof hideFeedbackDrawerTab==='function')hideFeedbackDrawerTab();
     if(typeof closeFeedbackDrawer==='function')closeFeedbackDrawer();
@@ -1151,7 +1151,7 @@ function renderSession(container){
     statementNumber:embeddedProgram?item.program.cursor+1:null,
     continuationStyle:true,
     interactive:!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked(),
-    revealCorrectness:item.checked&&state.mode!=='exam',
+    revealCorrectness:profileFeedbackVisible(item),
     isFullyResolved:()=>itemFullyResolved(item),
     renderTrailingActions:()=>renderInlineEvaluationActions({
       canUndo:canUndoForCurrentMode(item)&&!item.practiceInvalidExecution,
@@ -1161,13 +1161,13 @@ function renderSession(container){
   evaluationHost.appendChild(evalPanel);
   const invalidExecutionAlert=renderInvalidExecutionAlert(item,expressionStatement);
   if(invalidExecutionAlert) evaluationHost.appendChild(invalidExecutionAlert);
-  const canReset = state.mode==='practice' && !item.checked && (
+  const canReset = profileAllowsRetry() && !item.checked && (
     item.trace.length>0 || (item.program && item.program.cursor>0));
   const resetControl=renderItemResetControl(canReset);
   if(resetControl) evaluationHost.appendChild(resetControl);
 
   if(!item.practiceInvalidExecution&&!itemFullyResolved(item) && !item.checked
-    &&(state.mode!=='exam'||activeExamPolicy().showNeutralGuidance)){
+    &&activeProfileBehavior().showNeutralGuidance){
     const unresolvedCount = collectUnresolvedFlat(item.workingFlat,[]).length;
     if(unresolvedCount>0){
       evaluationHost.appendChild(renderContextHelp(`Resolve ${unresolvedCount} more highlighted token${unresolvedCount>1?'s':''} (variable, constant, or unary) before operators become active.`));
@@ -1177,7 +1177,7 @@ function renderSession(container){
   }
 
   // feedback
-  const examFeedbackDeferred=state.mode==='exam'&&!examFeedbackVisible();
+  const examFeedbackDeferred=item.checked&&!profileFeedbackVisible(item);
   if(item.checked&&examFeedbackDeferred){
     if(!(item.examSequenceFailure&&item.examSequenceFailure.terminal)){
       container.appendChild(h('div',{class:'exam-answer-recorded'},
@@ -1293,7 +1293,7 @@ function renderSession(container){
       if(isFirstFeedbackShow && typeof openFeedbackDrawer === 'function') openFeedbackDrawer();
     }
 
-    if(state.mode==='practice'){
+    if(profileAllowsRetry()){
       appendPracticeRetryBar(container);
     }
   } else if(typeof clearFeedbackDrawerContent === 'function'){

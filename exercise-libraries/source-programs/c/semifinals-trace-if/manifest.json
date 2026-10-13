@@ -1,0 +1,10 @@
+{
+  "title": "C Semifinals - Trace If Statements",
+  "exercises": [
+    "StockReorder.c",
+    "DeliveryAlerts.c",
+    "ScholarshipScreen.c",
+    "EquipmentInspection.c"
+  ]
+}
+

@@ -109,6 +109,6 @@ function ftsCheck({item,profile,state}){
   const points=roundPoints(total?profile.pointsPerItem*(correct/total):0);
   item.checked=true;item.correctSteps=correct;item.totalOpSteps=total;item.wasCorrectFinal=correct===total;
   item.points=points;item.maxPoints=profile.pointsPerItem;item.itemScore=profile.pointsPerItem?points/profile.pointsPerItem:0;
-  item.lockedAt=state.mode==='exam'?Date.now():null;item.lastResult=null;
+  item.lockedAt=profileLocksCheckedItems()?Date.now():null;item.lastResult=null;
   return {applied:true,completed:true};
 }

@@ -2,16 +2,17 @@
 
 Falling Token Sort presents a configurable number of tokens and asks the student
 to send each one to a configured category bucket. The token follows the shared curved
-transfer animation into the selected bucket. Practice and Exam behavior, token
+transfer animation into the selected bucket. Interaction, recovery, token
 counts, scoring, feedback, bucket positions, and category choices all come from
 the profile rather than from a profile-name check.
 
 ## Where the profile belongs
 
-Add the profile object to `PROFILES_RAW` in `js/profiles.js`.
+Add the profile with Profile Designer, then validate, download, and deploy the
+containing Profile Set JSON file.
 
 Do not create a profile file inside `plugins/falling-token-sort/`. That directory
-owns the activity's behavior and assets; the global profile catalog owns the
+owns the activity's behavior and assets; the selected Profile Set owns the
 configuration used to compose activities.
 
 ## Complete current profile

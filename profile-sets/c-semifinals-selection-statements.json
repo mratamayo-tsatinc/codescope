@@ -1,0 +1,1420 @@
+{
+  "schemaVersion": 1,
+  "id": "c-semifinals-selection-statements",
+  "name": "C Semifinals: Selection Statements",
+  "version": "1",
+  "description": "A persistent 90-minute C semifinals session focused on selection statements and their prerequisite operator, output, expression, tracing, simulation, and ordering skills.",
+  "session": {
+    "timing": {
+      "enabled": true,
+      "minutes": 90
+    },
+    "persistence": {
+      "enabled": true
+    }
+  },
+  "categories": [
+    {
+      "id": "semifinals-token-qualification",
+      "name": "Token Qualification",
+      "enabled": true,
+      "profileIds": [
+        "semifinals-operator-qualification"
+      ]
+    },
+    {
+      "id": "semifinals-trace-output",
+      "name": "Trace Output Commands",
+      "enabled": true,
+      "profileIds": [
+        "semifinals-trace-output-only",
+        "semifinals-trace-input-output"
+      ]
+    },
+    {
+      "id": "semifinals-expression-evaluator",
+      "name": "Relational and Boolean Expressions",
+      "enabled": true,
+      "profileIds": [
+        "semifinals-relational-expressions",
+        "semifinals-boolean-expressions"
+      ]
+    },
+    {
+      "id": "semifinals-trace-selection",
+      "name": "Trace Selection Statements",
+      "enabled": true,
+      "profileIds": [
+        "semifinals-trace-if",
+        "semifinals-trace-if-else",
+        "semifinals-trace-else-if",
+        "semifinals-trace-switch",
+        "semifinals-trace-combination"
+      ]
+    },
+    {
+      "id": "semifinals-simulate-selection",
+      "name": "Simulate Selection Statements",
+      "enabled": true,
+      "profileIds": [
+        "semifinals-simulate-if",
+        "semifinals-simulate-if-else",
+        "semifinals-simulate-else-if",
+        "semifinals-simulate-switch",
+        "semifinals-simulate-switch-if"
+      ]
+    },
+    {
+      "id": "semifinals-order-selection",
+      "name": "Order Selection Statements",
+      "enabled": true,
+      "profileIds": [
+        "semifinals-order-values",
+        "semifinals-order-if",
+        "semifinals-order-if-else",
+        "semifinals-order-else-if",
+        "semifinals-order-switch"
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-operator-qualification",
+        "name": "Operator Qualification",
+        "description": "Classify 20 C tokens as arithmetic, assignment, relational, Boolean, or invalid."
+      },
+      "scoring": {
+        "itemCount": 1,
+        "pointsPerItem": 20
+      },
+      "activity": {
+        "kind": "falling-token-sort",
+        "instructions": "Sort each token into its C operator family or Invalid. Keyboard: select a token, then choose a bucket.",
+        "buckets": [
+          {
+            "id": "arithmetic",
+            "category": "arithmetic-operator",
+            "region": "bottom",
+            "order": 1
+          },
+          {
+            "id": "assignment",
+            "category": "assignment-operator",
+            "region": "bottom",
+            "order": 2
+          },
+          {
+            "id": "relational",
+            "category": "relational-operator",
+            "region": "bottom",
+            "order": 3
+          },
+          {
+            "id": "boolean",
+            "category": "boolean-operator",
+            "region": "bottom",
+            "order": 4
+          },
+          {
+            "id": "invalid",
+            "category": "operator-distractor",
+            "region": "bottom",
+            "order": 5
+          }
+        ],
+        "dropArea": {
+          "visibleTokens": 20,
+          "landingBehavior": "pass-through"
+        },
+        "generator": {
+          "capability": "canonical-token-pools",
+          "tokenPools": {
+            "arithmetic-operator": [
+              "+",
+              "-",
+              "*",
+              "/",
+              "%"
+            ],
+            "assignment-operator": [
+              "=",
+              "+=",
+              "-=",
+              "*=",
+              "/=",
+              "%="
+            ],
+            "relational-operator": [
+              "<",
+              ">",
+              "<=",
+              ">=",
+              "==",
+              "!="
+            ],
+            "boolean-operator": [
+              "&&",
+              "||",
+              "!"
+            ],
+            "operator-distractor": [
+              "=>",
+              "=<",
+              "and",
+              "or",
+              "<>",
+              "**",
+              "value",
+              "42",
+              ";",
+              ","
+            ]
+          },
+          "policies": {
+            "practice": {
+              "totalTokens": {
+                "exact": 20
+              },
+              "counts": {
+                "arithmetic-operator": {
+                  "exact": 4
+                },
+                "assignment-operator": {
+                  "exact": 4
+                },
+                "relational-operator": {
+                  "exact": 4
+                },
+                "boolean-operator": {
+                  "exact": 3
+                },
+                "operator-distractor": {
+                  "exact": 5
+                }
+              },
+              "shuffle": true
+            },
+            "exam": {
+              "totalTokens": {
+                "exact": 20
+              },
+              "counts": {
+                "arithmetic-operator": {
+                  "exact": 4
+                },
+                "assignment-operator": {
+                  "exact": 4
+                },
+                "relational-operator": {
+                  "exact": 4
+                },
+                "boolean-operator": {
+                  "exact": 3
+                },
+                "operator-distractor": {
+                  "exact": 5
+                }
+              },
+              "shuffle": true
+            }
+          }
+        },
+        "assessment": {
+          "action": "SORT_TOKEN",
+          "cardinality": "per-token",
+          "scoreAttempt": "first",
+          "completion": "all-tokens-placed"
+        },
+        "response": {
+          "policies": {
+            "practice": {
+              "incorrectPlacement": "accept"
+            },
+            "exam": {
+              "incorrectPlacement": "accept"
+            }
+          }
+        },
+        "feedback": {
+        "practice": "deferred",
+          "exam": "deferred-until-timeout"
+        }
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-trace-output-only",
+        "name": "Output with Computation",
+        "description": "Trace five seeded C programs that compute and print realistic console results without selection statements."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-trace-output"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50,
+        "output": {
+          "enabled": false,
+          "mode": "complete-emission",
+          "rate": 0
+        }
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-trace-input-output",
+        "name": "Input, Computation, and Output",
+        "description": "Trace five C programs that read seeded input, compute a result, and print a realistic console response."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-trace-input-output"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50,
+        "output": {
+          "enabled": false,
+          "mode": "complete-emission",
+          "rate": 0
+        }
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-relational-expressions",
+        "name": "Relational Expressions",
+        "description": "Evaluate three variable-only relational expressions."
+      },
+      "shape": {
+        "operandRange": {
+          "min": 1,
+          "max": 40
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!="
+        ],
+        "constraints": {
+          "maxComparisons": 1
+        }
+      },
+      "template": "operand:var cmp operand:var",
+      "scoring": {
+        "itemCount": 3,
+        "pointsPerItem": 2
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-boolean-expressions",
+        "name": "Compound Boolean Expressions",
+        "description": "Evaluate two compound Boolean expressions built entirely from named variable values."
+      },
+      "shape": {
+        "operandRange": {
+          "min": 1,
+          "max": 40
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ],
+        "constraints": {
+          "maxComparisons": 3
+        }
+      },
+      "template": "(operand:var cmp operand:var) and (operand:var cmp operand:var) or (operand:var cmp operand:var)",
+      "scoring": {
+        "itemCount": 2,
+        "pointsPerItem": 2
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-trace-if",
+        "name": "Trace If Statements",
+        "description": "Trace four seeded C programs using if statements, including multiple and nested decisions."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-trace-if"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50,
+        "output": {
+          "enabled": true,
+          "mode": "complete-emission",
+          "rate": 100
+        }
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": true,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-trace-if-else",
+        "name": "Trace If Else Statements",
+        "description": "Trace three seeded C programs using if-else, including nested decisions in both paths."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-trace-if-else"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50,
+        "output": {
+          "enabled": true,
+          "mode": "complete-emission",
+          "rate": 100
+        }
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": true,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-trace-else-if",
+        "name": "Trace If Else If Statements",
+        "description": "Trace three seeded C programs using ordered else-if decisions."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-trace-else-if"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50,
+        "output": {
+          "enabled": true,
+          "mode": "complete-emission",
+          "rate": 100
+        }
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": true,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-trace-switch",
+        "name": "Trace Switch Statements",
+        "description": "Trace three seeded C switch programs, including a nested if inside a case."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-trace-switch"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50,
+        "output": {
+          "enabled": true,
+          "mode": "complete-emission",
+          "rate": 100
+        }
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": true,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-trace-combination",
+        "name": "Trace Combined Selection",
+        "description": "Trace two seeded C programs that combine if and switch decisions."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 1,
+          "max": 100
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!=",
+          "&&",
+          "||"
+        ]
+      },
+      "template": "operand cmp operand",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-trace-combination"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow"
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50,
+        "output": {
+          "enabled": true,
+          "mode": "complete-emission",
+          "rate": 100
+        }
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal"
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": true,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-simulate-if",
+        "name": "Simulate If",
+        "description": "Predict a medium-difficulty if program."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read the source program, predict its terminal output and final variable state, then check your response.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-simulate-if",
+          "shuffle": false
+        }
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-simulate-if-else",
+        "name": "Simulate If Else",
+        "description": "Predict a medium-difficulty if-else program."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read the source program, predict its terminal output and final variable state, then check your response.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-simulate-if-else",
+          "shuffle": false
+        }
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-simulate-else-if",
+        "name": "Simulate If Else If",
+        "description": "Predict a medium-difficulty else-if program."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read the source program, predict its terminal output and final variable state, then check your response.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-simulate-else-if",
+          "shuffle": false
+        }
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-simulate-switch",
+        "name": "Simulate Switch",
+        "description": "Predict a medium-difficulty switch program."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read the source program, predict its terminal output and final variable state, then check your response.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-simulate-switch",
+          "shuffle": false
+        }
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-simulate-switch-if",
+        "name": "Simulate Switch and If",
+        "description": "Predict a medium-difficulty program combining switch and if."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read the source program, predict its terminal output and final variable state, then check your response.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-simulate-switch-if",
+          "shuffle": false
+        }
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-order-values",
+        "name": "Order Variables, Expression, and Output",
+        "description": "Arrange computation and output statements to reproduce the target state."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the executable statements, run the program, and reproduce the target output and final variable state.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-order-values",
+          "shuffle": false
+        }
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-order-if",
+        "name": "Order If Statements",
+        "description": "Arrange a C program containing an if statement to reproduce the target state."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the executable statements, run the program, and reproduce the target output and final variable state.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-order-if",
+          "shuffle": false
+        }
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-order-if-else",
+        "name": "Order If Else Statements",
+        "description": "Arrange a C program containing if-else to reproduce the target state."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the executable statements, run the program, and reproduce the target output and final variable state.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-order-if-else",
+          "shuffle": false
+        }
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-order-else-if",
+        "name": "Order If Else If Statements",
+        "description": "Arrange a C program containing an else-if chain to reproduce the target state."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the executable statements, run the program, and reproduce the target output and final variable state.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-order-else-if",
+          "shuffle": false
+        }
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "semifinals-order-switch",
+        "name": "Order Switch Statements",
+        "description": "Arrange a C switch program to reproduce the target state."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the executable statements, run the program, and reproduce the target output and final variable state.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "semifinals-order-switch",
+          "shuffle": false
+        }
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": false,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    }
+  ]
+}
+

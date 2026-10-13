@@ -3,7 +3,7 @@
 // an otherwise executable token has been selected.
 
 function effectiveManualResponseConfig(profile){
-  const policy=state.mode==='exam'?activeExamPolicy():activePracticePolicy();
+  const policy=activeProfileBehavior();
   const modeConfig=(policy&&policy.manualResponses)||{mode:'profile'};
   const profileConfig=profile&&profile.manualResponses||{};
   const profileOutput=profileConfig.output&&profileConfig.output.enabled
@@ -328,6 +328,11 @@ function requestManualResponse(descriptor,onConfirm){
     number.oninput=()=>{
       const valid=/^-?\d+$/.test(number.value.trim());
       confirm.disabled=!valid;if(valid) chosen=Number(number.value.trim());
+    };
+    number.onkeydown=event=>{
+      if(event.key!=='Enter'||event.isComposing||confirm.disabled)return;
+      event.preventDefault();
+      confirm.click();
     };
     control=number;
   }

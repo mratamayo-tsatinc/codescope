@@ -271,7 +271,7 @@ function renderOutputStatement(ctx){
   if(isActive&&!statement.runtime.checked){
     const invalidExecutionAlert=renderInvalidExecutionAlert(item,statement);
     if(invalidExecutionAlert)panel.appendChild(invalidExecutionAlert);
-    if(!item.practiceInvalidExecution&&(state.mode!=='exam'||activeExamPolicy().showNeutralGuidance)){
+    if(!item.practiceInvalidExecution&&activeProfileBehavior().showNeutralGuidance){
       const unresolved=programOutputDynamicParts(statement).filter(entry=>
         statement.runtime.parts[entry.index].resolvedValue===null);
       const message=!unresolved.length
@@ -281,7 +281,7 @@ function renderOutputStatement(ctx){
           : `Read variables in any order. Each retrieved value unlocks its matching ${program.language==='c'?'placeholder':'concatenation operator'}.`);
       panel.appendChild(renderContextHelp(message));
     }
-    const reset=renderItemResetControl(state.mode==='practice'
+    const reset=renderItemResetControl(profileAllowsRetry()
       &&!(ctx.services&&ctx.services.statementTraceModal)
       &&(program.cursor>0||statement.runtime.trace.length>0));
     if(reset) panel.appendChild(reset);

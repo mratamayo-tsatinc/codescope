@@ -107,7 +107,7 @@ function renderAssignmentStatement(ctx){
   const compound=isCompoundAssignment(statement);
   card.appendChild(renderExpressionEvaluationPanel({runtime,labelText,labelCh:labelText.length+1,
     title:null,panelClass:'assignment-eval-panel program-expression-panel',
-    statementId:statement.id,interactive:isActive&&!runtime.checked&&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked(),revealCorrectness:runtime.checked&&state.mode!=='exam',
+    statementId:statement.id,interactive:isActive&&!runtime.checked&&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked(),revealCorrectness:runtime.checked&&profileFeedbackVisible(item),
     statementNumber:programStatementDisplayNumber(statement,statementIndex),sourceIndent:statement.sourceIndent||'',
     continuationStyle:true,
     isFullyResolved:()=>compound?assignmentReadyToApply(statement):assignmentRhsResolved(statement),
@@ -127,10 +127,10 @@ function renderAssignmentStatement(ctx){
     else if(unresolved) guidance='Substitute initialized values from program memory before evaluating the assignment value.';
     else if(!ready) guidance='Evaluate the highlighted operator.';
     else guidance=`Both values are ready. Click ${statement.operator} to update ${statement.target}.`;
-    if(!item.practiceInvalidExecution&&(state.mode!=='exam'||activeExamPolicy().showNeutralGuidance)){
+    if(!item.practiceInvalidExecution&&activeProfileBehavior().showNeutralGuidance){
       card.appendChild(renderContextHelp(guidance));
     }
-    const canReset=state.mode==='practice'&&(program.cursor>0||runtime.trace.length>0||runtime.targetRevealed);
+    const canReset=profileAllowsRetry()&&(program.cursor>0||runtime.trace.length>0||runtime.targetRevealed);
     const resetControl=renderItemResetControl(canReset&&!(ctx.services&&ctx.services.statementTraceModal));
     if(resetControl) card.appendChild(resetControl);
   }

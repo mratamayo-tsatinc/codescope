@@ -1,13 +1,14 @@
 # How to Create a Profile
 
-A profile is one JavaScript object added to the `PROFILES_RAW` array in
-`js/profiles.js`. This file holds *only* profile data, with zero generation
-logic in it. Expression generation lives in `js/generator.js`; activity-specific
-generation lives in its matching `plugins/<plugin-id>/` directory. You never
-need to add profile configuration inside a plugin directory.
+A profile is one object in a selectable Profile Set JSON file. The recommended
+workflow is to create and edit it with Profile Designer from the login screen,
+then download and deploy the complete Profile Set. Expression generation lives
+in `js/generator.js`; activity-specific generation lives in its matching
+`plugins/<plugin-id>/` directory. Profile configuration never belongs inside a
+plugin directory.
 
 After adding a profile, put its `meta.id` in exactly one category's
-`profileIds` array in `PROFILE_CATEGORIES`, also in `js/profiles.js`.
+`profileIds` array in the same Profile Set.
 Categories determine the expandable sidebar groups and the scope of each
 category's score summary and QR code. To create a new category, add an object
 with a stable `id`, visible `name`, `enabled` switch, and `profileIds` array. A
@@ -16,22 +17,28 @@ load time.
 
 ## Show or hide profiles and categories
 
-Every profile and category has an `enabled` boolean in `js/profiles.js`:
+Every profile and category has an `enabled` boolean in the Profile Set:
 
-```js
+```json
 {
-  enabled: false, // hides only this profile
-  meta: { id: 'division-practice', name: 'Division Practice', description: '...' },
-  // ...
+  "enabled": false,
+  "meta": {
+    "id": "division-practice",
+    "name": "Division Practice",
+    "description": "..."
+  }
 }
 
 {
-  id: 'expressions',
-  name: 'Expressions',
-  enabled: false, // hides this category and every profile assigned to it
-  profileIds: ['division-practice'],
+  "id": "expressions",
+  "name": "Expressions",
+  "enabled": false,
+  "profileIds": ["division-practice"]
 }
 ```
+
+See `docs/how-to-create-a-profile-set.md` for downloading, naming, cataloging,
+selecting, and versioning the containing Profile Set.
 
 Set the value to `false` to remove that content from the student session. A
 hidden profile is omitted from the sidebar, item generation, saved session
@@ -136,10 +143,10 @@ Walking through it:
   is worth (explicit here; Level 8 covers letting this be computed
   instead).
 
-That's the whole profile. Add it to `PROFILES_RAW` in `profiles.js` and
-it works —
-`validateProfiles()` runs automatically at load and will throw a clear
-error if anything doesn't line up (see the checklist at the end).
+That's the whole profile. Add it with Profile Designer, validate the complete
+Profile Set, download it, and deploy the JSON file. Runtime validation also
+rejects the set with a clear error if anything does not line up (see the
+checklist at the end).
 
 ---
 
@@ -742,7 +749,7 @@ The `token-classification` reference plugin separates five concerns:
 - `generator` chooses a registered content generator and pattern.
 - `sets` builds named token sets with reusable include/exclude selectors.
 - `interaction.policies` independently controls clickability and off-target
-  consequences for each Practice/Exam interaction mode.
+  consequences for the profile's configured interaction and recovery behavior.
 - `assessment.checks` declares actions, answer resolvers, weights, and bonuses.
 - `response.categories` declares the choices presented by the modal.
 
@@ -812,28 +819,23 @@ assessment: {
 }
 ```
 
-See the three `activity.kind: 'token-classification'` entries in
-`js/profiles.js` for complete configurations.
+See the `activity.kind: "token-classification"` entries in
+`profile-sets/codescope-default.json` for complete configurations.
 
 ## Control the correct-solution link
 
-Profiles inherit the global feedback policy: the **Show correct solution**
-link is available in practice mode and hidden in exam mode. Override either
-mode with a top-level `feedback` setting:
+The **Show correct solution** link is controlled directly by the profile's
+`behavior` object:
 
-```js
-feedback: {
-  showCorrectSolution: {
-    practice: false,
-    exam: true
-  }
+```json
+"behavior": {
+  "showCorrectSolution": false
 }
 ```
 
-The setting only affects activities that provide a correct-solution view.
-An exam override still follows the exam feedback release policy, so the link
-cannot appear before feedback is released. A boolean can be used to apply the
-same value to both modes, for example `showCorrectSolution: false`.
+The setting only affects activities that provide a correct-solution view. The
+link cannot appear before the profile's `feedbackRelease` policy releases
+feedback. Configure both fields in Profile Designer.
 
 ## Checklist before shipping a new profile
 

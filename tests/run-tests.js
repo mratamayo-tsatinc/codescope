@@ -30,6 +30,14 @@ function load(ctx, names){
   const loaded=loadedScriptsByContext.get(ctx)||new Set();
   loadedScriptsByContext.set(ctx,loaded);
   const expanded=names.slice();
+  if(expanded.includes('profiles.js')){
+    const profileIndex=expanded.indexOf('profiles.js');
+    if(!expanded.includes('profile-vocabulary.js')&&!loaded.has('profile-vocabulary.js'))
+      expanded.splice(profileIndex,0,'profile-vocabulary.js');
+    const currentProfileIndex=expanded.indexOf('profiles.js');
+    if(!expanded.includes('profile-registry.js')&&!loaded.has('profile-registry.js'))
+      expanded.splice(currentProfileIndex+1,0,'profile-registry.js');
+  }
   if(expanded.includes('program-item-builder.js')){
     const semanticDependencies=['language-core.js','expression-parser.js','expression-semantics.js',
       'output-statement-core.js','input-statement-core.js','selection-statement-core.js','loop-statement-core.js',
@@ -262,7 +270,8 @@ function testScriptManifestParses(){
   assert(memoryFloatRenderer.includes('function cycleVarFinalFlyAnimation()'));
   assert(memoryFloatRenderer.includes('function mountVarFinalDockPanel('));
   assert(memoryFloatRenderer.includes("setProgramContextTab('memory')"));
-  assert(memoryFloatRenderer.includes('Off -> 1s -> 2s -> 3s'));
+  assert(memoryFloatRenderer.includes('0s -> .5s -> 1s -> 1.5s'));
+  assert(stateSource.includes('speedLevelsMs: Object.freeze([500, 1000, 1500])'));
   assert(!memoryFloatRenderer.includes('renderVarFinalSpeedToggle'));
   assert(!memoryFloatRenderer.includes('var-final-float-speed-row'));
   assert(memoryFloatRenderer.includes("if(id!=null){")
@@ -2748,7 +2757,7 @@ function testConnectorCoordinatesRespectActivityZoom(){
 
 function testTokenClassificationPlugin(){
   const ctx=context();
-  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js']);
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profile-vocabulary.js']);
   const profilesFile=path.join(ROOT,'js','profiles.js');
   const profileSource=fs.readFileSync(profilesFile,'utf8')
     // Keep the hidden lessons out of the live catalog while exercising their
@@ -2759,7 +2768,7 @@ function testTokenClassificationPlugin(){
     .replace(/enabled:false,(\s*meta:\{id:'token-declaration-complete')/,'enabled:true,$1')
     .replace(/enabled:false,(\s*meta:\{id:'token-program-chain')/,'enabled:true,$1');
   vm.runInContext(profileSource,ctx,{filename:profilesFile});
-  load(ctx,['language.js',
+  load(ctx,['profile-registry.js','language.js',
     'program-ir.js','program-core.js','activity-core.js','legacy-expression-plugin.js',
     'declaration-statement-plugin.js','assignment-statement-plugin.js','unary-update-statement-plugin.js','program-item-builder.js']);
   loadRelative(ctx,[
@@ -4575,7 +4584,7 @@ int main() {
   assert(result.scrollIntentRecorded);
   assert(!renderSessionSource.includes("destination.scrollIntoView({behavior:'smooth'"));
   assert(renderSessionSource.includes("next.focus({preventScroll:true})"));
-  assert(result.sourceFlowTiming.resultHoldMs>=800&&result.sourceFlowTiming.movementDurationMs>=1000
+  assert(result.sourceFlowTiming.resultHoldMs===300&&result.sourceFlowTiming.movementDurationMs===500
     &&result.sourceFlowTiming.modalCloseSettleMs>=250);
   assert(result.sourceProgramText.includes('#include <stdio.h>')&&result.sourceProgramText.includes('int main() {')
     &&result.sourceProgramText.includes('return 0;')&&result.sourceProgramText.includes('IfStatement.c'));

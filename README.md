@@ -10,7 +10,8 @@ classification.
 - The 18 current profiles and seeded expression generation
 - Student-controlled substitution and operator selection
 - Precedence checking and canonical playback
-- Practice/exam rules, timer, persistence and score formulas
+- Profile-defined interaction and feedback rules, shared session timing,
+  session persistence, and score formulas
 - Drawers, connector lines, variable-state display and animations
 
 Existing generated items are automatically wrapped as one
@@ -19,6 +20,10 @@ the compatibility layer does not translate or duplicate active expression
 state.
 
 ## Profiles
+
+CodeScope loads selectable Profile Set JSON files from `profile-sets/`. The
+current configuration is `codescope-default.json` and is the catalog default.
+See `docs/how-to-create-a-profile-set.md` for authoring and deployment.
 
 The original 18 profiles are unchanged and still use one
 `legacy-expression` statement. `declaration-chain` teaches executable

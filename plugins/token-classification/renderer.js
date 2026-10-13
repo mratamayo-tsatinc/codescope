@@ -55,7 +55,7 @@ function tcRenderInvalidSelection(item){
     h('div',{class:'invalid-execution-icon','aria-hidden':'true'},h('i',{class:`fa-solid ${terminal?'fa-circle-exclamation':'fa-triangle-exclamation'}`})),
     h('div',{class:'invalid-execution-content'},h('div',{class:'invalid-execution-title'},terminal?'Invalid selection — item ended':'Invalid selection'),
       h('div',{class:'invalid-execution-message'},terminal?'This item cannot continue. Credit earned before this selection has been retained.':'This token is not an assessed target under the current profile.'),
-      !terminal&&state.mode==='practice'?h('button',{class:'invalid-execution-recovery',type:'button',onclick:handleUndo},h('i',{class:'fa-solid fa-rotate-left'}),h('span',{},'Undo invalid selection')):null));
+      !terminal&&profileAllowsUndo()?h('button',{class:'invalid-execution-recovery',type:'button',onclick:handleUndo},h('i',{class:'fa-solid fa-rotate-left'}),h('span',{},'Undo invalid selection')):null));
 }
 function tcToggleSolution(){const item=currentItem();if(!item||!item.activityKind
   ||!correctSolutionAvailable(currentProfile(),item))return;item.showSolution=!item.showSolution;render();}
@@ -67,8 +67,8 @@ function tcRender({container,item,profile}){
   if(flow.parentNode&&flow.parentNode.classList)flow.parentNode.classList.add('token-classification-workspace');
   item.statements.forEach((statement,index)=>flow.appendChild(tcRenderStatement(item,profile,statement,index,index===item.statements.length-1)));
   const invalid=tcRenderInvalidSelection(item);if(invalid)flow.appendChild(invalid);
-  if(item.checked&&state.mode==='exam'&&!state.examExpired&&!item.invalidSelection)container.appendChild(h('div',{class:'exam-answer-recorded'},h('i',{class:'fa-solid fa-lock'}),h('span',{},h('b',{},'Answer recorded and locked.'),' Correctness and score are withheld until time expires.')));
+  if(item.checked&&!profileFeedbackVisible(item)&&!item.invalidSelection)container.appendChild(h('div',{class:'exam-answer-recorded'},h('i',{class:'fa-solid fa-lock'}),h('span',{},h('b',{},'Answer recorded.'),' Correctness and score are withheld by this profile.')));
   tcSyncDrawers(item,profile);
-  if(item.checked&&state.mode==='practice')appendPracticeRetryBar(container);
+  if(item.checked&&profileAllowsRetry())appendPracticeRetryBar(container);
   if(typeof renderVariableFinalFloat==='function')renderVariableFinalFloat(null);
 }

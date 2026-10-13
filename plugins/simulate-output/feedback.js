@@ -1,7 +1,5 @@
 function soFeedbackReleased(item){
-  if(!item.checked)return false;
-  if(state.mode==='practice')return true;
-  return !!(state.examExpired&&activeExamPolicy().feedbackRelease==='after-timeout');
+  return profileFeedbackVisible(item);
 }
 
 function soBuildConsoleContent(){
@@ -82,7 +80,7 @@ function soBuildFeedback(item,profile){
 }
 
 function soSyncDrawers(item){
-  const consoleAllowed=state.mode!=='exam'||state.examExpired||activeExamPolicy().showNeutralGuidance;
+  const consoleAllowed=state.examExpired||activeProfileBehavior().showNeutralGuidance;
   if(consoleAllowed){
     if(typeof setConsoleDrawerTitle==='function')setConsoleDrawerTitle('C Program Guide');
     if(typeof setConsoleDrawerContent==='function')setConsoleDrawerContent(soBuildConsoleContent(),{cursor:false});

@@ -14,7 +14,7 @@ function renderDone(container){
   const card = h('div',{class:'card'});
   card.appendChild(h('div',{class:'summary-hero'},
     h('div',{class:'summary-score'}, `${totalPoints}/${totalMaxPoints}`),
-    h('div',{class:'summary-sub'}, `${correctCount}/${total} items correct  ·  ${currentProfile().name}  ·  ${state.mode}`)
+    h('div',{class:'summary-sub'}, `${correctCount}/${total} items correct  ·  ${currentProfile().name}`)
   ));
   const list = h('div',{class:'summary-list'});
   state.items.forEach((it,i)=>{

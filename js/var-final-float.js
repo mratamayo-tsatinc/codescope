@@ -75,8 +75,8 @@ const MEMORY_TRANSFER_SAFETY_BUFFER_MS = MEMORY_TRANSFER_SETTINGS.safetyBufferMs
 let floatVisible = MEMORY_PANEL_SETTINGS.visible;
 let flyAnimEnabled = MEMORY_TRANSFER_SETTINGS.enabled;
 
-// Flight duration, in ms — one of three discrete levels (1s/2s/3s). The
-// compact header control cycles Off -> 1s -> 2s -> 3s instead of consuming a
+// Flight duration, in ms — one of three discrete levels (.5s/1s/1.5s). The
+// compact header control cycles 0s -> .5s -> 1s -> 1.5s instead of consuming a
 // separate settings row in the panel body.
 let flightDurationMs = SPEED_LEVELS.includes(MEMORY_TRANSFER_SETTINGS.durationMs)
   ? MEMORY_TRANSFER_SETTINGS.durationMs
@@ -442,9 +442,11 @@ function buildAnimatedVarFinalSection(item){
 // Mounting + drag
 // ----------------------------------------------------------------------------
 function varFinalAnimationControl(){
-  const flyState=flyAnimEnabled?`${flightDurationMs/1000}s`:'Off';
-  const nextFlyState=!flyAnimEnabled?'1 second'
-    :(flightDurationMs===1000?'2 seconds':(flightDurationMs===2000?'3 seconds':'off'));
+  const flyState=flyAnimEnabled?`${flightDurationMs/1000}s`:'0s';
+  const levelIndex=SPEED_LEVELS.indexOf(flightDurationMs);
+  const nextDuration=!flyAnimEnabled?SPEED_LEVELS[0]
+    :(levelIndex>=0&&levelIndex<SPEED_LEVELS.length-1?SPEED_LEVELS[levelIndex+1]:0);
+  const nextFlyState=nextDuration?`${nextDuration/1000} seconds`:'0 seconds';
   const flyTitle=`Memory transfer animation: ${flyState}. Activate for ${nextFlyState}.`;
   return h('button',{class:'var-final-float-fly-toggle'+(flyAnimEnabled?' active':''),
     type:'button',title:flyTitle,'aria-label':flyTitle,

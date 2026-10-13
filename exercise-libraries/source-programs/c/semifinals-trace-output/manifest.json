@@ -1,0 +1,11 @@
+{
+  "title": "C Semifinals - Trace Output with Computation",
+  "exercises": [
+    "CafeOrder.c",
+    "LaundryService.c",
+    "MobileWallet.c",
+    "PrintShop.c",
+    "DeliveryRoute.c"
+  ]
+}
+

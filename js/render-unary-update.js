@@ -45,7 +45,7 @@ function renderUnaryUpdateStatement(ctx){
     sourceIndent:statement.sourceIndent||'',
     continuationStyle:true,
     interactive:isActive&&!runtime.checked&&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked(),
-    revealCorrectness:runtime.checked&&state.mode!=='exam',
+    revealCorrectness:runtime.checked&&profileFeedbackVisible(item),
     isFullyResolved:()=>unaryUpdateRuntimeResolved(runtime),
     renderFinalValue:context=>renderUnaryUpdateStoredResult(statement,runtime,context),
     renderPrefix:()=>[],
@@ -57,14 +57,14 @@ function renderUnaryUpdateStatement(ctx){
   const invalidExecutionAlert=renderInvalidExecutionAlert(item,statement);
   if(invalidExecutionAlert) card.appendChild(invalidExecutionAlert);
   if(isActive&&!item.checked){
-    if(!item.practiceInvalidExecution&&(state.mode!=='exam'||activeExamPolicy().showNeutralGuidance)){
+    if(!item.practiceInvalidExecution&&activeProfileBehavior().showNeutralGuidance){
       const operand=runtime.workingFlat.operands[0];
       const message=operand&&operand.substituted
         ? `Click ${statement.operator} to update ${statement.target} in program memory.`
         : `Retrieve ${statement.target}'s current value from program memory.`;
       card.appendChild(renderContextHelp(message));
     }
-    const canReset=state.mode==='practice'&&(ctx.program.cursor>0||runtime.trace.length>0);
+    const canReset=profileAllowsRetry()&&(ctx.program.cursor>0||runtime.trace.length>0);
     const resetControl=renderItemResetControl(canReset&&!(ctx.services&&ctx.services.statementTraceModal));
     if(resetControl) card.appendChild(resetControl);
   }

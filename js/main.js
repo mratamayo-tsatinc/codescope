@@ -87,10 +87,10 @@ function render(){
   const activitySurface=typeof mountActivityZoom==='function'?mountActivityZoom(container):container;
   if(activeItem&&activeItem.activityKind) renderActivityItem(activitySurface,activeItem);
   else renderProgramItem(activitySurface, activeItem);
-  if(state.mode==='exam'&&state.examExpired){
+  if(state.examExpired){
     activitySurface.prepend(h('div',{class:'exam-time-expired-notice',role:'status'},
       h('i',{class:'fa-solid fa-lock','aria-hidden':'true'}),
-      h('span',{},h('b',{},'Time expired.'),' Answers and scoring are locked. Use the Score/QR button beside each category to view your result.')));
+      h('span',{},h('b',{},'Time expired.'),' Current work was scored and all activities are locked.')));
   }
   // A click rebuilds #app, but the student's horizontal reading position is
   // part of the current work context. Restore it before connector geometry is
@@ -187,10 +187,10 @@ function syncGlobalHeaderUI(){
 
   const timerContainer = document.getElementById('timerContainer');
   if(timerContainer){
-    const timerVisible=state.mode==='exam'&&(timerIntervalId!==null||state.examExpired);
+    const timerVisible=sessionTimingEnabled()&&(timerIntervalId!==null||state.examExpired);
     timerContainer.style.display=timerVisible?'flex':'none';
-    timerContainer.classList.toggle('expired',state.mode==='exam'&&state.examExpired);
-    timerContainer.setAttribute('aria-label',state.examExpired?'Exam time expired':'Exam time remaining');
+    timerContainer.classList.toggle('expired',state.examExpired);
+    timerContainer.setAttribute('aria-label',state.examExpired?'Session time expired':'Session time remaining');
   }
   const scoreButton=document.getElementById('scoreSummaryBtn');
   if(scoreButton){
@@ -205,6 +205,7 @@ function syncGlobalHeaderUI(){
 loadPersistedAppSettings();
 
 async function initializeCodeScope(){
+  await loadProfileSetCatalog();
   // Runtime-authored activity content must exist before a new or migrated
   // session generates items. Simulate Output uses this boundary to fetch its
   // manifest and only the source files explicitly listed there.
@@ -215,8 +216,8 @@ async function initializeCodeScope(){
     const login=JSON.parse(savedLogin);
     state.userEmail=login.email;
     state.userStudentId=login.studentId;
-    if(!tryResumeSession(appSettings.mode,login.email)){
-      state.mode=appSettings.mode;
+    if(!tryResumeSession('session',login.email)){
+      state.mode='practice';
       startSession();
     }
   }

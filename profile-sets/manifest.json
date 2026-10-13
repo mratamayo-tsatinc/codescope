@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "defaultSetId": "codescope-default",
+  "sets": [
+    {
+      "id": "codescope-default",
+      "name": "CodeScope Default",
+      "description": "The current CodeScope categories, profiles, activities, and session policy.",
+      "file": "codescope-default.json",
+      "enabled": true
+    },
+    {
+      "id": "c-semifinals-selection-statements",
+      "name": "C Semifinals: Selection Statements",
+      "description": "A 90-minute C semifinals session covering operator qualification, expressions, tracing, simulation, and code ordering with selection statements.",
+      "file": "c-semifinals-selection-statements.json",
+      "enabled": true
+    }
+  ]
+}
