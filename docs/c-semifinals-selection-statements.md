@@ -11,7 +11,8 @@ Selection Statements**.
 - Feedback: released after the timer expires
 - Correct solution: hidden
 - Review flags: enabled
-- Scores during the active session: hidden
+- Live scores: visible throughout the active session, with a score summary and
+  QR code available for every category
 
 The Profile Set ID is `c-semifinals-selection-statements`. Its configuration
 is stored in `profile-sets/c-semifinals-selection-statements.json`.
