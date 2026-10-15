@@ -21,7 +21,8 @@ Language, timer, persistence, and result retrieval belong to the Profile Set's t
     "language": "c",
     "timing": {
       "enabled": true,
-      "minutes": 90
+      "minutes": 90,
+      "allowReset": false
     },
     "persistence": {
       "enabled": true
@@ -49,6 +50,15 @@ The timer starts once when the student begins and continues across every
 category, profile, and item. It never restarts during navigation. When it
 expires, attempted work is scored and the complete session is locked.
 
+When <code>session.timing.allowReset</code> is <code>true</code>, the signed-in
+student receives a teacher-PIN guarded timer reset control. Each page load
+uses the local machine timestamp to choose either YYMMDD or MMDDYY; the chosen
+format and PIN are never persisted or shown in the interface. Resetting an
+active timer grants the full configured duration and preserves all progress.
+Reopening an expired session restores only items that timeout finalized, using
+their pre-timeout checkpoints; items completed by the student remain completed.
+Keep this option disabled for assessments whose duration must remain fixed.
+
 When persistence is enabled, CodeScope saves the generated items, responses,
 scores, active location, seed, and absolute timer deadline. Storage is scoped
 to both the student and Profile Set:
@@ -59,6 +69,16 @@ codescopeSessionProgress:<student-email>:<profile-set-id>
 
 A saved session resumes only when the Profile Set ID and version match. Change
 the set's `version` when a deployment should start a fresh session.
+
+Legacy progress saved by builds that predate Profile Set-scoped storage is
+migrated when its saved profile IDs match the selected Profile Set. Additive
+session-policy changes, including enabling timer reset, therefore retain the
+student's completed scores and original timer deadline.
+
+The Profile Set ID and version form the persistence compatibility contract.
+Older records whose saved global language differs are normalized when the ID
+and version still match. Increment the version for an intentional language or
+exercise change that must begin a new attempt.
 
 ## Per-profile teaching behavior
 

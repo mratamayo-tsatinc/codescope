@@ -17,7 +17,8 @@ function normalizeProfileSession(session){
   return Object.freeze({
     language,
     timing:Object.freeze({enabled:!!timing.enabled,
-      minutes:Math.max(1,Math.min(999,Math.round(Number(timing.minutes)||120)))}),
+      minutes:Math.max(1,Math.min(999,Math.round(Number(timing.minutes)||120))),
+      allowReset:timing.allowReset===true}),
     persistence:Object.freeze({enabled:persistence===true||!!(persistence&&persistence.enabled)}),
     results:Object.freeze({unified:results.unified===true})
   });

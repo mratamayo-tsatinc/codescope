@@ -127,6 +127,7 @@ function showLoginError(message) {
 
 function logout() {
   if(typeof closeAccountMenu==='function') closeAccountMenu();
+  if(typeof closeTimerManagementModal==='function') closeTimerManagementModal();
   stopTimer();
   localStorage.removeItem('precedifyLogin');
   state.screen = 'login';
@@ -360,6 +361,207 @@ function handleClearAllLocalData(){
 // while every answer mutation is locked.
 // ============================================================================
 
+function timerResetPinFormatFromTimestamp(timestamp){
+  let seed=Math.trunc(Number(timestamp)||0)|0;
+  seed=Math.imul(seed^(seed>>>16),0x45d9f3b);
+  seed=Math.imul(seed^(seed>>>16),0x45d9f3b);
+  seed^=seed>>>16;
+  return (seed>>>0)%2===0?'YYMMDD':'MMDDYY';
+}
+
+// Chosen once per page load from the local machine timestamp. Deliberately
+// excluded from saved session state so a refresh performs a new format draw.
+const TIMER_RESET_PIN_FORMAT=timerResetPinFormatFromTimestamp(Date.now());
+
+function timerResetPinForDate(date,format){
+  const pad=value=>String(value).padStart(2,'0');
+  const year=pad(date.getFullYear()%100),month=pad(date.getMonth()+1),day=pad(date.getDate());
+  return format==='MMDDYY'?month+day+year:year+month+day;
+}
+
+let timerManagementState={step:'pin',operation:'reset',resultSeconds:null,liveInterval:null};
+
+function timerManagementMaximumSeconds(){
+  return Math.max(60,Math.round(Number(ACTIVE_PROFILE_SESSION.timing.minutes)||1)*60);
+}
+
+function timerManagementCurrentSeconds(){
+  if(state.examExpired)return 0;
+  if(Number.isFinite(examEndTimestamp))return Math.max(0,Math.round((examEndTimestamp-Date.now())/1000));
+  return Math.max(0,Math.round(timeRemaining||0));
+}
+
+function timerManagementFormatTime(seconds){
+  seconds=Math.max(0,Math.round(Number(seconds)||0));
+  return `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
+}
+
+function timerManagementElement(id){return typeof document!=='undefined'?document.getElementById(id):null;}
+
+function timerManagementSetError(id,message){
+  const element=timerManagementElement(id);if(element)element.textContent=message||'';
+}
+
+function timerManagementProposal(){
+  const current=timerManagementCurrentSeconds(),maximum=timerManagementMaximumSeconds();
+  const operation=timerManagementState.operation;
+  if(operation==='reset')return {valid:true,current,maximum,result:maximum,amount:0,operation};
+  const input=timerManagementElement('timerAdjustmentMinutes');
+  const amount=Number(input&&input.value);
+  if(!Number.isInteger(amount)||amount<1)
+    return {valid:false,current,maximum,result:current,amount,operation,error:'Enter a whole number of at least 1 minute.'};
+  if(operation==='add'){
+    const result=current+amount*60;
+    if(result>maximum)return {valid:false,current,maximum,result:current,amount,operation,
+      error:'The resulting time cannot exceed the original maximum allowance.'};
+    return {valid:true,current,maximum,result,amount,operation};
+  }
+  if(state.examExpired)return {valid:false,current,maximum,result:current,amount,operation,
+    error:'Time cannot be reduced after the session has expired.'};
+  const result=current-amount*60;
+  if(result<60)return {valid:false,current,maximum,result:current,amount,operation,
+    error:'The timer must retain at least 1 minute.'};
+  return {valid:true,current,maximum,result,amount,operation};
+}
+
+function timerManagementOperationCopy(proposal){
+  if(proposal.operation==='add')return {title:`Add ${proposal.amount} minute${proposal.amount===1?'':'s'}`,
+    message:'The adjustment will be added to the live remaining time.'};
+  if(proposal.operation==='reduce')return {title:`Reduce by ${proposal.amount} minute${proposal.amount===1?'':'s'}`,
+    message:'The adjustment will be subtracted from the live remaining time.'};
+  return {title:'Reset to full time',message:'The timer will return to the original maximum allowance.'};
+}
+
+function updateTimerManagementPreview(){
+  const proposal=timerManagementProposal();
+  const current=timerManagementElement('timerManagementCurrent'),maximum=timerManagementElement('timerManagementMaximum');
+  const result=timerManagementElement('timerManagementResult'),next=timerManagementElement('timerManagementNext');
+  if(current)current.textContent=timerManagementFormatTime(proposal.current);
+  if(maximum)maximum.textContent=timerManagementFormatTime(proposal.maximum);
+  if(result)result.textContent=timerManagementFormatTime(proposal.valid?proposal.result:proposal.current);
+  timerManagementSetError('timerManagementOperationError',proposal.valid?'':proposal.error);
+  const add=timerManagementElement('timerOperationAdd'),reduce=timerManagementElement('timerOperationReduce');
+  if(add)add.disabled=proposal.current>=proposal.maximum;
+  if(reduce)reduce.disabled=state.examExpired||proposal.current<=60;
+  if(timerManagementState.step==='operation'&&next)next.disabled=!proposal.valid;
+  if(timerManagementState.step==='confirm'){
+    const copy=timerManagementOperationCopy(proposal);
+    const title=timerManagementElement('timerConfirmationTitle'),message=timerManagementElement('timerConfirmationMessage');
+    const before=timerManagementElement('timerConfirmationCurrent'),after=timerManagementElement('timerConfirmationResult');
+    if(title)title.textContent=copy.title;if(message)message.textContent=copy.message;
+    if(before)before.textContent=timerManagementFormatTime(proposal.current);
+    if(after)after.textContent=timerManagementFormatTime(proposal.valid?proposal.result:proposal.current);
+    if(next)next.disabled=!proposal.valid;
+  }
+  timerManagementState.resultSeconds=proposal.valid?proposal.result:null;
+  return proposal;
+}
+
+function timerManagementShowStep(step){
+  timerManagementState.step=step;
+  document.querySelectorAll('[data-timer-step]').forEach(section=>{section.hidden=section.dataset.timerStep!==step;});
+  const order=['pin','operation','confirm'],position=order.indexOf(step);
+  document.querySelectorAll('[data-timer-progress]').forEach(marker=>{
+    const markerPosition=order.indexOf(marker.dataset.timerProgress);
+    marker.classList.toggle('active',markerPosition===position);marker.classList.toggle('complete',markerPosition<position);
+  });
+  const back=timerManagementElement('timerManagementBack'),next=timerManagementElement('timerManagementNext');
+  if(back)back.hidden=step==='pin';
+  if(next){next.disabled=false;next.textContent=step==='confirm'?'Apply timer change':step==='operation'?'Review change':'Continue';}
+  if(step==='operation'||step==='confirm')updateTimerManagementPreview();
+  const focusTarget=step==='pin'?timerManagementElement('timerManagementPin'):
+    step==='operation'?document.querySelector('[data-timer-operation].selected'):next;
+  if(focusTarget)setTimeout(()=>focusTarget.focus(),0);
+}
+
+function openTimerManagementModal(){
+  if(!sessionTimingEnabled()||!sessionTimerResetAllowed())return false;
+  if(state.examExpired&&!state.timeoutCheckpointReady)return false;
+  const modal=timerManagementElement('timerManagementModal'),overlay=timerManagementElement('timerManagementOverlay');
+  if(!modal||!overlay)return false;
+  timerManagementState.operation='reset';timerManagementState.resultSeconds=null;
+  const pin=timerManagementElement('timerManagementPin'),amount=timerManagementElement('timerAdjustmentMinutes');
+  if(pin){pin.value='';pin.type='password';pin.setAttribute('aria-invalid','false');}
+  const visibility=timerManagementElement('timerPinVisibilityBtn');
+  if(visibility){visibility.setAttribute('aria-pressed','false');visibility.setAttribute('aria-label','Show PIN');
+    const icon=visibility.querySelector('i');if(icon)icon.className='fa-solid fa-eye';}
+  if(amount)amount.value='1';
+  timerManagementSetError('timerManagementPinError','');timerManagementSetError('timerManagementOperationError','');
+  selectTimerOperation('reset',false);timerManagementShowStep('pin');
+  modal.style.display='flex';overlay.style.display='block';
+  if(timerManagementState.liveInterval!==null)clearInterval(timerManagementState.liveInterval);
+  timerManagementState.liveInterval=setInterval(()=>{
+    if(timerManagementState.step!=='pin')updateTimerManagementPreview();
+  },1000);
+  setTimeout(()=>pin&&pin.focus(),0);
+  return true;
+}
+
+function closeTimerManagementModal(){
+  const modal=timerManagementElement('timerManagementModal'),overlay=timerManagementElement('timerManagementOverlay');
+  if(modal)modal.style.display='none';if(overlay)overlay.style.display='none';
+  if(timerManagementState.liveInterval!==null){clearInterval(timerManagementState.liveInterval);timerManagementState.liveInterval=null;}
+  const pin=timerManagementElement('timerManagementPin');if(pin)pin.value='';
+}
+
+function handleTimerPinInput(event){
+  event.target.value=event.target.value.replace(/\D/g,'').slice(0,6);
+  event.target.setAttribute('aria-invalid','false');timerManagementSetError('timerManagementPinError','');
+}
+
+function toggleTimerPinVisibility(){
+  const input=timerManagementElement('timerManagementPin'),button=timerManagementElement('timerPinVisibilityBtn');
+  if(!input||!button)return;const reveal=input.type==='password';input.type=reveal?'text':'password';
+  button.setAttribute('aria-pressed',String(reveal));button.setAttribute('aria-label',reveal?'Hide PIN':'Show PIN');
+  const icon=button.querySelector('i');if(icon)icon.className=`fa-solid ${reveal?'fa-eye-slash':'fa-eye'}`;input.focus();
+}
+
+function selectTimerOperation(operation,focus=true){
+  const button=document.querySelector(`[data-timer-operation="${operation}"]`);
+  if(!button||button.disabled)return false;
+  timerManagementState.operation=operation;
+  document.querySelectorAll('[data-timer-operation]').forEach(candidate=>{
+    const selected=candidate.dataset.timerOperation===operation;candidate.classList.toggle('selected',selected);
+    candidate.setAttribute('aria-checked',String(selected));
+  });
+  const adjustment=timerManagementElement('timerAdjustmentField');if(adjustment)adjustment.hidden=operation==='reset';
+  updateTimerManagementPreview();if(focus)button.focus();return true;
+}
+
+function timerManagementBack(){
+  if(timerManagementState.step==='confirm')timerManagementShowStep('operation');
+  else if(timerManagementState.step==='operation')timerManagementShowStep('pin');
+}
+
+function timerManagementNext(){
+  if(timerManagementState.step==='pin'){
+    const input=timerManagementElement('timerManagementPin');
+    const entered=String(input&&input.value||'');
+    const expected=timerResetPinForDate(new Date(),TIMER_RESET_PIN_FORMAT);
+    if(!/^\d{6}$/.test(entered)||entered!==expected){
+      if(input)input.setAttribute('aria-invalid','true');
+      timerManagementSetError('timerManagementPinError','The teacher PIN is incorrect.');
+      if(input){input.select();input.focus();}return false;
+    }
+    timerManagementShowStep('operation');return true;
+  }
+  if(timerManagementState.step==='operation'){
+    const proposal=updateTimerManagementPreview();if(!proposal.valid)return false;
+    timerManagementShowStep('confirm');return true;
+  }
+  return applyTimerManagementChange();
+}
+
+function applyTimerManagementChange(){
+  const proposal=timerManagementProposal();if(!proposal.valid)return false;
+  const wasExpired=state.examExpired===true;
+  if(wasExpired&&!restoreSessionTimeoutCheckpoints())return false;
+  if(timerIntervalId!==null){clearInterval(timerIntervalId);timerIntervalId=null;}
+  state.examExpired=false;state.examExpiredAt=null;state.timeoutCheckpointReady=false;
+  state.examTimerMinutes=ACTIVE_PROFILE_SESSION.timing.minutes;
+  closeTimerManagementModal();startTimer(proposal.result);render();return true;
+}
+
 function startTimer(resumeSeconds) {
   if (!sessionTimingEnabled()) {
     return;
@@ -431,6 +633,10 @@ function stopTimer() {
   }
   const timerContainer = document.getElementById('timerContainer');
   if (timerContainer) timerContainer.style.display = 'none';
+}
+
+function resetSessionTimer() {
+  return openTimerManagementModal();
 }
 
 function handleTimerExpired() {
@@ -759,3 +965,19 @@ function goToItem(index) {
   state.itemIndex = safeIndex;
   render();
 }
+
+if(typeof document!=='undefined'&&typeof document.addEventListener==='function')document.addEventListener('keydown',event=>{
+  const modal=timerManagementElement('timerManagementModal');
+  if(!modal||modal.style.display!=='flex')return;
+  if(event.key==='Escape'){event.preventDefault();closeTimerManagementModal();return;}
+  if(event.key==='Enter'&&event.target.tagName!=='BUTTON'){
+    event.preventDefault();timerManagementNext();return;
+  }
+  if(event.key!=='Tab')return;
+  const focusable=[...modal.querySelectorAll('button:not([disabled]):not([hidden]),input:not([disabled]):not([hidden])')]
+    .filter(element=>element.offsetParent!==null);
+  if(!focusable.length)return;
+  const first=focusable[0],last=focusable[focusable.length-1];
+  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+  else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+});

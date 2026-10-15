@@ -15,17 +15,61 @@ function sessionProgressKey(mode,email){
   return 'codescopeSessionProgress:' + email + ':' + ACTIVE_PROFILE_SET.id;
 }
 
+function parseSavedProgress(raw){
+  if(!raw)return null;
+  try{return JSON.parse(raw);}catch(error){return null;}
+}
+
+function savedProgressMatchesActiveSet(record){
+  if(!record||!record.itemsByProfile||typeof record.itemsByProfile!=='object')return false;
+  if(record.profileSetId)return record.profileSetId===ACTIVE_PROFILE_SET.id;
+  const savedIds=Object.keys(record.itemsByProfile);
+  if(!savedIds.length)return false;
+  const activeIds=new Set(enabledProfiles().map(profile=>profile.id));
+  return savedIds.every(id=>activeIds.has(id));
+}
+
+function savedProgressAmount(record){
+  if(!record||!record.itemsByProfile)return 0;
+  return Object.values(record.itemsByProfile).flat().reduce((amount,item)=>{
+    if(!item)return amount;
+    if(item.checked)return amount+1000;
+    const traceCount=Array.isArray(item.trace)?item.trace.length:0;
+    const actionCount=Array.isArray(item.examActionLog)?item.examActionLog.length:0;
+    const cursor=item.program&&Number(item.program.cursor)||0;
+    return amount+Math.min(999,traceCount+actionCount+cursor);
+  },0);
+}
+
+function itemNeedsPersistence(item){
+  if(!item)return false;
+  if(item.checked||item.flagged)return true;
+  return typeof itemHasAttempt==='function'&&itemHasAttempt(item);
+}
+
+function compactItemsForPersistence(itemsByProfile){
+  return Object.fromEntries(Object.entries(itemsByProfile||{}).flatMap(([profileId,items])=>{
+    if(!Array.isArray(items))return [];
+    const compact=items.map(item=>itemNeedsPersistence(item)?item:null);
+    return compact.some(Boolean)?[[profileId,compact]]:[];
+  }));
+}
+
 function loadSessionProgress(mode,email){
   if(!email||!sessionPersistenceEnabled()) return null;
   try{
-    const raw=localStorage.getItem(sessionProgressKey(mode,email));
-    if(raw)return JSON.parse(raw);
-    // Migrate the most recent record from the former mode-scoped keys.
-    const legacy=ACTIVE_PROFILE_SET.id==='codescope-default'
-      ?[localStorage.getItem(examProgressKey(email)),localStorage.getItem(practiceProgressKey(email))]
-      .filter(Boolean).map(value=>{try{return JSON.parse(value);}catch(error){return null;}}).filter(Boolean)
-      .sort((a,b)=>(b.savedAt||0)-(a.savedAt||0)):[];
-    return legacy[0]||null;
+    // Older builds used one pair of mode-scoped keys for every deployment.
+    // Accept those records only when all saved profile IDs belong to the
+    // selected Profile Set. Prefer the record containing more actual student
+    // work so a newly-created blank session cannot hide a compatible legacy
+    // attempt after an additive application update.
+    const candidates=[
+      parseSavedProgress(localStorage.getItem(sessionProgressKey(mode,email))),
+      parseSavedProgress(localStorage.getItem(examProgressKey(email))),
+      parseSavedProgress(localStorage.getItem(practiceProgressKey(email)))
+    ].filter(savedProgressMatchesActiveSet).sort((a,b)=>
+      savedProgressAmount(b)-savedProgressAmount(a)||(b.savedAt||0)-(a.savedAt||0));
+    return candidates[0]||null;
   }catch(e){ return null; }
 }
 
@@ -61,18 +105,25 @@ function saveSessionProgress(){
       itemIndex: state.itemIndex,
       itemIndexByProfile: state.itemIndexByProfile,
       sessionSeed: state.sessionSeed,
-      // Persist complete generated item snapshots so either mode restores the
-      // same seeded work, not just its action history or scores.
-      itemsByProfile: state.itemsByProfile,
+      // Untouched items are reproducible from sessionSeed. Persist only items
+      // containing student work so large source-based sessions stay within
+      // browser storage limits.
+      itemsByProfile: compactItemsForPersistence(state.itemsByProfile),
       showConnectors: state.showConnectors,
       timerMinutes:sessionTimingEnabled()?ACTIVE_PROFILE_SESSION.timing.minutes:null,
       expired:!!state.examExpired,
       expiredAt:state.examExpiredAt,
+      timeoutCheckpointReady:state.timeoutCheckpointReady===true,
       examEndTimestamp:sessionTimingEnabled()?examEndTimestamp:null,
       savedAt: Date.now()
     };
-    localStorage.setItem(sessionProgressKey(mode,state.userEmail), JSON.stringify(record));
-  }catch(e){ /* storage full/unavailable — silently skip persistence this time */ }
+    const serialized=JSON.stringify(record,(key,value)=>key==='_bindings'?null:value);
+    localStorage.setItem(sessionProgressKey(mode,state.userEmail),serialized);
+    return true;
+  }catch(error){
+    console.error('CodeScope could not save session progress:',error);
+    return false;
+  }
 }
 function saveExamProgress(){ saveSessionProgress(); }
 
@@ -108,8 +159,12 @@ function tryResumeSession(mode,email){
   if(!record||!record.itemsByProfile||typeof record.itemsByProfile!=='object'
     ||(record.profileSetId&&record.profileSetId!==ACTIVE_PROFILE_SET.id)
     ||(record.profileSetVersion&&String(record.profileSetVersion)!==String(ACTIVE_PROFILE_SET.version))
-    ||(record.language&&record.language!==state.language)
     ) return false;
+
+  // Profile Set ID and version are the compatibility contract. Early builds
+  // stored the deployment-global language here, which could disagree with a
+  // C Profile Set even though its generated exercises and profile IDs were
+  // correct. The next save normalizes this field to the session language.
 
   state.userEmail = record.email;
   state.userStudentId = record.studentId;
@@ -128,23 +183,23 @@ function tryResumeSession(mode,email){
   // same review-only state as a timer-expired attempt.
   state.examExpired = !!(record.expired||record.submitted);
   state.examExpiredAt = record.expiredAt||record.submittedAt||null;
+  state.timeoutCheckpointReady=record.timeoutCheckpointReady===true;
   examEndTimestamp = sessionTimingEnabled()?(record.examEndTimestamp || null):null;
-  state.itemsByProfile = Object.fromEntries(sessionProfiles
+  const savedItemsByProfile = Object.fromEntries(sessionProfiles
     .filter(profile=>Array.isArray(record.itemsByProfile[profile.id]))
     .map(profile=>[profile.id,record.itemsByProfile[profile.id]]));
 
-  // A saved session from an earlier release may not contain profiles added by
-  // this one. Replay the seeded generation sequence and retain only missing
-  // profiles; existing student work is never regenerated or overwritten.
-  const missingProfileIds = sessionProfiles.filter(p=>!state.itemsByProfile[p.id]).map(p=>p.id);
-  if(missingProfileIds.length){
-    initializeSeededRandom(state.sessionSeed);
-    sessionProfiles.forEach(profile=>{
-      const generated = generateItemsForProfile(profile.id);
-      if(!state.itemsByProfile[profile.id]) state.itemsByProfile[profile.id] = generated;
-    });
-    resetRandomGenerator();
-  }
+  // Replay the full seeded generation sequence, then overlay only the saved
+  // item slots. This restores compact new records and complete legacy records
+  // through the same path without changing any student's generated exercise.
+  state.itemsByProfile={};
+  initializeSeededRandom(state.sessionSeed);
+  sessionProfiles.forEach(profile=>{
+    const generated=generateItemsForProfile(profile.id);
+    const saved=savedItemsByProfile[profile.id]||[];
+    state.itemsByProfile[profile.id]=generated.map((item,index)=>saved[index]||item);
+  });
+  resetRandomGenerator();
   state.items = state.profileId ? (state.itemsByProfile[state.profileId] || []) : [];
   if(state.profileId)syncActiveProfileBehavior();
   state.showConnectors = record.showConnectors !== undefined ? record.showConnectors : state.showConnectors;

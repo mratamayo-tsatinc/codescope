@@ -55,7 +55,7 @@
 // never restarts when a category or profile changes.
 const PROFILE_SESSION = {
   language: 'c',
-  timing: { enabled: false, minutes: 120 },
+  timing: { enabled: false, minutes: 120, allowReset: false },
   persistence: { enabled: true },
   results: { unified: false }
 };

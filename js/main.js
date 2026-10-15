@@ -192,6 +192,17 @@ function syncGlobalHeaderUI(){
     timerContainer.classList.toggle('expired',state.examExpired);
     timerContainer.setAttribute('aria-label',state.examExpired?'Session time expired':'Session time remaining');
   }
+  const timerResetButton=document.getElementById('timerResetBtn');
+  if(timerResetButton){
+    const resetVisible=sessionTimingEnabled()&&sessionTimerResetAllowed()
+      &&(timerIntervalId!==null||state.examExpired);
+    timerResetButton.hidden=!resetVisible;
+    timerResetButton.disabled=state.examExpired&&!state.timeoutCheckpointReady;
+    const resetLabel=state.examExpired?'Reopen or adjust session timer':'Manage session timer';
+    timerResetButton.title=timerResetButton.disabled
+      ?'This expired session has no pre-timeout checkpoint to restore.':resetLabel;
+    timerResetButton.setAttribute('aria-label',timerResetButton.title);
+  }
   const scoreButton=document.getElementById('scoreSummaryBtn');
   if(scoreButton){
     scoreButton.hidden=!sessionUnifiedResultsEnabled()||!examResultsVisible();

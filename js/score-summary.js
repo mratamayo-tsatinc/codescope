@@ -154,7 +154,13 @@ function renderScoreSummaryContent(){
   const totalEl = document.getElementById('scoreSummaryTotal');
   if(totalEl){
     const score = category?computeCategoryScore(category.id):computeGrandTotalScore();
-    totalEl.textContent = score.earned+' / '+score.max;
+    const earnedEl=document.getElementById('scoreSummaryEarned');
+    const maximumEl=document.getElementById('scoreSummaryMaximum');
+    if(earnedEl&&maximumEl){
+      earnedEl.textContent=score.earned;
+      maximumEl.textContent=score.max;
+      totalEl.setAttribute('aria-label',score.earned+' out of '+score.max+' points');
+    }else totalEl.textContent = score.earned+' / '+score.max;
   }
 
   const categorySection=document.getElementById('scoreSummaryCategorySection');

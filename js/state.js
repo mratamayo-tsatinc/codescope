@@ -92,7 +92,8 @@ const state = {
   examPolicy: null, // immutable snapshot of exam settings captured when an attempt starts
   examTimerMinutes: null,
   examExpired: false,
-  examExpiredAt: null
+  examExpiredAt: null,
+  timeoutCheckpointReady: false
 };
 
 // ============================================================================
@@ -208,6 +209,8 @@ function activeProfileBehavior(profile){
   return profile&&profile.behavior?profile.behavior:DEFAULT_PROFILE_BEHAVIOR;
 }
 function sessionTimingEnabled(){return !!(ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.timing.enabled);}
+function sessionTimerResetAllowed(){return !!(ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.timing
+  &&ACTIVE_PROFILE_SESSION.timing.allowReset===true);}
 function sessionPersistenceEnabled(){return !!(ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.persistence&&ACTIVE_PROFILE_SESSION.persistence.enabled);}
 function sessionUnifiedResultsEnabled(){return !!(ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.results&&ACTIVE_PROFILE_SESSION.results.unified);}
 function profileAllowsUndo(){return !state.examExpired&&activeProfileBehavior().allowUndo!==false;}
@@ -383,6 +386,7 @@ function startSession(){
   state.examTimerMinutes = sessionTimingEnabled() ? ACTIVE_PROFILE_SESSION.timing.minutes : null;
   state.examExpired = false;
   state.examExpiredAt = null;
+  state.timeoutCheckpointReady = false;
   state.itemIndexByProfile = {};
   
   // Generate items only for enabled profiles once using the seed. Hidden
@@ -1131,8 +1135,47 @@ function finalizeItemAtSessionTimeout(item,profile){
     expressionCorrectSteps:correct,expressionTotalSteps:total,finalCorrect:false,timedOut:true};
 }
 
+function timeoutRestoreSnapshot(item){
+  const snapshot=JSON.parse(JSON.stringify(item,(key,value)=>
+    key==='_bindings'||key==='timeoutRestorePoint'?null:value));
+  delete snapshot.timeoutRestorePoint;
+  snapshot._bindings=null;
+  return snapshot;
+}
+
+function prepareSessionTimeoutCheckpoints(){
+  state.timeoutCheckpointReady=sessionTimerResetAllowed();
+  if(!state.timeoutCheckpointReady)return;
+  enabledProfiles().forEach(profile=>(state.itemsByProfile[profile.id]||[]).forEach(item=>{
+    if(item&&!item.checked&&itemHasAttempt(item)&&!item.timeoutRestorePoint)
+      item.timeoutRestorePoint=timeoutRestoreSnapshot(item);
+  }));
+}
+
+function restoreSessionTimeoutCheckpoints(){
+  if(!state.timeoutCheckpointReady)return false;
+  enabledProfiles().forEach(profile=>{
+    const items=state.itemsByProfile[profile.id]||[];
+    state.itemsByProfile[profile.id]=items.map(item=>{
+      if(!item||!item.timeoutRestorePoint)return item;
+      const restored=item.timeoutRestorePoint;
+      delete restored.timeoutRestorePoint;
+      restored._bindings=null;
+      restored._feedbackAnimated=false;
+      if(Array.isArray(restored.trace))restored.trace.forEach(step=>{
+        step._flashed=false;step._entered=false;
+      });
+      return restored;
+    });
+  });
+  state.items=state.profileId?(state.itemsByProfile[state.profileId]||[]):[];
+  state.timeoutCheckpointReady=false;
+  return true;
+}
+
 function expireExam(){
   if(!sessionTimingEnabled()||state.examExpired) return false;
+  prepareSessionTimeoutCheckpoints();
   enabledProfiles().forEach(profile=>(state.itemsByProfile[profile.id]||[])
     .forEach(item=>finalizeItemAtSessionTimeout(item,profile)));
   state.examExpired=true;

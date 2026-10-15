@@ -24,7 +24,7 @@ session policy:
 {
   "session": {
     "language": "c",
-    "timing": { "enabled": false, "minutes": 120 },
+    "timing": { "enabled": false, "minutes": 120, "allowReset": false },
     "persistence": { "enabled": true },
     "results": { "unified": false }
   }
@@ -35,6 +35,13 @@ Use <code>session.language</code> with <code>"c"</code> or
 <code>"java"</code>. It selects exercise manifests, parsers, rendered syntax,
 and generated content before the session loads. Older sets without the field
 default to C.
+
+Set <code>session.timing.allowReset</code> to <code>true</code> to show a timer
+reset control guarded by a teacher PIN. During an active session it grants a
+fresh full duration without changing work. After expiration it reopens the
+session from a checkpoint taken immediately before timeout scoring, while
+preserving items the student had already completed. Keep it <code>false</code>
+for fixed-duration assessments.
 
 Set <code>session.results.unified</code> to <code>true</code> to add one
 aggregate session score and QR code with a category breakdown. Category scores

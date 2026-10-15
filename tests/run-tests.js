@@ -318,6 +318,17 @@ function testScriptManifestParses(){
   assert(!html.includes('id="submitExamBtn"'));
   assert(!bundle.includes('function submitExam('));
   assert(bundle.includes('function expireExam()'));
+  assert(bundle.includes('function timerResetPinFormatFromTimestamp(timestamp)'));
+  assert(bundle.includes('const TIMER_RESET_PIN_FORMAT=timerResetPinFormatFromTimestamp(Date.now())'));
+  assert(bundle.includes("timerResetPinForDate(new Date(),TIMER_RESET_PIN_FORMAT)"));
+  assert(bundle.includes("function openTimerManagementModal()"));
+  assert(bundle.includes("function timerManagementProposal()"));
+  assert(bundle.includes("function applyTimerManagementChange()"));
+  assert(html.includes('id="timerManagementModal"'));
+  assert(html.includes('type="password" inputmode="numeric"'));
+  assert(html.includes('data-timer-operation="reset"'));
+  assert(html.includes('data-timer-operation="add"'));
+  assert(html.includes('data-timer-operation="reduce"'));
   assert(bundle.includes("showScoresDuringExam: true"));
   assert(bundle.includes("feedbackRelease: 'after-timeout'"));
   assert(html.includes('id="headerSessionContext"'));
@@ -2646,6 +2657,118 @@ function testExamSettingsAndTimeoutPolicy(){
     timeoutLocks:true,solutionBlocked:true,fullPurge:true});
 }
 
+function testTimerResetRestoresOnlyTimeoutFinalizedItems(){
+  const ctx=context();
+  load(ctx,[
+    'engine.js','flat-model.js','template-engine.js','generator.js','profiles.js',
+    'program-ir.js','program-core.js','legacy-expression-plugin.js',
+    'declaration-statement-plugin.js','assignment-statement-plugin.js','program-item-builder.js'
+  ]);
+  load(ctx,['state.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    rebuildProfileRegistry(PROFILES_RAW,PROFILE_CATEGORIES,
+      {language:'c',timing:{enabled:true,minutes:30,allowReset:true},persistence:{enabled:true},results:{unified:false}},
+      ACTIVE_PROFILE_SET);
+    initializeSeededRandom(24680);
+    const profile=PROFILES[0];
+    const completed=generateItemsForProfile(profile.id)[0];
+    const attempted=generateItemsForProfile(profile.id)[0];
+    const untouched=generateItemsForProfile(profile.id)[0];
+    completed.checked=true;completed.points=profile.pointsPerItem;completed.itemScore=1;
+    attempted.trace.push({action:'EVALUATE',wasCorrect:true});
+    state.profileId=profile.id;state.itemsByProfile={[profile.id]:[completed,attempted,untouched]};
+    state.items=state.itemsByProfile[profile.id];state.itemIndex=1;state.screen='session';state.examExpired=false;
+    const expired=expireExam();
+    const timeoutFinalized=attempted.checked===true&&attempted.timeoutRestorePoint
+      &&state.timeoutCheckpointReady===true;
+    const completedPreservedAtTimeout=completed.checked===true&&completed.points===profile.pointsPerItem
+      &&completed.timeoutRestorePoint===undefined;
+    const untouchedPreservedAtTimeout=untouched.checked===false&&untouched.timeoutRestorePoint===undefined;
+    const restored=restoreSessionTimeoutCheckpoints();
+    const restoredItems=state.itemsByProfile[profile.id];
+    const completedPreserved=restoredItems[0].checked===true&&restoredItems[0].points===profile.pointsPerItem;
+    const attemptedRolledBack=restoredItems[1].checked===false&&restoredItems[1].points===null
+      &&restoredItems[1].trace.length===1&&restoredItems[1].timeoutRestorePoint===undefined;
+    const untouchedPreserved=restoredItems[2].checked===false&&restoredItems[2].trace.length===0;
+    resetRandomGenerator();
+    return JSON.stringify({expired,timeoutFinalized,completedPreservedAtTimeout,untouchedPreservedAtTimeout,
+      restored,completedPreserved,attemptedRolledBack,untouchedPreserved,checkpointCleared:state.timeoutCheckpointReady===false});
+  })()`));
+  assert.deepStrictEqual(result,{expired:true,timeoutFinalized:true,completedPreservedAtTimeout:true,
+    untouchedPreservedAtTimeout:true,restored:true,completedPreserved:true,attemptedRolledBack:true,
+    untouchedPreserved:true,checkpointCleared:true});
+}
+
+function testLegacyProfileSetProgressMigrationPreservesScoreAndTimer(){
+  const ctx=context();
+  load(ctx,[
+    'engine.js','flat-model.js','template-engine.js','generator.js','profiles.js',
+    'program-ir.js','program-core.js','legacy-expression-plugin.js',
+    'declaration-statement-plugin.js','assignment-statement-plugin.js','program-item-builder.js',
+    'state.js','exam-persistence.js'
+  ]);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    ACTIVE_PROFILE_SET={id:'c-semifinals-selection-statements',name:'C Semifinals',version:'1'};
+    ACTIVE_PROFILE_SESSION=normalizeProfileSession({language:'c',timing:{enabled:true,minutes:90,allowReset:true},
+      persistence:{enabled:true},results:{unified:true}});
+    const profile=enabledProfiles()[0];
+    initializeSeededRandom(86420);
+    const completed=generateItemsForProfile(profile.id)[0];
+    const completedPoints=profile.pointsPerItem;
+    completed.checked=true;completed.points=completedPoints;completed.itemScore=1;
+    const blank=generateItemsForProfile(profile.id)[0];
+    resetRandomGenerator();
+    const deadline=Date.now()+2700000;
+    const base={schemaVersion:5,language:'java',email:'student@example.edu',studentId:'ST-1',profileId:profile.id,
+      itemIndex:0,itemIndexByProfile:{[profile.id]:0},sessionSeed:86420,showConnectors:true,
+      expired:false,examEndTimestamp:deadline};
+    const legacy=Object.assign({},base,{itemsByProfile:{[profile.id]:[completed]},savedAt:100});
+    const fresh=Object.assign({},base,{profileSetId:ACTIVE_PROFILE_SET.id,profileSetVersion:'1',
+      itemsByProfile:{[profile.id]:[blank]},savedAt:200});
+    localStorage.setItem(examProgressKey(base.email),JSON.stringify(legacy));
+    localStorage.setItem(sessionProgressKey('session',base.email),JSON.stringify(fresh));
+    const resumed=tryResumeSession('session',base.email);
+    return JSON.stringify({resumed,checked:state.itemsByProfile[profile.id][0].checked,
+      points:state.itemsByProfile[profile.id][0].points,completedPoints,
+      deadlinePreserved:examEndTimestamp===deadline});
+  })()`));
+  assert.deepStrictEqual(result,{resumed:true,checked:true,points:result.completedPoints,
+    completedPoints:result.completedPoints,deadlinePreserved:true});
+}
+
+function testSessionPersistenceStoresOnlyStudentWork(){
+  const ctx=context();
+  load(ctx,[
+    'engine.js','flat-model.js','template-engine.js','generator.js','profiles.js',
+    'program-ir.js','program-core.js','legacy-expression-plugin.js',
+    'declaration-statement-plugin.js','assignment-statement-plugin.js','program-item-builder.js',
+    'state.js','exam-persistence.js'
+  ]);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    ACTIVE_PROFILE_SET={id:'compact-session-test',name:'Compact session',version:'1'};
+    ACTIVE_PROFILE_SESSION=normalizeProfileSession({language:'c',timing:{enabled:true,minutes:90,allowReset:true},
+      persistence:{enabled:true},results:{unified:false}});
+    const profile=enabledProfiles()[0];
+    initializeSeededRandom(97531);
+    const items=generateItemsForProfile(profile.id);
+    resetRandomGenerator();
+    items[1].checked=true;items[1].points=profile.pointsPerItem;items[1].itemScore=1;
+    state.userEmail='compact@example.edu';state.userStudentId='ST-2';state.screen='session';
+    state.profileId=profile.id;state.itemIndex=1;state.itemIndexByProfile={[profile.id]:1};
+    state.sessionSeed=97531;state.items=items;state.itemsByProfile={[profile.id]:items};
+    examEndTimestamp=Date.now()+1800000;
+    const fullSize=JSON.stringify(state.itemsByProfile).length;
+    const saved=saveSessionProgress();
+    const record=JSON.parse(localStorage.getItem(sessionProgressKey('session',state.userEmail)));
+    const compact=record.itemsByProfile[profile.id];
+    return JSON.stringify({saved,slotCount:compact.length,firstOmitted:compact[0]===null,
+      completedKept:compact[1].checked===true,deadlineKept:record.examEndTimestamp===examEndTimestamp,
+      smaller:JSON.stringify(record.itemsByProfile).length<fullSize});
+  })()`));
+  assert.deepStrictEqual(result,{saved:true,slotCount:5,firstOmitted:true,completedKept:true,
+    deadlineKept:true,smaller:true});
+}
+
 function testCodeOrderingPartialRecordScoring(){
   const ctx=context();
   ctx.registerActivityPlugin=plugin=>{ctx.codeOrderingPlugin=plugin;};
@@ -2705,6 +2828,9 @@ function run(){
   testOldExamSaveGainsNewProfile();
   testCanonicalProgramPlayback();
   testExamSettingsAndTimeoutPolicy();
+  testTimerResetRestoresOnlyTimeoutFinalizedItems();
+  testLegacyProfileSetProgressMigrationPreservesScoreAndTimer();
+  testSessionPersistenceStoresOnlyStudentWork();
   testStrictExamSequencePolicy();
   testStateOnlySettingsPolicy();
   testManualResponseProfilesAndPropagation();

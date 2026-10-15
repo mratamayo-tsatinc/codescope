@@ -35,7 +35,7 @@ function profileDesignerCurrentData(){
     return profile;
   });
   return {set:profileDesignerClone(ACTIVE_PROFILE_SET),
-    session:profileDesignerClone(typeof PROFILE_SESSION==='undefined'?{language:'c',timing:{enabled:false,minutes:120},persistence:{enabled:true},results:{unified:false}}:ACTIVE_PROFILE_SESSION),
+    session:profileDesignerClone(typeof PROFILE_SESSION==='undefined'?{language:'c',timing:{enabled:false,minutes:120,allowReset:false},persistence:{enabled:true},results:{unified:false}}:ACTIVE_PROFILE_SESSION),
     profiles,categories:profileDesignerClone(PROFILE_CATEGORIES)};
 }
 
@@ -146,9 +146,10 @@ function renderProfileDesignerEditor(category){
 
 function renderProfileDesignerSessionForm(){
   const set=profileDesignerDraft.set||(profileDesignerDraft.set={id:'new-profile-set',name:'New Profile Set',version:'1',description:''});
-  const session=profileDesignerDraft.session||(profileDesignerDraft.session={language:'c',timing:{enabled:false,minutes:120},persistence:{enabled:true},results:{unified:false}});
+  const session=profileDesignerDraft.session||(profileDesignerDraft.session={language:'c',timing:{enabled:false,minutes:120,allowReset:false},persistence:{enabled:true},results:{unified:false}});
   session.language=['c','java'].includes(session.language)?session.language:'c';
-  session.timing=session.timing||{enabled:false,minutes:120};
+  session.timing=session.timing||{enabled:false,minutes:120,allowReset:false};
+  if(typeof session.timing.allowReset!=='boolean')session.timing.allowReset=false;
   session.persistence=session.persistence&&typeof session.persistence==='object'?session.persistence:{enabled:session.persistence!==false};
   session.results=session.results&&typeof session.results==='object'?session.results:{unified:false};
   return h('div',{class:'pd-form'},
@@ -169,6 +170,8 @@ function renderProfileDesignerSessionForm(){
       profileDesignerField('Duration in minutes',profileDesignerTextInput(session.timing.minutes||120,value=>{
         session.timing.minutes=Math.max(1,Math.min(999,Math.round(Number(value)||1)));
       },{type:'number',min:'1',max:'999'}),'One allowance for the entire session; profile switches never restart it.'),
+      profileDesignerToggle('Allow timer reset controls',session.timing.allowReset===true,value=>{session.timing.allowReset=value;},
+        'Shows a teacher-PIN guarded control for resetting a running timer or safely reopening an expired session.'),
       profileDesignerToggle('Resume saved session',session.persistence.enabled===true,value=>{session.persistence.enabled=value;},
         'Keeps the same generated items, progress, and absolute timer deadline after refresh or login.'))),
     h('div',{class:'pd-form-section'},h('h4',{},'Session results'),h('div',{class:'pd-form-grid'},
@@ -347,6 +350,7 @@ function profileDesignerValidationErrors(){
   if(!set.id||!slug.test(set.id))errors.push('Profile Set ID must use lowercase letters, numbers, and hyphens.');
   if(!String(set.name||'').trim())errors.push('Profile Set name is required.');
   if(!timing||typeof timing.enabled!=='boolean')errors.push('Session timing must declare enabled as true or false.');
+  if(timing&&typeof timing.allowReset!=='boolean')errors.push('Session timing must declare allowReset as true or false.');
   if(timing&&(!Number.isFinite(Number(timing.minutes))||Number(timing.minutes)<1||Number(timing.minutes)>999))errors.push('Session timer minutes must be from 1 to 999.');
   if(!profileDesignerDraft.session.persistence||typeof profileDesignerDraft.session.persistence.enabled!=='boolean')
     errors.push('Session persistence must declare enabled as true or false.');

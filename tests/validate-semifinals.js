@@ -39,7 +39,7 @@ function evaluate(source){return vm.runInContext(source,context);}
 const profileSetPath=path.join(ROOT,'profile-sets','c-semifinals-selection-statements.json');
 const profileSet=JSON.parse(fs.readFileSync(profileSetPath,'utf8'));
 assert.strictEqual(profileSet.id,'c-semifinals-selection-statements');
-assert.deepStrictEqual(profileSet.session,{language:'c',timing:{enabled:true,minutes:90},persistence:{enabled:true},results:{unified:true}});
+assert.deepStrictEqual(profileSet.session,{language:'c',timing:{allowReset:true,enabled:true,minutes:100},persistence:{enabled:true},results:{unified:true}});
 assert.strictEqual(profileSet.categories.length,6);
 assert.strictEqual(profileSet.profiles.length,20);
 
