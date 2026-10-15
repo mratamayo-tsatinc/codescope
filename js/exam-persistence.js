@@ -54,6 +54,7 @@ function saveSessionProgress(){
       mode,
       profileSetId:ACTIVE_PROFILE_SET.id,
       profileSetVersion:ACTIVE_PROFILE_SET.version,
+      language:state.language,
       email: state.userEmail,
       studentId: state.userStudentId,
       profileId: state.profileId,
@@ -107,6 +108,7 @@ function tryResumeSession(mode,email){
   if(!record||!record.itemsByProfile||typeof record.itemsByProfile!=='object'
     ||(record.profileSetId&&record.profileSetId!==ACTIVE_PROFILE_SET.id)
     ||(record.profileSetVersion&&String(record.profileSetVersion)!==String(ACTIVE_PROFILE_SET.version))
+    ||(record.language&&record.language!==state.language)
     ) return false;
 
   state.userEmail = record.email;

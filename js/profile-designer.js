@@ -35,7 +35,7 @@ function profileDesignerCurrentData(){
     return profile;
   });
   return {set:profileDesignerClone(ACTIVE_PROFILE_SET),
-    session:profileDesignerClone(typeof PROFILE_SESSION==='undefined'?{timing:{enabled:false,minutes:120},persistence:{enabled:true}}:ACTIVE_PROFILE_SESSION),
+    session:profileDesignerClone(typeof PROFILE_SESSION==='undefined'?{language:'c',timing:{enabled:false,minutes:120},persistence:{enabled:true},results:{unified:false}}:ACTIVE_PROFILE_SESSION),
     profiles,categories:profileDesignerClone(PROFILE_CATEGORIES)};
 }
 
@@ -146,25 +146,34 @@ function renderProfileDesignerEditor(category){
 
 function renderProfileDesignerSessionForm(){
   const set=profileDesignerDraft.set||(profileDesignerDraft.set={id:'new-profile-set',name:'New Profile Set',version:'1',description:''});
-  const session=profileDesignerDraft.session||(profileDesignerDraft.session={timing:{enabled:false,minutes:120},persistence:{enabled:true}});
+  const session=profileDesignerDraft.session||(profileDesignerDraft.session={language:'c',timing:{enabled:false,minutes:120},persistence:{enabled:true},results:{unified:false}});
+  session.language=['c','java'].includes(session.language)?session.language:'c';
   session.timing=session.timing||{enabled:false,minutes:120};
   session.persistence=session.persistence&&typeof session.persistence==='object'?session.persistence:{enabled:session.persistence!==false};
+  session.results=session.results&&typeof session.results==='object'?session.results:{unified:false};
   return h('div',{class:'pd-form'},
     h('div',{class:'pd-editor-heading'},h('div',{},h('span',{class:'pd-eyebrow'},'Shared configuration'),h('h3',{},'Session policy'))),
     h('div',{class:'pd-form-section'},h('h4',{},'Profile Set identity'),h('div',{class:'pd-form-grid'},
       profileDesignerField('Set name',profileDesignerTextInput(set.name,value=>{set.name=value;})),
       profileDesignerField('Set ID',profileDesignerTextInput(set.id,value=>{set.id=profileDesignerSlug(value);}), 'Used in the filename and saved-session key.'),
-      profileDesignerField('Version',profileDesignerTextInput(set.version||'1',value=>{set.version=value||'1';}))),
-      profileDesignerField('Description',h('textarea',{rows:'3',oninput:event=>{set.description=event.target.value;}},set.description||''))),
+      profileDesignerField('Version',profileDesignerTextInput(set.version||'1',value=>{set.version=value||'1';})),
+      profileDesignerField('Description',h('textarea',{rows:'3',oninput:event=>{set.description=event.target.value;}},set.description||'')))),
+    h('div',{class:'pd-form-section'},h('h4',{},'Session language'),h('div',{class:'pd-form-grid'},
+      profileDesignerField('Programming language',profileDesignerSelect(session.language,[
+        {value:'c',label:'C'},{value:'java',label:'Java'}
+      ],value=>{session.language=value;}),'Controls exercise files, parsing, rendering, and generated syntax for the entire session.'))),
     h('div',{class:'pd-callout'},h('i',{class:'fa-solid fa-circle-info','aria-hidden':'true'}),
-      h('span',{},'This timer starts once when the student begins and continues across every category, profile, and item.')),
+      h('span',{},'The timer and unified result apply once to the complete session across every category, profile, and item.')),
     h('div',{class:'pd-form-section'},h('h4',{},'Session timing'),h('div',{class:'pd-form-grid'},
       profileDesignerToggle('Enable shared timer',session.timing.enabled===true,value=>{session.timing.enabled=value;}),
       profileDesignerField('Duration in minutes',profileDesignerTextInput(session.timing.minutes||120,value=>{
         session.timing.minutes=Math.max(1,Math.min(999,Math.round(Number(value)||1)));
       },{type:'number',min:'1',max:'999'}),'One allowance for the entire session; profile switches never restart it.'),
       profileDesignerToggle('Resume saved session',session.persistence.enabled===true,value=>{session.persistence.enabled=value;},
-        'Keeps the same generated items, progress, and absolute timer deadline after refresh or login.'))));
+        'Keeps the same generated items, progress, and absolute timer deadline after refresh or login.'))),
+    h('div',{class:'pd-form-section'},h('h4',{},'Session results'),h('div',{class:'pd-form-grid'},
+      profileDesignerToggle('Add unified session score and QR',session.results.unified===true,value=>{session.results.unified=value;},
+        'Adds one aggregate session result with a category breakdown. Category scores and QR codes remain available.'))));
 }
 
 function renderProfileDesignerCategoryForm(category){
@@ -332,13 +341,17 @@ function changeProfileDesignerKind(profile,kind){
 function profileDesignerValidationErrors(){
   const errors=[],profiles=profileDesignerDraft.profiles,categories=profileDesignerDraft.categories,slug=/^[a-z0-9]+(?:-[a-z0-9]+)*$/;
   const profileIds=new Set(),categoryIds=new Set(),membership=new Map();
-  const set=profileDesignerDraft.set||{},timing=profileDesignerDraft.session&&profileDesignerDraft.session.timing;
+  const set=profileDesignerDraft.set||{},session=profileDesignerDraft.session||{},timing=session.timing;
+  const language=String(session.language||'').toLowerCase();
+  if(!['c','java'].includes(language))errors.push('Session language must be C or Java.');
   if(!set.id||!slug.test(set.id))errors.push('Profile Set ID must use lowercase letters, numbers, and hyphens.');
   if(!String(set.name||'').trim())errors.push('Profile Set name is required.');
   if(!timing||typeof timing.enabled!=='boolean')errors.push('Session timing must declare enabled as true or false.');
   if(timing&&(!Number.isFinite(Number(timing.minutes))||Number(timing.minutes)<1||Number(timing.minutes)>999))errors.push('Session timer minutes must be from 1 to 999.');
   if(!profileDesignerDraft.session.persistence||typeof profileDesignerDraft.session.persistence.enabled!=='boolean')
     errors.push('Session persistence must declare enabled as true or false.');
+  if(!profileDesignerDraft.session.results||typeof profileDesignerDraft.session.results.unified!=='boolean')
+    errors.push('Session results must declare unified as true or false.');
   if(!categories.length)errors.push('At least one category is required.');
   if(!profiles.length)errors.push('At least one profile is required.');
   profiles.forEach((profile,index)=>{

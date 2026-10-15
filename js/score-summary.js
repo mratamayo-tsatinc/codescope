@@ -47,6 +47,7 @@ let scoreSummaryCategoryId = null;
 function openScoreSummaryModal(categoryId){
   if(!examResultsVisible()) return;
   if(categoryId&&!enabledCategories().some(category=>category.id===categoryId)) return;
+  if(!categoryId&&!sessionUnifiedResultsEnabled()) return;
   scoreSummaryCategoryId=categoryId||null;
   const modal=document.getElementById('scoreSummaryModal');
   modal.classList.toggle('score-summary-exam',state.mode==='exam');
@@ -72,7 +73,7 @@ let scoreSummaryDownloadInProgress = false;
 function scoreSummaryPngFilename(now){
   const pad=value=>String(value).padStart(2,'0');
   const stamp=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-  const scope=scoreSummaryCategoryId||'overall';
+  const scope=scoreSummaryCategoryId||'session';
   return `${DEFAULT_APP_SETTINGS.shell.scoreSummary.filenamePrefix}-${scope}-${stamp}.png`;
 }
 
@@ -145,14 +146,41 @@ function toggleScoreSummaryDetails(){
 
 function renderScoreSummaryContent(){
   const category=enabledCategories().find(entry=>entry.id===scoreSummaryCategoryId);
+  const unified=!category&&sessionUnifiedResultsEnabled();
   const title=document.getElementById('scoreSummaryTitle');
-  if(title) title.textContent=category?`${category.name} Score Summary`:'Overall Score Summary';
+  if(title) title.textContent=category?category.name+' Score Summary':'Session Score Summary';
   const scopeLabel=document.getElementById('scoreSummaryScopeLabel');
-  if(scopeLabel) scopeLabel.textContent=category?`Total score for ${category.name}`:'Total score across all profiles';
+  if(scopeLabel) scopeLabel.textContent=category?'Total score for '+category.name:'Total score for '+ACTIVE_PROFILE_SET.name;
   const totalEl = document.getElementById('scoreSummaryTotal');
   if(totalEl){
-    const {earned, max} = category?computeCategoryScore(category.id):computeGrandTotalScore();
-    totalEl.textContent = `${earned} / ${max}`;
+    const score = category?computeCategoryScore(category.id):computeGrandTotalScore();
+    totalEl.textContent = score.earned+' / '+score.max;
+  }
+
+  const categorySection=document.getElementById('scoreSummaryCategorySection');
+  const categoryBreakdown=document.getElementById('scoreSummaryCategoryBreakdown');
+  if(categorySection)categorySection.hidden=!unified;
+  if(categoryBreakdown){
+    categoryBreakdown.textContent='';
+    if(unified)enabledCategories().forEach(entry=>{
+      const score=computeCategoryScore(entry.id);
+      if(!score)return;
+      const profiles=profilesForCategory(entry.id);
+      const items=profiles.flatMap(profile=>state.itemsByProfile[profile.id]||[]);
+      const anyChecked=items.some(item=>item.checked);
+      const row=document.createElement('div');
+      row.className='score-summary-category-row';
+      const name=document.createElement('span');
+      name.className='ssc-name';
+      name.textContent=entry.name;
+      const value=document.createElement('span');
+      value.className='ssc-value';
+      const percent=score.max>0?Math.round((score.earned/score.max)*100):0;
+      value.textContent=anyChecked
+        ? score.earned+' / '+score.max+' · '+percent+'%'
+        : '0 / '+score.max+' · Not started';
+      row.appendChild(name);row.appendChild(value);categoryBreakdown.appendChild(row);
+    });
   }
 
   const toggleBtn = document.getElementById('scoreSummaryDetailsToggle');
@@ -180,11 +208,10 @@ function renderScoreSummaryContent(){
     } else {
       const max = items.reduce((sum,item)=>sum+itemMaximumPoints(item,p),0);
       const anyChecked = items.some(it=>it.checked);
-      // roundPoints() (state.js) — see computeGrandTotalScore's comment.
       const earned = roundPoints(items.reduce((sum, it)=> sum + (it.points || 0), 0));
       const correctCount = items.filter(it=>it.wasCorrectFinal).length;
       value.textContent = anyChecked
-        ? `${earned} / ${max}  ·  ${correctCount}/${items.length} correct`
+        ? earned+' / '+max+'  ·  '+correctCount+'/'+items.length+' correct'
         : 'Not started';
     }
 

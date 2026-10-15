@@ -3,7 +3,7 @@
 A **Profile Set** is one complete selectable CodeScope configuration. It owns:
 
 - Profile Set identity and version;
-- the shared session timer and persistence policy;
+- the shared programming language, timer, persistence, and result retrieval policy;
 - profile categories;
 - the profiles inside those categories.
 
@@ -15,7 +15,7 @@ An individual **profile** still represents one activity configuration.
 2. Select **Profiles** to open Profile Designer.
 3. Open **Session policy**.
 4. Enter a stable Set ID, visible name, version, and description.
-5. Configure the shared timer and persistence behavior.
+5. Select C or Java, then configure the shared timer, persistence behavior, and whether to add a unified session score and QR.
 6. Add or edit categories and profiles.
 7. Select **Validate**.
 8. Select **Download Profile Set**.
@@ -63,10 +63,22 @@ available. The selection is remembered on that browser.
 Once a session begins, its Profile Set is fixed. The student must log out to
 start or resume a different set.
 
+## Session language
+
+Language is configured only at <code>session.language</code> and accepts
+<code>"c"</code> or <code>"java"</code>. CodeScope applies it before loading
+exercise manifests or generating items. Every source-based exercise set used
+by the Profile Set must exist under that language directory.
+
 ## Version and persistence
 
-Persistence is configured only at `session.persistence.enabled`. Categories
-and profiles do not have persistence fields.
+Persistence is configured only at <code>session.persistence.enabled</code>.
+Unified result retrieval is configured only at
+<code>session.results.unified</code>. Categories and profiles do not own either
+setting.
+
+A unified result adds one session total, QR code, and category breakdown.
+Category totals and QR codes remain available as fallback results.
 
 Saved progress is keyed by student email and Profile Set ID. CodeScope also
 records the set version and refuses to restore a record created by another

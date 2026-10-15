@@ -40,8 +40,15 @@ function programOutputPartStates(statement,traceCount){
     if(!part) return;
     if(step.action==='READ_OUTPUT_VALUE') part.stagedValue=step.sourceValue;
     else if(step.action==='EVALUATE'){
-      part.stagedValue=step.result;
-      part.resolvedValue=step.result;
+      if(step.outputAction==='CONCATENATE_VALUE'&&step.separatorIndex!=null){
+        statement.parts.slice(0,step.separatorIndex+1).forEach((candidate,index)=>{
+          if(candidate.kind==='expression'&&states[index].stagedValue!==null)
+            states[index].resolvedValue=states[index].stagedValue;
+        });
+      }else{
+        part.stagedValue=step.result;
+        part.resolvedValue=step.result;
+      }
     }
   });
   return states;
@@ -68,6 +75,32 @@ function programOutputReadActionable(interactive,partState){
 function programOutputResolveActionable(interactive,partState){
   return interactive&&partState.resolvedValue===null
     &&(partState.stagedValue!==null||programOutputStrictControls());
+}
+function programOutputJavaVisualTrace(statement,traceCount){
+  return programOutputVisualTrace(statement).slice(0,traceCount);
+}
+
+function programOutputJavaVisualConcatResolved(statement,separatorIndex,traceCount){
+  return programOutputJavaConcatResolved(statement,separatorIndex,
+    programOutputJavaVisualTrace(statement,traceCount));
+}
+
+function programOutputJavaResolveActionable(interactive,statement,partStates,separatorIndex,traceCount){
+  if(!interactive||programOutputJavaVisualConcatResolved(statement,separatorIndex,traceCount))return false;
+  if(programOutputStrictControls())return true;
+  return programOutputJavaConcatReady(statement,separatorIndex,partStates,
+    programOutputJavaVisualTrace(statement,traceCount));
+}
+
+function programOutputVisualResolved(statement,language,partStates,traceCount){
+  if(language!=='java')return programOutputDynamicParts(statement).every(entry=>
+    partStates[entry.index].resolvedValue!==null);
+  const valuesReady=programOutputDynamicParts(statement).every(entry=>{
+    const state=partStates[entry.index];
+    return state.stagedValue!==null||state.resolvedValue!==null;
+  });
+  return valuesReady&&programOutputJavaSeparators(statement).every(separatorIndex=>
+    programOutputJavaVisualConcatResolved(statement,separatorIndex,traceCount));
 }
 
 function renderProgramOutputConsumedIdentifier(statement,entry,partState,showDerived){
@@ -108,9 +141,10 @@ function renderProgramOutputResolvedJavaString(statement,partStates){
 function renderProgramOutputState(statement,item,program,options){
   options=options||{};
   const language=program.language||item.language||state.language;
-  const partStates=programOutputPartStates(statement,options.traceCount||0);
+  const traceCount=options.traceCount||0;
+  const partStates=programOutputPartStates(statement,traceCount);
   const interactive=!!options.interactive&&!item.checked&&!item.practiceInvalidExecution&&!examInteractionLocked();
-  const resolved=programOutputDynamicParts(statement).every(entry=>partStates[entry.index].resolvedValue!==null);
+  const resolved=programOutputVisualResolved(statement,language,partStates,traceCount);
   const readyToPrint=interactive&&(resolved||programOutputStrictControls());
   const command=language==='c'?'printf':(statement.newline?'System.out.println':'System.out.print');
   const code=h('code',{class:'program-output-code'});
@@ -178,15 +212,17 @@ function renderProgramOutputState(statement,item,program,options){
       renderProgramOutputResolvedJavaString(statement,partStates).forEach(node=>code.appendChild(node));
     }else statement.parts.forEach((part,index)=>{
       if(index>0){
-        const partState=part.kind==='expression'?partStates[index]:null;
-        const actionable=part.kind==='expression'&&programOutputResolveActionable(interactive,partState);
+        const concatResolved=programOutputJavaVisualConcatResolved(statement,index,traceCount);
+        const actionable=programOutputJavaResolveActionable(interactive,statement,partStates,index,traceCount);
         code.appendChild(h('span',{},' '));
         code.appendChild(outputActionToken('+',{
-          class:'program-output-token output-combine tok '+(actionable?'tok-op-active':'tok-static'),
-          'data-output-combine-id':part.kind==='expression'?programOutputResultTokenId(statement,index):null,
-          title:actionable?'Concatenate the retrieved value':null,
-          'aria-label':actionable?'Concatenate the retrieved value':null,
-          onclick:actionable?()=>handleTokenClick({type:'resolve-output-part',partIndex:index,statementId:statement.id}):null
+          class:'program-output-token output-combine tok '+(actionable?'tok-op-active':'tok-static')
+            +(concatResolved?' resolved':''),
+          'data-output-combine-id':programOutputConcatTokenId(statement,index),
+          title:actionable?'Concatenate these output parts':null,
+          'aria-label':actionable?'Concatenate these output parts':null,
+          onclick:actionable?()=>handleTokenClick({type:'resolve-output-concatenation',
+            separatorIndex:index,statementId:statement.id}):null
         },actionable));
         code.appendChild(h('span',{},' '));
       }

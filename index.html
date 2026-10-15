@@ -169,8 +169,12 @@
       </div>
       <div class="score-summary-total">
         <div id="scoreSummaryTotal" class="sst-value">0 / 0</div>
-        <div id="scoreSummaryScopeLabel" class="sst-label">Total score across all profiles</div>
+        <div id="scoreSummaryScopeLabel" class="sst-label">Total session score</div>
       </div>
+      <section id="scoreSummaryCategorySection" class="score-summary-category-section" aria-labelledby="scoreSummaryCategoryHeading" hidden>
+        <h3 id="scoreSummaryCategoryHeading">Category breakdown</h3>
+        <div id="scoreSummaryCategoryBreakdown" class="score-summary-category-breakdown"></div>
+      </section>
             <div class="qr-share-section">
         <div id="scoreQrCodeBox" class="qr-code-box" aria-label="QR code linking to a shareable results page"></div>
         <p class="qr-caption">Scan to view a shareable results page</p>
@@ -368,7 +372,7 @@
               <span id="activityZoomStatus" class="visually-hidden" role="status" aria-live="polite"></span>
             </div>
             <button id="scoreSummaryBtn" class="score-summary-btn" onclick="openScoreSummaryModal()" hidden
-              title="View overall scores" aria-label="View overall scores">
+              title="View session score and QR code" aria-label="View session score summary and QR code">
               <i class="fa-solid fa-chart-simple" aria-hidden="true"></i>
               <span class="control-label score-control-label">Scores</span>
             </button>

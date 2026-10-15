@@ -105,8 +105,10 @@ async function renderScoreSummaryQr(){
   if(!state.userEmail) return;
   const category=enabledCategories().find(entry=>entry.id===scoreSummaryCategoryId);
   const {earned, max} = category?computeCategoryScore(category.id):computeGrandTotalScore();
-  const shareUrl = await buildResultsShareUrl(earned, max,
-    category?`${getActivityName()} — ${category.name}`:undefined);
+  const resultName=category
+    ? getActivityName()+' — '+category.name
+    : getActivityName()+' — '+ACTIVE_PROFILE_SET.name;
+  const shareUrl = await buildResultsShareUrl(earned, max, resultName);
   if(scoreSummaryCategoryId!==(category?category.id:null)) return;
   renderQrInto('scoreQrCodeBox', shareUrl, 190);
 }

@@ -54,8 +54,10 @@
 // Session policy applies once to the complete student session. The countdown
 // never restarts when a category or profile changes.
 const PROFILE_SESSION = {
+  language: 'c',
   timing: { enabled: false, minutes: 120 },
-  persistence: { enabled: true }
+  persistence: { enabled: true },
+  results: { unified: false }
 };
 
 const PROFILES_RAW = [

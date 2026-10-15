@@ -62,7 +62,6 @@ const DEFAULT_SHELL_SETTINGS = Object.freeze({
     windowSize: 5
   }),
   scoreSummary: Object.freeze({
-    overallVisible: false,
     pngScale: 2,
     filenamePrefix: 'codescope-score-summary'
   }),
@@ -79,7 +78,7 @@ const state = {
   screen: 'login', // login | setup | session | done
   userEmail: null,
   userStudentId: null,
-  language: 'c',
+  language:(ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.language)||'c',
   mode: 'practice',
   profileId: null,
   itemIndex: 0,
@@ -210,6 +209,7 @@ function activeProfileBehavior(profile){
 }
 function sessionTimingEnabled(){return !!(ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.timing.enabled);}
 function sessionPersistenceEnabled(){return !!(ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.persistence&&ACTIVE_PROFILE_SESSION.persistence.enabled);}
+function sessionUnifiedResultsEnabled(){return !!(ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.results&&ACTIVE_PROFILE_SESSION.results.unified);}
 function profileAllowsUndo(){return !state.examExpired&&activeProfileBehavior().allowUndo!==false;}
 function profileAllowsRetry(){return !state.examExpired&&activeProfileBehavior().allowRetry!==false;}
 function profileAllowsReviewFlags(){return !state.examExpired&&activeProfileBehavior().allowReviewFlags===true;}

@@ -5,7 +5,7 @@ Selection Statements**.
 
 ## Session policy
 
-- Language: C in the current deployment
+- Language: C, enforced by the Profile Set session policy
 - Time limit: 90 minutes for the whole session
 - Persistence: enabled
 - Feedback: released after the timer expires
@@ -13,6 +13,8 @@ Selection Statements**.
 - Review flags: enabled
 - Live scores: visible throughout the active session, with a score summary and
   QR code available for every category
+- Unified result: enabled, adding one aggregate session score, QR code, and
+  category breakdown while retaining every category result
 
 The Profile Set ID is `c-semifinals-selection-statements`. Its configuration
 is stored in `profile-sets/c-semifinals-selection-statements.json`.

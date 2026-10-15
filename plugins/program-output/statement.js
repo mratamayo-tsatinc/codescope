@@ -28,10 +28,39 @@ function programOutputPartSource(part){
 
 function programOutputReadTokenId(statement,index){return `output-read-${statement.id}-${index}`;}
 function programOutputResultTokenId(statement,index){return `output-result-${statement.id}-${index}`;}
+function programOutputConcatTokenId(statement,separatorIndex){return `output-concat-${statement.id}-${separatorIndex}`;}
 
-function programOutputResolved(statement){
-  return programOutputDynamicParts(statement).every(entry=>
-    statement.runtime.parts[entry.index].resolvedValue!==null);
+function programOutputJavaSeparators(statement){
+  return statement.parts.slice(1).map((part,index)=>index+1);
+}
+
+function programOutputJavaConcatResolved(statement,separatorIndex,trace){
+  return (trace||statement.runtime.trace).some(step=>step.action==='EVALUATE'
+    &&step.outputAction==='CONCATENATE_VALUE'&&step.separatorIndex===separatorIndex);
+}
+
+function programOutputJavaConcatReady(statement,separatorIndex,partStates,trace){
+  const states=partStates||statement.runtime.parts,steps=trace||statement.runtime.trace;
+  if(separatorIndex<1||separatorIndex>=statement.parts.length
+    ||programOutputJavaConcatResolved(statement,separatorIndex,steps))return false;
+  if(separatorIndex>1&&!programOutputJavaConcatResolved(statement,separatorIndex-1,steps))return false;
+  const required=[];
+  if(separatorIndex===1&&statement.parts[0].kind==='expression')required.push(0);
+  if(statement.parts[separatorIndex].kind==='expression')required.push(separatorIndex);
+  return required.every(index=>states[index]
+    &&(states[index].stagedValue!==null||states[index].resolvedValue!==null));
+}
+
+function programOutputResolved(statement,language){
+  const dynamicReady=programOutputDynamicParts(statement).every(entry=>{
+    const state=statement.runtime.parts[entry.index];
+    return state.stagedValue!==null||state.resolvedValue!==null;
+  });
+  if(String(language||'c').toLowerCase()!=='java')
+    return programOutputDynamicParts(statement).every(entry=>
+      statement.runtime.parts[entry.index].resolvedValue!==null);
+  return dynamicReady&&programOutputJavaSeparators(statement).every(separatorIndex=>
+    programOutputJavaConcatResolved(statement,separatorIndex));
 }
 
 function programOutputFormatValue(value,format){
@@ -43,7 +72,8 @@ function programOutputStatementText(statement,expected){
   const text=statement.parts.map((part,index)=>{
     if(part.kind==='text') return part.value;
     const statePart=runtime.parts[index];
-    const value=expected?statePart.expectedValue:statePart.resolvedValue;
+    const value=expected?statePart.expectedValue
+      :(statePart.resolvedValue!==null?statePart.resolvedValue:statePart.stagedValue);
     return value==null?'':programOutputFormatValue(value,part.format);
   }).join('');
   return text+(statement.newline?'\n':'');
@@ -92,14 +122,19 @@ registerStatementPlugin({
       return {mode:'direct',action:{type:'begin-output-response',statementId:ctx.statement.id},
         label:ctx.statement.runtime.manualOutputActive?'Enter complete output':'Predict complete output'};
     }
-    return programOutputResolved(ctx.statement)
+    return programOutputResolved(ctx.statement,ctx.program.language)
       ? {mode:'direct',action:{type:'emit-output',statementId:ctx.statement.id},label:'Run output statement'}
       : {mode:'modal',focus:'output-values',label:'Evaluate output statement'};
   },
 
   classifyRejectedAction(ctx){
     const action=ctx.action||{};
-    if(action.type==='emit-output'&&!programOutputResolved(ctx.statement)) return 'output-unresolved';
+    if(action.type==='emit-output'&&!programOutputResolved(ctx.statement,ctx.program.language)) return 'output-unresolved';
+    if(action.type==='resolve-output-concatenation'){
+      if(String(ctx.program.language).toLowerCase()!=='java'
+        ||programOutputJavaConcatResolved(ctx.statement,action.separatorIndex))return 'output-order';
+      if(!programOutputJavaConcatReady(ctx.statement,action.separatorIndex))return 'output-value-unread';
+    }
     if(action.type==='resolve-output-part'){
       const entry=programOutputPartEntry(ctx.statement,action.partIndex);
       if(!entry||ctx.statement.runtime.parts[entry.index].resolvedValue!==null) return 'output-order';
@@ -171,17 +206,39 @@ registerStatementPlugin({
       const partState=runtime.parts[entry.index];
       if(partState.stagedValue===null||partState.resolvedValue!==null) return {applied:false};
       partState.resolvedValue=partState.stagedValue;
-      runtime.trace.push({type:'EVALUATE',action:'EVALUATE',outputAction:
-        program.language==='c'?'FORMAT_VALUE':'CONCATENATE_VALUE',statementId:statement.id,
-        partIndex:entry.index,result:partState.resolvedValue,wasCorrect:true,
+      runtime.trace.push({type:'EVALUATE',action:'EVALUATE',outputAction:'FORMAT_VALUE',
+        statementId:statement.id,partIndex:entry.index,result:partState.resolvedValue,wasCorrect:true,
         sourceBinding:programOutputPartName(entry.part),sourceBindingKind:'variable',
         sourceNodeId:programOutputReadTokenId(statement,entry.index),
         resultNodeId:programOutputResultTokenId(statement,entry.index)});
       return {applied:true};
     }
 
+    if(action.type==='resolve-output-concatenation'){
+      const separatorIndex=Number(action.separatorIndex);
+      if(String(program.language).toLowerCase()!=='java'
+        ||!programOutputJavaConcatReady(statement,separatorIndex))return {applied:false};
+      statement.parts.slice(0,separatorIndex+1).forEach((part,index)=>{
+        if(part.kind==='expression'&&runtime.parts[index].stagedValue!==null)
+          runtime.parts[index].resolvedValue=runtime.parts[index].stagedValue;
+      });
+      const sourceIndex=statement.parts[separatorIndex].kind==='expression'
+        ?separatorIndex:(separatorIndex===1&&statement.parts[0].kind==='expression'?0:null);
+      const sourcePart=sourceIndex==null?null:statement.parts[sourceIndex];
+      const result=statement.parts.slice(0,separatorIndex+1).map((part,index)=>part.kind==='text'
+        ?part.value:programOutputFormatValue(runtime.parts[index].stagedValue,part.format)).join('');
+      runtime.trace.push({type:'EVALUATE',action:'EVALUATE',outputAction:'CONCATENATE_VALUE',
+        statementId:statement.id,separatorIndex,partIndex:sourceIndex,result,wasCorrect:true,
+        sourceBinding:sourcePart?programOutputPartName(sourcePart):null,
+        sourceBindingKind:sourcePart?'variable':null,
+        sourceNodeId:sourcePart?programOutputReadTokenId(statement,sourceIndex)
+          :programOutputConcatTokenId(statement,separatorIndex-1),
+        resultNodeId:programOutputConcatTokenId(statement,separatorIndex)});
+      return {applied:true};
+    }
+
     if(action.type==='emit-output'){
-      if(!programOutputResolved(statement)) return {applied:false};
+      if(!programOutputResolved(statement,program.language)) return {applied:false};
       const text=programOutputStatementText(statement,false);
       const semantic=programSemanticsForContext(ctx).execute(statement,program.memory);
       const expectedText=semantic.value;
@@ -216,7 +273,16 @@ registerStatementPlugin({
       runtime.checked=false;runtime.assignedValue=null;runtime.wasCorrectAssignment=null;
       runtime.correctSteps=0;runtime.totalOpSteps=0;
     }else if(step.action==='EVALUATE'){
-      runtime.parts[step.partIndex].resolvedValue=null;
+      runtime.parts.forEach(part=>{part.resolvedValue=null;});
+      runtime.trace.filter(entry=>entry.action==='EVALUATE').forEach(entry=>{
+        if(entry.outputAction==='CONCATENATE_VALUE'&&entry.separatorIndex!=null){
+          statement.parts.slice(0,entry.separatorIndex+1).forEach((part,index)=>{
+            if(part.kind==='expression'&&runtime.parts[index].stagedValue!==null)
+              runtime.parts[index].resolvedValue=runtime.parts[index].stagedValue;
+          });
+        }else if(entry.partIndex!=null&&runtime.parts[entry.partIndex])
+          runtime.parts[entry.partIndex].resolvedValue=runtime.parts[entry.partIndex].stagedValue;
+      });
     }else if(step.action==='READ_OUTPUT_VALUE'){
       runtime.parts[step.partIndex].stagedValue=null;
     }
@@ -256,13 +322,29 @@ registerStatementPlugin({
       events.push({type:'READ',action:'READ_OUTPUT_VALUE',statementId:ctx.statement.id,
         partIndex:entry.index,target:name,targetKind:'variable',sourceValue:value,
         resultNodeId:programOutputReadTokenId(ctx.statement,entry.index)});
-      events.push({type:'EVALUATE',action:'EVALUATE',outputAction:
-        ctx.program.language==='c'?'FORMAT_VALUE':'CONCATENATE_VALUE',
-        statementId:ctx.statement.id,partIndex:entry.index,result:value,wasCorrect:true,
-        sourceBinding:name,sourceBindingKind:'variable',
-        sourceNodeId:programOutputReadTokenId(ctx.statement,entry.index),
-        resultNodeId:programOutputResultTokenId(ctx.statement,entry.index)});
+      if(String(ctx.program.language).toLowerCase()!=='java')
+        events.push({type:'EVALUATE',action:'EVALUATE',outputAction:'FORMAT_VALUE',
+          statementId:ctx.statement.id,partIndex:entry.index,result:value,wasCorrect:true,
+          sourceBinding:name,sourceBindingKind:'variable',
+          sourceNodeId:programOutputReadTokenId(ctx.statement,entry.index),
+          resultNodeId:programOutputResultTokenId(ctx.statement,entry.index)});
     });
+    if(String(ctx.program.language).toLowerCase()==='java'){
+      programOutputJavaSeparators(ctx.statement).forEach(separatorIndex=>{
+        const sourceIndex=ctx.statement.parts[separatorIndex].kind==='expression'
+          ?separatorIndex:(separatorIndex===1&&ctx.statement.parts[0].kind==='expression'?0:null);
+        const sourcePart=sourceIndex==null?null:ctx.statement.parts[sourceIndex];
+        const result=ctx.statement.parts.slice(0,separatorIndex+1).map((part,index)=>part.kind==='text'
+          ?part.value:programOutputFormatValue(ctx.statement.runtime.parts[index].expectedValue,part.format)).join('');
+        events.push({type:'EVALUATE',action:'EVALUATE',outputAction:'CONCATENATE_VALUE',
+          statementId:ctx.statement.id,separatorIndex,partIndex:sourceIndex,result,wasCorrect:true,
+          sourceBinding:sourcePart?programOutputPartName(sourcePart):null,
+          sourceBindingKind:sourcePart?'variable':null,
+          sourceNodeId:sourcePart?programOutputReadTokenId(ctx.statement,sourceIndex)
+            :programOutputConcatTokenId(ctx.statement,separatorIndex-1),
+          resultNodeId:programOutputConcatTokenId(ctx.statement,separatorIndex)});
+      });
+    }
     const text=programOutputStatementText(ctx.statement,true);
     events.push({type:'OUTPUT',action:'PRINT',statementId:ctx.statement.id,
       text,expectedText:text,wasCorrect:true});

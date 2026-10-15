@@ -4,31 +4,46 @@ CodeScope separates deployment presentation settings from teaching policy.
 
 - `DEFAULT_SHELL_SETTINGS` in `js/state.js` controls shared presentation such
   as animation, panels, zoom, pagination, and celebrations.
-- A Profile Set JSON file controls the session timer, persistence, categories,
-  profiles, interaction, feedback, retry, Undo, and scoring behavior.
+- A Profile Set JSON file controls the programming language, session timer,
+  persistence, unified result retrieval, categories, profiles, interaction, feedback, retry, Undo,
+  and scoring behavior.
 - The login Settings panel manages saved device data only.
 
 There is no global Practice or Exam switch.
 
 ## Session policy
 
-Timer and persistence belong to the Profile Set's top-level `session` object:
+Language, timer, persistence, and result retrieval belong to the Profile Set's top-level <code>session</code> object:
 
 ```json
 {
   "session": {
+    "language": "c",
     "timing": {
       "enabled": true,
       "minutes": 90
     },
     "persistence": {
       "enabled": true
+    },
+    "results": {
+      "unified": true
     }
   }
 }
 ```
 
 These settings cannot be declared by a category or individual profile.
+
+The session language must be <code>"c"</code> or <code>"java"</code>. It is
+applied before exercise manifests load and remains fixed for the complete
+session.
+
+When <code>session.results.unified</code> is <code>true</code>, the header
+exposes an additional session score and QR code. It sums every enabled category
+and shows each category's contribution. Existing category score and QR controls
+remain available. Set it to <code>false</code> when categories are separate
+assessments.
 
 The timer starts once when the student begins and continues across every
 category, profile, and item. It never restarts during navigation. When it

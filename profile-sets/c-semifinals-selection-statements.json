@@ -5,12 +5,16 @@
   "version": "1",
   "description": "A persistent 90-minute C semifinals session focused on selection statements and their prerequisite operator, output, expression, tracing, simulation, and ordering skills.",
   "session": {
+    "language": "c",
     "timing": {
       "enabled": true,
       "minutes": 90
     },
     "persistence": {
       "enabled": true
+    },
+    "results": {
+      "unified": true
     }
   },
   "categories": [

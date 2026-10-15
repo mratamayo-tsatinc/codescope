@@ -344,10 +344,14 @@ function testScriptManifestParses(){
   assert(bundle.includes("linksToggle.setAttribute('aria-pressed'"));
   assert(bundle.includes('userControlVisible: false'));
   assert(bundle.includes("displayPolicy: 'content-aware'"));
-  assert(bundle.includes('overallVisible: false'));
   assert(bundle.includes('if(!DEFAULT_APP_SETTINGS.shell.connectors.userControlVisible) return;'));
   assert(bundle.includes('state.showConnectors=connectorSettings.visible'));
-  assert(bundle.includes('scoreButton.hidden=!DEFAULT_APP_SETTINGS.shell.scoreSummary.overallVisible'));
+  assert(bundle.includes('scoreButton.hidden=!sessionUnifiedResultsEnabled()'));
+  assert(bundle.includes('function sessionUnifiedResultsEnabled()'));
+  assert(bundle.includes("language:(ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.language)||'c'"));
+  assert(bundle.includes('state.language=ACTIVE_PROFILE_SESSION.language'));
+  assert(bundle.includes('Session language must be C or Java.'));
+  assert(html.includes('id="scoreSummaryCategoryBreakdown"'));
   assert(bundle.includes('function varFinalPanelShouldRender(item)'));
   assert(html.includes('handleClearAllLocalData()'));
   assert(!login.includes('clearExamProgress(email);'));
@@ -3306,7 +3310,7 @@ function testProfileCategoriesAndScopedScores(){
     'state.js','score-summary.js']);
   installFakeDom(ctx);
   const nodes=new Map();
-  ['profileList','scoreSummaryTitle','scoreSummaryScopeLabel','scoreSummaryTotal'].forEach(id=>nodes.set(id,new ctx.FakeNode('div')));
+  ['profileList','scoreSummaryTitle','scoreSummaryScopeLabel','scoreSummaryTotal','scoreSummaryCategorySection','scoreSummaryCategoryBreakdown'].forEach(id=>nodes.set(id,new ctx.FakeNode('div')));
   ctx.document.getElementById=id=>nodes.get(id)||null;
   load(ctx,['login.js']);
   const result=JSON.parse(evaluate(ctx,`(()=>{
@@ -3325,9 +3329,9 @@ function testProfileCategoriesAndScopedScores(){
       [hiddenExpression.id]:[{checked:true,points:1,wasCorrectFinal:true}],
       [falling.id]:[{checked:true,points:12,wasCorrectFinal:false}]
     };
-    const hiddenProfileExcluded=!profilesForCategory('expressions').includes(hiddenExpression)
+    const hiddenProfileExcluded=!profilesForCategory('expressions-arithmetic').includes(hiddenExpression)
       &&generateItemsForProfile(hiddenExpression.id).length===0;
-    const expressionScore=computeCategoryScore('expressions');
+    const expressionScore=computeCategoryScore('expressions-arithmetic');
     const identifierScore=computeCategoryScore('identifier-activities');
     const overall=computeGrandTotalScore();
     const identifierCategory=PROFILE_CATEGORIES.find(category=>category.id==='identifier-activities');
@@ -3342,10 +3346,13 @@ function testProfileCategoriesAndScopedScores(){
     const scopedModal=document.getElementById('scoreSummaryTitle').textContent==='Identifier Activities Score Summary'
       &&document.getElementById('scoreSummaryTotal').textContent==='12 / 30';
     const scopedFilename=scoreSummaryPngFilename(new Date(2026,0,2)).includes('-identifier-activities-');
+    ACTIVE_PROFILE_SESSION=normalizeProfileSession({results:{unified:true}});
     scoreSummaryCategoryId=null;
     renderScoreSummaryContent();
-    const overallModal=document.getElementById('scoreSummaryTitle').textContent==='Overall Score Summary'
-      &&document.getElementById('scoreSummaryTotal').textContent==='12.6 / 31';
+    const overallModal=document.getElementById('scoreSummaryTitle').textContent==='Session Score Summary'
+      &&document.getElementById('scoreSummaryTotal').textContent==='12.6 / 31'
+      &&document.getElementById('scoreSummaryCategorySection').hidden===false
+      &&document.getElementById('scoreSummaryCategoryBreakdown').children.length===enabledCategories().length;
     populateProfileSidebar();
     const categories=document.getElementById('profileList').children;
     const grouped=categories.length===enabledCategories().length
@@ -3570,7 +3577,11 @@ function testProgramOutputStatementPlugin(){
     item.program.language='java';
     const javaSource=outputStatementSource(dynamic,item);
     const javaLineSource=outputStatementSource(item.program.statements[5],item);
-    const javaResolvedState=renderProgramOutputState(dynamic,item,item.program,{traceCount:2,interactive:false});
+    dynamic.runtime.trace.push({action:'EVALUATE',outputAction:'CONCATENATE_VALUE',separatorIndex:1,
+      statementId:dynamic.id,result:'resolved',wasCorrect:true});
+    const javaResolvedState=renderProgramOutputState(dynamic,item,item.program,
+      {traceCount:dynamic.runtime.trace.length,interactive:false});
+    dynamic.runtime.trace.pop();
     const multi=sourceItems[1];
     multi.program.memory={};
     multi.decls.forEach(declaration=>{multi.program.memory[declaration.name]={name:declaration.name,
@@ -3603,6 +3614,56 @@ function testProgramOutputStatementPlugin(){
       generateDefault:()=>['generated-fallback']});
     const javaItems=poGenerateContentItems({profile:sourceProfile,language:'java',generateDefault:()=>[]});
     const javaMulti=javaItems[1].program.statements.find(statement=>statement.kind==='output');
+    state.profileId=sourceProfile.id;
+    const leadingMemory={drinks:{name:'drinks',kind:'variable',initialized:true,value:3,dataType:'int'},
+      unitPrice:{name:'unitPrice',kind:'variable',initialized:true,value:45,dataType:'int'}};
+    const leadingOutput=coreParseStatement({language:'java',
+      source:'System.out.println(drinks + " drinks at P" + unitPrice);',symbols:leadingMemory}).ir;
+    leadingOutput.id='output-leading-java';leadingOutput.status='active';
+    leadingOutput.runtime={parts:leadingOutput.parts.map(part=>{
+      if(part.kind!=='expression')return {stagedValue:null,resolvedValue:null,expectedValue:null,initialStagedValue:null};
+      const name=programOutputPartName(part),value=leadingMemory[name].value;
+      return {stagedValue:null,resolvedValue:null,expectedValue:value,initialStagedValue:null};
+    }),trace:[],checked:false,assignedValue:null,wasCorrectAssignment:null,correctSteps:0,totalOpSteps:0};
+    const leadingProgram={language:'java',memory:leadingMemory,statements:[leadingOutput],cursor:0,
+      status:'running',events:[],executionHistory:[]};
+    const leadingItem={language:'java',program:leadingProgram,checked:false,practiceInvalidExecution:null};
+    const leadingReadFirst=dispatchProgramAction(leadingItem,{type:'read-output-value',partIndex:0,
+      statementId:leadingOutput.id});
+    const leadingResolveFirst=dispatchProgramAction(leadingItem,{type:'resolve-output-concatenation',separatorIndex:1,
+      statementId:leadingOutput.id});
+    const leadingIncompleteAfterFirst=!programOutputResolved(leadingOutput,'java');
+    const leadingReadSecond=dispatchProgramAction(leadingItem,{type:'read-output-value',partIndex:2,
+      statementId:leadingOutput.id});
+    const leadingResolveSecond=dispatchProgramAction(leadingItem,{type:'resolve-output-concatenation',separatorIndex:2,
+      statementId:leadingOutput.id});
+    const leadingPlan=statementInteractionPlan(leadingItem,leadingOutput);
+    const leadingPrint=dispatchProgramAction(leadingItem,leadingPlan.action);
+
+    const durationMemory={hours:{name:'hours',kind:'variable',initialized:true,value:7,dataType:'int'}};
+    const durationOutput=coreParseStatement({language:'java',
+      source:'System.out.println("Duration: " + hours + " hours");',symbols:durationMemory}).ir;
+    durationOutput.id='output-duration-java';durationOutput.status='active';
+    durationOutput.runtime={parts:durationOutput.parts.map(part=>{
+      if(part.kind!=='expression')return {stagedValue:null,resolvedValue:null,expectedValue:null,initialStagedValue:null};
+      return {stagedValue:null,resolvedValue:null,expectedValue:7,initialStagedValue:null};
+    }),trace:[],checked:false,assignedValue:null,wasCorrectAssignment:null,correctSteps:0,totalOpSteps:0};
+    const durationProgram={language:'java',memory:durationMemory,statements:[durationOutput],cursor:0,
+      status:'running',events:[],executionHistory:[]};
+    const durationItem={language:'java',program:durationProgram,checked:false,practiceInvalidExecution:null};
+    const durationRead=dispatchProgramAction(durationItem,{type:'read-output-value',partIndex:1,
+      statementId:durationOutput.id});
+    const durationFirstConcat=dispatchProgramAction(durationItem,{type:'resolve-output-concatenation',separatorIndex:1,
+      statementId:durationOutput.id});
+    const durationMidPlan=statementInteractionPlan(durationItem,durationOutput);
+    const durationMidState=renderProgramOutputState(durationOutput,durationItem,durationProgram,
+      {traceCount:durationOutput.runtime.trace.length,interactive:true});
+    const durationSecondConcat=dispatchProgramAction(durationItem,{type:'resolve-output-concatenation',separatorIndex:2,
+      statementId:durationOutput.id});
+    const durationFinalPlan=statementInteractionPlan(durationItem,durationOutput);
+    const durationFinalState=renderProgramOutputState(durationOutput,durationItem,durationProgram,
+      {traceCount:durationOutput.runtime.trace.length,interactive:true});
+    const durationPrint=dispatchProgramAction(durationItem,durationFinalPlan.action);
     const sourceFlowCatalogProfile=PROFILES.find(candidate=>candidate.id==='program-output-source-flow');
     const sourceFlowProfile=Object.assign({},sourceFlowCatalogProfile,{id:'program-output-inline-test',
       content:Object.assign({},sourceFlowCatalogProfile.content,{provider:'program-output'}),
@@ -3727,8 +3788,19 @@ function testProgramOutputStatementPlugin(){
       javaFilenames:javaItems.map(sourceItem=>sourceItem.filename),
       javaMultiPartKinds:javaMulti.parts.map(part=>part.kind),
       javaMultiSource:outputStatementSource(javaMulti,javaItems[1]),
-      javaLanguage:javaItems[1].language
-    });
+      javaLanguage:javaItems[1].language,
+      leadingParts:leadingOutput.parts.map(part=>part.kind),
+      leadingReadFirst:leadingReadFirst.applied,
+      leadingResolveFirst:leadingResolveFirst.applied,leadingReadSecond:leadingReadSecond.applied,
+      leadingResolveSecond:leadingResolveSecond.applied,leadingPlanMode:leadingPlan.mode,
+      leadingIncompleteAfterFirst,
+      leadingPrint:leadingPrint.applied,leadingText:programOutputText(leadingProgram),
+      durationRead:durationRead.applied,durationFirstConcat:durationFirstConcat.applied,
+      durationMidPlanMode:durationMidPlan.mode,durationSecondConcat:durationSecondConcat.applied,
+      durationFinalPlanMode:durationFinalPlan.mode,durationPrint:durationPrint.applied,
+      durationText:programOutputText(durationProgram),durationMidText:durationMidState.textContent,
+      durationFinalText:durationFinalState.textContent,
+      durationConcatSteps:durationOutput.runtime.trace.filter(step=>step.outputAction==='CONCATENATE_VALUE').length    });
   })()`));
   assert.strictEqual(result.manifest,'program-output');
   assert.strictEqual(result.studentOutputPlanMode,'direct');
@@ -3842,6 +3914,18 @@ function testProgramOutputStatementPlugin(){
   assert.deepStrictEqual(result.javaMultiPartKinds,result.multiPartKinds);
   assert(result.javaMultiSource.startsWith('System.out.print('));
   assert.strictEqual(result.javaLanguage,'java');
+  assert.deepStrictEqual(result.leadingParts,['expression','text','expression']);
+  assert(result.leadingReadFirst&&result.leadingResolveFirst&&result.leadingReadSecond&&result.leadingResolveSecond);
+  assert(result.leadingIncompleteAfterFirst);
+  assert.strictEqual(result.leadingPlanMode,'direct');
+  assert(result.leadingPrint);
+  assert.strictEqual(result.leadingText,'3 drinks at P45\n');
+  assert(result.durationRead&&result.durationFirstConcat&&result.durationSecondConcat&&result.durationPrint);
+  assert.strictEqual(result.durationMidPlanMode,'modal');
+  assert.strictEqual(result.durationFinalPlanMode,'direct');
+  assert(result.durationMidText.includes(' + ')&&!result.durationFinalText.includes(' + '));
+  assert.strictEqual(result.durationConcatSteps,2);
+  assert.strictEqual(result.durationText,'Duration: 7 hours\n');
 }
 
 function testCodeSimulatorPlugin(){

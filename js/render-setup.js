@@ -11,12 +11,9 @@ function renderSetup(container){
     )
   ));
 
-  // Language picker intentionally omitted here: at this stage Java and C
-  // produce identical declaration/assignment text for every profile (see
-  // declLine()), so exposing the choice would just be a no-op control that
-  // teaches nothing. state.language stays 'java' as the fixed default;
-  // re-add this field if/when a profile actually diverges between the two
-  // (e.g. C's lack of a native boolean type becoming visible to the student).
+  // Language is owned by the active Profile Set and is intentionally not a
+  // student-selectable setup control. Source loading, parsing, rendering, and
+  // item generation all use that session language.
 
   card.appendChild(h('div',{class:'field'},
     h('span',{class:'field-label'},'Number of items'),

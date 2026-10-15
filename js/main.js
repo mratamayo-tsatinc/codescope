@@ -194,7 +194,7 @@ function syncGlobalHeaderUI(){
   }
   const scoreButton=document.getElementById('scoreSummaryBtn');
   if(scoreButton){
-    scoreButton.hidden=!DEFAULT_APP_SETTINGS.shell.scoreSummary.overallVisible||!examResultsVisible();
+    scoreButton.hidden=!sessionUnifiedResultsEnabled()||!examResultsVisible();
   }
 }
 

@@ -5,12 +5,16 @@
   "version": "1",
   "description": "The current CodeScope categories, profiles, activities, and session policy.",
   "session": {
+    "language": "c",
     "timing": {
       "enabled": false,
       "minutes": 120
     },
     "persistence": {
       "enabled": true
+    },
+    "results": {
+      "unified": false
     }
   },
   "categories": [

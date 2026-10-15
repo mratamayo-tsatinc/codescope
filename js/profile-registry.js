@@ -9,12 +9,17 @@ const ACTIVITY_PROFILES=[];
 
 function normalizeProfileSession(session){
   session=session&&typeof session==='object'?session:{};
+  const language=String(session.language||'c').trim().toLowerCase();
+  if(!['c','java'].includes(language))throw new Error("Profile Set session language must be 'c' or 'java'");
   const timing=session.timing&&typeof session.timing==='object'?session.timing:{};
   const persistence=session.persistence;
+  const results=session.results&&typeof session.results==='object'?session.results:{};
   return Object.freeze({
+    language,
     timing:Object.freeze({enabled:!!timing.enabled,
       minutes:Math.max(1,Math.min(999,Math.round(Number(timing.minutes)||120)))}),
-    persistence:Object.freeze({enabled:persistence===true||!!(persistence&&persistence.enabled)})
+    persistence:Object.freeze({enabled:persistence===true||!!(persistence&&persistence.enabled)}),
+    results:Object.freeze({unified:results.unified===true})
   });
 }
 
@@ -49,6 +54,7 @@ function rebuildProfileRegistry(rawProfiles,categories,session,setMeta){
   ACTIVITY_PROFILES.splice(0,ACTIVITY_PROFILES.length,...finalized.filter(profile=>profile.activity));
   PROFILES.splice(0,PROFILES.length,...finalized.filter(profile=>!profile.activity));
   ACTIVE_PROFILE_SESSION=normalizeProfileSession(session);
+  if(typeof state==='object'&&state)state.language=ACTIVE_PROFILE_SESSION.language;
   ACTIVE_PROFILE_SET=Object.freeze(Object.assign({id:'default',name:'CodeScope Default',version:'1'},setMeta||{}));
 
   if(typeof activityPluginRegistry!=='undefined'){

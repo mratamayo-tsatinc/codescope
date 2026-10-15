@@ -2,7 +2,7 @@
 
 Each JSON file in this directory describes one complete CodeScope session:
 
-- session timer and persistence policy
+- programming language, timer, persistence, and result retrieval policy
 - profile categories
 - activity profiles
 
@@ -17,16 +17,28 @@ which one is selected by default.
    top-level `id`.
 4. Reload CodeScope.
 
-Persistence belongs only to the top-level session policy:
+Language, timer, persistence, and unified result retrieval belong only to the top-level
+session policy:
 
-```json
+~~~json
 {
   "session": {
+    "language": "c",
     "timing": { "enabled": false, "minutes": 120 },
-    "persistence": { "enabled": true }
+    "persistence": { "enabled": true },
+    "results": { "unified": false }
   }
 }
-```
+~~~
+
+Use <code>session.language</code> with <code>"c"</code> or
+<code>"java"</code>. It selects exercise manifests, parsers, rendered syntax,
+and generated content before the session loads. Older sets without the field
+default to C.
+
+Set <code>session.results.unified</code> to <code>true</code> to add one
+aggregate session score and QR code with a category breakdown. Category scores
+and QR codes remain available as fallback results.
 
 Saved progress is isolated by student email and Profile Set ID. Increment the
 Profile Set `version` after changes that should start a fresh student session.
