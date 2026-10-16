@@ -56,3 +56,6 @@ Profile Set `version` after changes that should start a fresh student session.
 - `c-semifinals-selection-statements.json` is the C selection-statements
   semifinals. Its assessment blueprint and content guard are documented in
   `docs/c-semifinals-selection-statements.md`.
+- `c-midterms-expressions.json` is the C expressions midterms set. Its four
+  ordered categories, seeded source libraries, and validation command are
+  documented in `docs/c-midterms-expressions.md`.

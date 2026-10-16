@@ -1,0 +1,344 @@
+{
+  "schemaVersion": 1,
+  "id": "c-midterms-expressions",
+  "name": "C - Midterms: Expressions",
+  "version": "1",
+  "description": "A persistent C midterms session covering output simulation, variable state, declarations, assignments, unary updates, and logical expressions.",
+  "session": {
+    "language": "c",
+    "timing": {
+      "allowReset": true,
+      "enabled": true,
+      "minutes": 100
+    },
+    "persistence": {
+      "enabled": true
+    },
+    "results": {
+      "unified": true
+    }
+  },
+  "categories": [
+    {
+      "id": "midterms-direct-output",
+      "name": "Direct Output Commands",
+      "enabled": true,
+      "profileIds": ["midterms-direct-output"]
+    },
+    {
+      "id": "midterms-output-variable-state",
+      "name": "Output and Variable State",
+      "enabled": true,
+      "profileIds": ["midterms-output-variable-state"]
+    },
+    {
+      "id": "midterms-declaration-assignment",
+      "name": "Declaration and Assignment Statements",
+      "enabled": true,
+      "profileIds": [
+        "declaration-chain",
+        "assignment-basic",
+        "assignment-add-sub",
+        "assignment-multiply",
+        "assignment-div-mod",
+        "assignment-rhs-expression",
+        "assignment-sequential",
+        "assignment-dependent",
+        "assignment-advanced-chain"
+      ]
+    },
+    {
+      "id": "midterms-unary-logical",
+      "name": "Unary and Logical Evaluation",
+      "enabled": true,
+      "profileIds": [
+        "unary-update-sequence",
+        "assignment-unary-advanced-chain",
+        "relational-logical-student-derived"
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "enabled": true,
+      "meta": {
+        "id": "midterms-direct-output",
+        "name": "Direct Output Commands",
+        "description": "Predict the terminal output of C programs that use direct output commands and escape sequences."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read each C source program and reproduce its terminal output.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "midterms-direct-output",
+          "shuffle": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "midterms-output-variable-state",
+        "name": "Output and Variable State",
+        "description": "Predict terminal output and final variable values from seeded C source programs."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read each seeded C source program, reproduce its terminal output, and provide its final variable values.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "midterms-output-variable-state",
+          "shuffle": false
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "declaration-chain",
+        "name": "Declaration Chain",
+        "description": "Execute dependent variable and constant declarations before evaluating the final expression."
+      },
+      "shape": {
+        "operandSources": {"variable": 3, "constant": 1},
+        "operandRange": {"min": 2, "max": 15},
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": ["+", "-", "*"],
+        "constraints": {"requireMultipleTiers": true}
+      },
+      "template": "operand op operand op operand op operand",
+      "scoring": {"itemCount": 5, "pointsPerItem": 4, "statementCommits": true},
+      "lesson": {"focus": "declaration", "variant": "dependency-chain"},
+      "interaction": {"declarations": "interactive"}
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-basic",
+        "name": "Assignment: Replace with =",
+        "description": "Initialize a variable, replace its value with =, then use the updated value."
+      },
+      "shape": {
+        "operandSources": {"variable": 1, "literal": 1},
+        "operandRange": {"min": 2, "max": 15},
+        "allowNegativeOperands": false
+      },
+      "operators": {"allowed": ["+", "-"]},
+      "template": "operand op operand",
+      "scoring": {"itemCount": 5, "pointsPerItem": 2, "statementCommits": true},
+      "lesson": {"focus": "assignment", "variant": "basic-set"},
+      "interaction": {"declarations": "interactive"}
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-add-sub",
+        "name": "Assignment: += and -=",
+        "description": "Trace consecutive addition and subtraction assignments on one variable."
+      },
+      "shape": {
+        "operandSources": {"variable": 1, "literal": 1},
+        "operandRange": {"min": 2, "max": 15},
+        "allowNegativeOperands": false
+      },
+      "operators": {"allowed": ["+", "-"]},
+      "template": "operand op operand",
+      "scoring": {"itemCount": 5, "pointsPerItem": 3, "statementCommits": true},
+      "lesson": {"focus": "assignment", "variant": "add-sub"},
+      "interaction": {"declarations": "interactive"}
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-multiply",
+        "name": "Assignment: *=",
+        "description": "Apply multiplication assignment and observe the variable change in memory."
+      },
+      "shape": {
+        "operandSources": {"variable": 1, "literal": 1},
+        "operandRange": {"min": 2, "max": 12},
+        "allowNegativeOperands": false
+      },
+      "operators": {"allowed": ["+", "-"]},
+      "template": "operand op operand",
+      "scoring": {"itemCount": 5, "pointsPerItem": 2, "statementCommits": true},
+      "lesson": {"focus": "assignment", "variant": "multiply"},
+      "interaction": {"declarations": "interactive"}
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-div-mod",
+        "name": "Assignment: /= and %=",
+        "description": "Compare integer quotient assignment with remainder assignment."
+      },
+      "shape": {
+        "operandSources": {"variable": 1, "literal": 1},
+        "operandRange": {"min": 6, "max": 30},
+        "allowNegativeOperands": false
+      },
+      "operators": {"allowed": ["+", "-"]},
+      "template": "operand op operand",
+      "scoring": {"itemCount": 5, "pointsPerItem": 3, "statementCommits": true},
+      "lesson": {"focus": "assignment", "variant": "divide-remainder"},
+      "interaction": {"declarations": "interactive"}
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-rhs-expression",
+        "name": "Assignment: Expression on the Right",
+        "description": "Resolve a multi-step right-hand expression before applying a compound assignment."
+      },
+      "shape": {
+        "operandSources": {"variable": 2, "literal": 1},
+        "operandRange": {"min": 2, "max": 12},
+        "allowNegativeOperands": false
+      },
+      "operators": {"allowed": ["+", "-", "*"]},
+      "template": "operand op operand op operand",
+      "scoring": {"itemCount": 5, "pointsPerItem": 4, "statementCommits": true},
+      "lesson": {"focus": "assignment", "variant": "rhs-expression"},
+      "interaction": {"declarations": "interactive"}
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-sequential",
+        "name": "Assignment: Sequential Updates",
+        "description": "Follow several compound assignments that repeatedly update the same variable."
+      },
+      "shape": {
+        "operandSources": {"variable": 1, "literal": 1},
+        "operandRange": {"min": 2, "max": 12},
+        "allowNegativeOperands": false
+      },
+      "operators": {"allowed": ["+", "-"]},
+      "template": "operand op operand",
+      "scoring": {"itemCount": 5, "pointsPerItem": 4, "statementCommits": true},
+      "lesson": {"focus": "assignment", "variant": "sequential"},
+      "interaction": {"declarations": "interactive"}
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-dependent",
+        "name": "Assignment: Variables and Constants",
+        "description": "Use an updated variable and an immutable constant in a later assignment."
+      },
+      "shape": {
+        "operandSources": {"variable": 2, "constant": 1},
+        "operandRange": {"min": 2, "max": 12},
+        "allowNegativeOperands": false
+      },
+      "operators": {"allowed": ["+", "-", "*" ]},
+      "template": "operand op operand op operand",
+      "scoring": {"itemCount": 5, "pointsPerItem": 5, "statementCommits": true},
+      "lesson": {"focus": "assignment", "variant": "dependent"},
+      "interaction": {"declarations": "interactive"}
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-advanced-chain",
+        "name": "Assignment: Advanced Chain",
+        "description": "Combine precedence, multiple variables, and dependent compound assignments."
+      },
+      "shape": {
+        "operandSources": {"variable": 3},
+        "operandRange": {"min": 2, "max": 10},
+        "allowNegativeOperands": false
+      },
+      "operators": {"allowed": ["+", "-", "*"]},
+      "template": "operand op operand op operand",
+      "scoring": {"itemCount": 5, "pointsPerItem": 6, "statementCommits": true},
+      "lesson": {"focus": "assignment", "variant": "advanced"},
+      "interaction": {"declarations": "interactive"}
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "unary-update-sequence",
+        "name": "Unary Updates: ++ and -- Statements",
+        "description": "Apply prefix and postfix increment or decrement as standalone statements, then reuse the changed variables."
+      },
+      "shape": {
+        "operandSources": {"variable": 2, "literal": 1},
+        "operandRange": {"min": 3, "max": 12},
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": ["+", "-", "*"],
+        "constraints": {"requireMultipleTiers": true}
+      },
+      "template": "operand op operand op operand",
+      "scoring": {"itemCount": 5, "pointsPerItem": 5, "statementCommits": true},
+      "lesson": {"focus": "unary-update", "variant": "standalone-sequence"},
+      "interaction": {"declarations": "interactive"}
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "assignment-unary-advanced-chain",
+        "name": "Assignment + Unary: Advanced Chain",
+        "description": "Trace dependent compound assignments and standalone prefix or postfix updates before evaluating the final expression."
+      },
+      "shape": {
+        "operandSources": {"variable": 3, "constant": 1},
+        "operandRange": {"min": 3, "max": 12},
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": ["+", "-", "*"],
+        "constraints": {"requireMultipleTiers": true}
+      },
+      "template": "operand op operand op operand op operand",
+      "scoring": {"itemCount": 5, "pointsPerItem": 7, "statementCommits": true},
+      "manualResponses": {"enabled": true, "namedValueRate": 50, "operatorRate": 50},
+      "lesson": {"focus": "assignment-unary", "variant": "advanced-assignment-unary"},
+      "interaction": {"declarations": "interactive"}
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "relational-logical-student-derived",
+        "name": "Relational + Logical: Student Derived",
+        "description": "Evaluate one mixed relational and logical expression while supplying selected retrieved and derived values."
+      },
+      "shape": {
+        "operandRange": {"min": 1, "max": 20},
+        "allowNegativeOperands": false
+      },
+      "operators": {"allowed": ["<", ">", "<=", ">=", "==", "!=", "&&", "||"]},
+      "extras": {
+        "unaryWrap": {"enabled": true, "operators": ["!"], "forms": ["prefix"], "fraction": 0.5}
+      },
+      "template": "(operand:lit cmp operand:lit) and operand:var:bool:unary or operand:var:bool:unary",
+      "scoring": {"itemCount": 5, "pointsPerItem": 4},
+      "manualResponses": {"enabled": true, "namedValueRate": 50, "operatorRate": 50}
+    }
+  ]
+}

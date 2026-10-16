@@ -10,6 +10,13 @@
       "enabled": true
     },
     {
+      "id": "c-midterms-expressions",
+      "name": "C Midterms: Expressions",
+      "description": "A persistent C midterms session covering output simulation, variable state, declarations, assignments, unary updates, and logical expressions.",
+      "file": "c-midterms-expressions.json",
+      "enabled": true
+    },
+    {
       "id": "c-semifinals-selection-statements",
       "name": "C Semifinals: Selection Statements",
       "description": "A 90-minute C semifinals session covering operator qualification, expressions, tracing, simulation, and code ordering with selection statements.",

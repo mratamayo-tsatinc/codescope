@@ -1,0 +1,12 @@
+{
+  "title": "C Midterms - Direct Output Commands",
+  "exercises": [
+    "TaskAlpha.c",
+    "TaskBravo.c",
+    "TaskCharlie.c",
+    "TaskDelta.c",
+    "TaskEcho.c",
+    "TaskFoxtrot.c",
+    "TaskHotel.c"
+  ]
+}
