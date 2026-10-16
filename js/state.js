@@ -481,8 +481,8 @@ function handleTokenClick(action){
       const producedStep=runtime&&runtime.trace&&runtime.trace.length>traceLength
         ? runtime.trace[runtime.trace.length-1] : null;
       const event=result.event||null;
-      const modalOwnsCompletion=!!(result.completed&&typeof programStatementTraceOpenFor==='function'
-        &&programStatementTraceOpenFor(item,statement&&statement.id));
+      const evaluationOwnsCompletion=!!(result.completed&&typeof programStatementEvaluationOwnsCompletion==='function'
+        &&programStatementEvaluationOwnsCompletion(item,statement&&statement.id));
       const transition=result.completed&&typeof stageSourceFlowTransition==='function'
         ?stageSourceFlowTransition(item,statement,event&&event.type==='OUTPUT'?'waiting-output':'waiting'):null;
       const outboundMemoryDelay=transition&&event&&event.action==='ASSIGN'
@@ -507,14 +507,14 @@ function handleTokenClick(action){
         queueProgramTerminalAnimation(item,event,()=>{
           if(!transition)return;
           transition.phase='waiting';
-          if(typeof programStatementTraceOpenFor==='function'
-            &&programStatementTraceOpenFor(item,statement&&statement.id))render();
+          if(typeof programStatementEvaluationOwnsCompletion==='function'
+            &&programStatementEvaluationOwnsCompletion(item,statement&&statement.id))render();
           else beginSourceFlowTransition(item);
         });
       }
       const itemFinalized=finalizeSourceProgramItem(item);
       render();
-      if(transition&&!modalOwnsCompletion&&(!event||event.type!=='OUTPUT')){
+      if(transition&&!evaluationOwnsCompletion&&(!event||event.type!=='OUTPUT')){
         if(outboundMemoryDelay>0) setTimeout(()=>beginSourceFlowTransition(item),outboundMemoryDelay);
         else beginSourceFlowTransition(item);
       }

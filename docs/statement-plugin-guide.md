@@ -309,6 +309,12 @@ renderer, so semantic actions, scoring, Undo, persistence, memory reads, and
 Program Output events remain unchanged. A statement plugin must not add a
 modal-only semantic path.
 
+Use `timeline:'source-inline'` when the complete source file must stay visible
+and a multistep statement should expand beneath its current source row. This
+host also mounts the registered renderer and shares the existing memory and
+console workspace; plugins must use the same actions for inline, source-inline,
+and modal presentation.
+
 For a source-flow item, the statement-modal presentation uses the shell's
 shared source-file panel. It renders `item.sourceDisplay.filename`, the item
 language, and every `sourceDisplay.lines` row inside one continuous code

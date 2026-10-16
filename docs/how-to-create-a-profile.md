@@ -618,8 +618,20 @@ presentation:{workspace:'source-program',timeline:'statement-modal'},
 scoring:{itemCount:'manifest',pointsPerItem:2,statementCommits:true}
 ```
 
+To keep the same IDE-like source panel while expanding a multistep evaluation
+directly below its active line, use:
+
+```js
+presentation:{workspace:'source-program',timeline:'source-inline'}
+```
+
+`source-inline` uses the same registered statement renderer and execution
+actions as the modal. It changes only where the evaluation timeline is
+mounted. Direct statements still execute from their source row, and the
+existing memory and console panels remain visible in the workspace.
+
 Omit `presentation.timeline`, or set it to `'inline'`, to retain the established
-inline timeline used by other profiles. This option changes presentation only;
+statement-card timeline used by other profiles. These options change presentation only;
 the same statement renderer, actions, scoring, Undo, persistence, memory, and
 Program Output behavior are reused.
 

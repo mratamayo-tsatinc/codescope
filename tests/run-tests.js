@@ -4961,6 +4961,78 @@ int main() {
   ],2).get(id)})()`),evaluate(ctx,'stepColor(1)'));
 }
 
+function testSourceInlineTimelinePresentation(){
+  const ctx=context();installFakeDom(ctx);
+  load(ctx,['engine.js','flat-model.js','template-engine.js','generator.js','profiles.js','language.js',
+    'program-ir.js','language-core.js','expression-parser.js','expression-semantics.js','output-statement-core.js',
+    'input-statement-core.js','selection-statement-core.js','loop-statement-core.js','statement-parser.js',
+    'statement-semantics.js','program-parser.js','source-program-pipeline.js','program-core.js',
+    'legacy-expression-plugin.js','declaration-statement-plugin.js','assignment-statement-plugin.js',
+    'program-return.js','program-break.js','activity-core.js','source-library-registry.js']);
+  loadRelative(ctx,['plugins/program-output/manifest.js','plugins/program-output/statement.js',
+    'plugins/program-input/manifest.js','plugins/program-input/parser.js','plugins/program-input/statement.js']);
+  load(ctx,['program-item-builder.js']);
+  loadRelative(ctx,['plugins/program-output/content.js','plugins/code-simulator/manifest.js',
+    'plugins/code-simulator/statement.js','plugins/code-simulator/content.js']);
+  load(ctx,['state.js','manual-response.js','dom-helpers.js','program-terminal.js','var-final-state.js',
+    'render-tree.js','render-flat.js','render-declaration.js','render-assignment.js','render-unary-update.js','render-session.js']);
+  loadRelative(ctx,['plugins/program-output/renderer.js','plugins/program-input/renderer.js',
+    'plugins/code-simulator/renderer.js']);
+  ctx.sourceInlineFixture=`#include <stdio.h>
+int main(void) {
+    int a = 2;
+    int b = 3;
+    int total;
+    total = a + b * 2;
+    printf("Total: %d\\n", total);
+    return 0;
+}`;
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const profile=PROFILES.find(candidate=>candidate.id==='trace-output-variables');
+    const item=csBuildItem(profile,{id:'SourceInline',filename:'SourceInline.c',raw:sourceInlineFixture},'c',1);
+    state.language='c';state.profileId=profile.id;state.items=[item];state.itemIndex=0;state.mode='practice';
+    while(item.program.status==='running'&&item.program.statements[item.program.cursor].kind==='declaration'){
+      const statement=item.program.statements[item.program.cursor],plan=statementInteractionPlan(item,statement);
+      dispatchProgramAction(item,plan.action,{applyExpressionAction});
+    }
+    const assignment=item.program.statements[item.program.cursor];
+    const before=h('div',{});renderProgramItem(before,item,{});
+    const opened=activateProgramSourceStatement(item,assignment.id,null);
+    const expanded=h('div',{});renderProgramItem(expanded,item,{});
+    const ownsCompletion=programStatementEvaluationOwnsCompletion(item,assignment.id);
+    const toggledClosed=activateProgramSourceStatement(item,assignment.id,null);
+    const toggledHost=h('div',{});renderProgramItem(toggledHost,item,{});
+    activateProgramSourceStatement(item,assignment.id,null);
+    item.practiceInvalidExecution={statementId:assignment.id,reason:'operand-unavailable',recoverable:true};
+    const invalidExpanded=h('div',{});renderProgramItem(invalidExpanded,item,{});
+    closeProgramSourceInlineTrace(item,false);
+    const closed=h('div',{});renderProgramItem(closed,item,{});
+    return JSON.stringify({timeline:programTimelinePresentation(item),plan:statementInteractionPlan(item,assignment).mode,
+      opened,sourcePanels:countNodesWithClass(before,'program-source-file-panel'),
+      legacyCards:countNodesWithClass(before,'program-source-context'),
+      expandedTraces:countNodesWithClass(expanded,'program-source-inline-trace'),
+      inlineHeadings:countNodesWithClass(expanded,'program-source-inline-heading'),
+      toggledClosed,toggledTraces:countNodesWithClass(toggledHost,'program-source-inline-trace'),
+      expandedWarnings:countNodesWithClass(invalidExpanded,'invalid-execution-alert'),
+      modalOpen:programStatementTraceOpenFor(item,assignment.id),ownsCompletion,
+      closedTraces:countNodesWithClass(closed,'program-source-inline-trace'),
+      collapsedWarnings:countNodesWithClass(closed,'invalid-execution-alert')});
+  })()`));
+  assert.strictEqual(result.timeline,'source-inline');
+  assert.strictEqual(result.plan,'modal');
+  assert(result.opened&&result.ownsCompletion);
+  assert.strictEqual(result.sourcePanels,1);
+  assert.strictEqual(result.legacyCards,0);
+  assert.strictEqual(result.expandedTraces,1);
+  assert.strictEqual(result.inlineHeadings,0);
+  assert(result.toggledClosed);
+  assert.strictEqual(result.toggledTraces,0);
+  assert.strictEqual(result.expandedWarnings,1);
+  assert.strictEqual(result.modalOpen,false);
+  assert.strictEqual(result.closedTraces,0);
+  assert.strictEqual(result.collapsedWarnings,1);
+}
+
 function testProgramInputPlugin(){
   const inputRendererSource=fs.readFileSync(path.join(ROOT,'plugins','program-input','renderer.js'),'utf8');
   const inputStyles=fs.readFileSync(path.join(ROOT,'plugins','program-input','styles.css'),'utf8');
@@ -5085,6 +5157,7 @@ function testProgramInputPlugin(){
   assert(connectorSource.includes("statement.kind==='input'&&typeof programInputFinishedConnectorVisuals==='function'"));
 }
 
+testSourceInlineTimelinePresentation();
 testExerciseLibraryRegistry();
 testProfileCategoriesAndScopedScores();
 testModeScopedPersistence();

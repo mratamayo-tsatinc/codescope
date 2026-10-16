@@ -2960,7 +2960,7 @@
       },
       "presentation": {
         "workspace": "source-program",
-        "timeline": "statement-modal"
+        "timeline": "source-inline"
       },
       "feedback": {
         "showCorrectSolution": {

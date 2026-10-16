@@ -306,7 +306,10 @@ function renderProgramSourceFilePanel(item,program){
       &&!examInteractionLocked()&&(isExpected||strictCandidate));
     const activeVisual=isExpected&&!strictStatements;
     const plan=(interactive||strictPaused)?statementInteractionPlan(item,statement):null;
-    const interactionClass=plan?` interaction-${plan.mode}`:'',result=statementTraceResult(statement);
+    const sourceInline=!!(plan&&plan.mode==='modal'&&programUsesSourceInlineTrace(item));
+    const sourceInlineOpen=!!(sourceInline&&programSourceInlineTraceOpenFor(item,statement.id));
+    const interactionMode=sourceInline?'source-inline':plan&&plan.mode;
+    const interactionClass=interactionMode?` interaction-${interactionMode}`:'',result=statementTraceResult(statement);
     const visualStatus=strictStatements&&program.status==='running'&&statement
       &&statement.status!=='complete'&&statement.status!=='invalid'?'waiting':statement&&statement.status;
     const stateClass=statement
@@ -317,8 +320,9 @@ function renderProgramSourceFilePanel(item,program){
       type:interactive?'button':null,'data-source-line':String(line.number),
       'data-statement-id':statement&&statement.id||null,
       'aria-disabled':strictPaused?'true':null,
-      'aria-label':interactive?`${plan.label}, line ${line.number}`:null,
-      title:interactive?plan.label:null,
+      'aria-expanded':sourceInline?String(sourceInlineOpen):null,
+      'aria-label':interactive?(sourceInlineOpen?`Collapse line ${line.number} evaluation`:`${plan.label}, line ${line.number}`):null,
+      title:interactive?(sourceInlineOpen?'Collapse evaluation':plan.label):null,
       onclick:interactive?event=>activateProgramSourceStatement(item,statement.id,event.currentTarget):null});
     row.appendChild(h('span',{class:'program-source-file-number','aria-hidden':'true'},String(line.number)));
     row.appendChild(h('code',{class:'program-source-file-text'},...programSourceFragments(line.text,item.language)));
@@ -336,13 +340,15 @@ function renderProgramSourceFilePanel(item,program){
       h('i',{class:'fa-solid fa-rotate-left','aria-hidden':'true'})));
     }
     if(plan){
-      const icon=plan.mode==='direct'?'fa-play':'fa-up-right-and-down-left-from-center';
-      state.appendChild(h('i',{class:`fa-solid ${icon} program-source-file-action ${plan.mode}-action`,'aria-hidden':'true'}));
+      const icon=plan.mode==='direct'?'fa-play':(sourceInline?(sourceInlineOpen?'fa-chevron-up':'fa-chevron-down'):'fa-up-right-and-down-left-from-center');
+      state.appendChild(h('i',{class:`fa-solid ${icon} program-source-file-action ${interactionMode}-action`,'aria-hidden':'true'}));
     }
     row.appendChild(state);source.appendChild(row);
     const inlineResponse=typeof renderProgramOutputInlineResponse==='function'
       ?renderProgramOutputInlineResponse(item,program,statement):null;
     if(inlineResponse)source.appendChild(inlineResponse);
+    const inlineTrace=renderProgramSourceInlineTrace(item,program,statement,entry&&entry.index);
+    if(inlineTrace)source.appendChild(inlineTrace);
   });
   if(transition&&transition.phase==='moving'&&transition.destinationId){
     source.appendChild(h('span',{class:'program-source-flow-highlight','aria-hidden':'true'}));
@@ -354,7 +360,8 @@ function renderProgramSourceFilePanel(item,program){
     const failed=program.statements.find(candidate=>candidate.id===failedStatementId)
       ||currentProgramStatement(item);
     const alert=renderInvalidExecutionAlert(item,failed);
-    if(alert)panel.appendChild(alert);
+    const inlineOwnsAlert=!!(failed&&programSourceInlineTraceOpenFor(item,failed.id));
+    if(alert&&!inlineOwnsAlert)panel.appendChild(alert);
   }
   if(typeof requestAnimationFrame==='function') requestAnimationFrame(()=>{
     source.scrollTop=viewport.top;source.scrollLeft=viewport.left;
@@ -395,7 +402,7 @@ function renderProgramSourceContextLine(line){
 
 function renderProgramSourceFlow(container,item,program,services,renderStatement){
   if(!item||!item.sourceFlow||!item.sourceDisplay||!Array.isArray(item.sourceDisplay.lines)) return false;
-  if(programUsesStatementTraceModal(item)){
+  if(programUsesSourceFilePanel(item)){
     container.appendChild(renderProgramSourceFilePanel(item,program));
     return true;
   }
@@ -467,6 +474,14 @@ function programUsesStatementTraceModal(item){
   return programTimelinePresentation(item)==='statement-modal';
 }
 
+function programUsesSourceInlineTrace(item){
+  return programTimelinePresentation(item)==='source-inline';
+}
+
+function programUsesSourceFilePanel(item){
+  return programUsesStatementTraceModal(item)||programUsesSourceInlineTrace(item);
+}
+
 function programStatementTraceOpenFor(item,statementId){
   return !!(statementTraceModalState&&statementTraceModalState.item===item
     &&statementTraceModalState.statementId===statementId);
@@ -476,6 +491,15 @@ function programStatementTraceOpenForItem(item){
   return !!(statementTraceModalState&&statementTraceModalState.item===item);
 }
 
+function programSourceInlineTraceOpenFor(item,statementId){
+  const request=item&&item._sourceInlineTrace;
+  return !!(request&&request.statementId===statementId&&programUsesSourceInlineTrace(item));
+}
+
+function programStatementEvaluationOwnsCompletion(item,statementId){
+  return programStatementTraceOpenFor(item,statementId)||programSourceInlineTraceOpenFor(item,statementId);
+}
+
 function statementTraceResult(statement){
   if(!statement||statement.kind!=='selection'||statement.status!=='complete'||!statement.runtime||!statement.runtime.checked) return null;
   if(statement.selectionKind==='switch') return `${formatValue(statement.runtime.assignedValue)} · ${statement.runtime.selectedLabel}`;
@@ -483,6 +507,9 @@ function statementTraceResult(statement){
 }
 
 function activateProgramSourceStatement(item,statementId,trigger){
+  if(programSourceInlineTraceOpenFor(item,statementId)){
+    closeProgramSourceInlineTrace(item,true);return true;
+  }
   const selection=typeof attemptProgramStatementSelection==='function'
     ?attemptProgramStatementSelection(item,statementId):{applied:false,ignored:true};
   if(!selection.applied)return false;
@@ -490,7 +517,73 @@ function activateProgramSourceStatement(item,statementId,trigger){
   if(plan.mode==='direct'){
     handleTokenClick(plan.action);return true;
   }
+  if(programUsesSourceInlineTrace(item)){
+    openProgramSourceInlineTrace(item,statement.id,trigger);return true;
+  }
   openProgramStatementTrace(item,statement.id,trigger);return true;
+}
+
+function openProgramSourceInlineTrace(item,statementId,trigger){
+  if(!item||!item.program||!programUsesSourceInlineTrace(item))return;
+  const statement=item.program.statements.find(candidate=>candidate.id===statementId);
+  if(!statement||statement.status==='locked'||statement.status==='blocked')return;
+  const plan=statementInteractionPlan(item,statement);
+  if(plan.mode!=='modal')return;
+  setProgramContextTab('memory');
+  item._sourceInlineTrace={statementId,focus:plan.focus,
+    returnFocus:trigger&&typeof trigger.focus==='function'?trigger:null};
+  render();
+  if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>{
+    const trace=document.querySelector&&document.querySelector(`[data-source-inline-trace="${statementId}"]`);
+    const target=trace&&trace.querySelector&&trace.querySelector('button:not([disabled]), [tabindex="0"]');
+    if(target&&typeof target.focus==='function')target.focus({preventScroll:true});
+  });
+}
+
+function closeProgramSourceInlineTrace(item,restoreFocus=true){
+  const request=item&&item._sourceInlineTrace;
+  if(!request)return false;
+  const shouldAdvance=!!(item._sourceFlowTransition&&item._sourceFlowTransition.phase!=='waiting-output');
+  const returnFocus=request.returnFocus;
+  delete item._sourceInlineTrace;
+  if(shouldAdvance)beginSourceFlowTransition(item,sourceFlowTimings().modalCloseSettleMs);
+  else{
+    render();
+    if(restoreFocus&&returnFocus&&returnFocus.isConnected!==false&&typeof returnFocus.focus==='function'){
+      if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>returnFocus.focus({preventScroll:true}));
+      else returnFocus.focus();
+    }
+  }
+  return true;
+}
+
+function renderProgramSourceInlineTrace(item,program,statement,statementIndex){
+  if(!statement||!programSourceInlineTraceOpenFor(item,statement.id))return null;
+  const request=item._sourceInlineTrace;
+  const current=statementIndex===program.cursor&&program.status!=='complete';
+  const completed=statement.status==='complete';
+  if((!current&&!completed)||statement.status==='invalid'){
+    delete item._sourceInlineTrace;return null;
+  }
+  const waitingForOutput=!!(completed&&item._sourceFlowTransition&&item._sourceFlowTransition.phase==='waiting-output');
+  const region=h('section',{class:`program-source-inline-trace${completed?' is-complete':''}`,
+    'data-source-inline-trace':statement.id,'aria-label':`Line ${programStatementDisplayNumber(statement,statementIndex)} evaluation`});
+  const trace=h('div',{class:'statement-trace-detail program-source-inline-detail'});
+  const renderer=statementRendererRegistry.get(statement.kind);
+  if(typeof renderer!=='function')throw new Error(`No renderer registered for statement kind '${statement.kind}'`);
+  renderer({container:trace,item,program,statement,statementIndex,isActive:!completed,
+    services:{statementTraceModal:true,sourceInlineTrace:true,
+      expressionOnly:request.focus==='condition-expression',preserveCompletedTimeline:completed}});
+  region.appendChild(trace);
+  if(completed){
+    region.appendChild(h('footer',{class:'program-source-inline-complete',role:'status'},
+      h('span',{},h('i',{class:'fa-solid fa-circle-check','aria-hidden':'true'}),' Evaluation complete'),
+      h('button',{class:'statement-trace-action primary program-source-inline-continue',type:'button',disabled:waitingForOutput,
+        'aria-disabled':waitingForOutput?'true':'false',onclick:()=>closeProgramSourceInlineTrace(item,true)},
+        h('span',{},waitingForOutput?'Finishing output…':'Continue program'),
+        h('i',{class:'fa-solid fa-arrow-right','aria-hidden':'true'}))));
+  }
+  return region;
 }
 
 function openProgramStatementTrace(item,statementId,trigger){
@@ -715,7 +808,14 @@ function renderProgramStatementTraceSource(statement,statementIndex,item,isActiv
 }
 
 if(typeof document!=='undefined'&&document.addEventListener){
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&statementTraceModalState)closeProgramStatementTrace();});
+  document.addEventListener('keydown',event=>{
+    if(event.key!=='Escape')return;
+    if(statementTraceModalState)closeProgramStatementTrace();
+    else{
+      const item=state&&state.items&&state.items[state.itemIndex];
+      if(item&&item._sourceInlineTrace)closeProgramSourceInlineTrace(item,true);
+    }
+  });
 }
 
 function renderProgramWorkspaceShell(container,item,program){

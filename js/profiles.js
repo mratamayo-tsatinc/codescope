@@ -772,7 +772,7 @@ const PROFILES_RAW = [
     content:{mode:'source-files',source:{library:'source-programs',exerciseSet:'simulate-output-variables'},
       values:{variables:'seeded'},selection:{count:'all',shuffle:false}},
     interaction:{declarations:'interactive'},
-    presentation:{workspace:'source-program',timeline:'statement-modal'},
+    presentation:{workspace:'source-program',timeline:'source-inline'},
     feedback:{showCorrectSolution:{practice:false,exam:false}},
   },
   {
