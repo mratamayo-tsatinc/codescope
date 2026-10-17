@@ -87,7 +87,7 @@ Every profile has the generation fields plus optional declarative capability blo
   content:   { mode, source, values, selection },// where items come from (optional)
   lesson:    { focus, variant, constructs },      // learning intent (optional)
   interaction: { declarations },                 // learner interaction (optional)
-  presentation: { workspace, timeline },          // UI form (optional)
+  presentation: { workspace, timeline, flowTrail }, // UI form (optional)
   manualResponses: { ... },                      // student-derived values (optional)
 }
 ```
@@ -593,7 +593,7 @@ content:{
   selection:{count:'all',shuffle:false},
 },
 lesson:{focus:'program-flow',constructs:['selection']},
-presentation:{workspace:'source-program',timeline:'statement-modal'}
+presentation:{workspace:'source-program',timeline:'statement-modal',flowTrail:true}
 ```
 
 Each manifest-listed source file is parsed independently. It may contain any
@@ -642,6 +642,22 @@ it without opening a modal. An expand icon marks a multistep statement. Its
 registered renderer opens in the trace modal. Selection modals show the
 condition expression alone while the complete control statement remains visible
 in the source file.
+
+Set `presentation.flowTrail:true` with `workspace:'source-program'`, or on a
+`code-ordering` activity profile, to add the persistent program-flow overlay.
+The overlay anchors to the beginning of
+each executed source statement, keeps earlier routes visible, uses an indented
+inner route for a selected branch body, and uses the left gutter for skipped
+`if`/`else if` clauses and `switch` cases. Omit the property or set it to
+`false` to retain the source workspace without this overlay.
+
+For code ordering, the trail follows runtime playback rather than drag order,
+so it appears progressively when the learner uses Play or Next:
+
+```js
+activity:{kind:'code-ordering',/* generator and instructions */},
+presentation:{flowTrail:true}
+```
 
 The source file, rather than the profile, owns each allowed range:
 

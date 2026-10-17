@@ -93,6 +93,7 @@ function profileVariableValueMode(profile){const values=profile&&profile.content
 function profileInputValueMode(profile){const values=profile&&profile.content&&profile.content.values||{};return values.input||'authored';}
 function profileWorkspacePresentation(profile){return profile&&profile.presentation&&profile.presentation.workspace||'statement-flow';}
 function profileTimelineMode(profile){return profile&&profile.presentation&&profile.presentation.timeline||'inline';}
+function profileFlowTrailEnabled(profile){return !!(profile&&profile.presentation&&profile.presentation.flowTrail===true);}
 function profileScoresStatementCommits(profile){return !!(profile&&profile.scoring&&profile.scoring.statementCommits===true);}
 
 rebuildProfileRegistry(PROFILES_RAW,PROFILE_CATEGORIES,PROFILE_SESSION,{id:'codescope-default',name:'CodeScope Default',version:'1'});

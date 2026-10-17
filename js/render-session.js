@@ -288,6 +288,7 @@ function renderProgramSourceFilePanel(item,program){
     style:`--program-flow-duration:${flowTiming.movementDurationMs}ms;`,
     onscroll:()=>rememberSourceFlowViewport(item,source),onwheel:markUserScroll,
     ontouchstart:markUserScroll,onpointerdown:markUserScroll,onkeydown:flowKeydown});
+  const flowLineElements=new Map();
   display.lines.forEach(line=>{
     const lineStatementIds=Array.isArray(line.statementIds)&&line.statementIds.length
       ?line.statementIds:(line.statementId?[line.statementId]:[]);
@@ -325,7 +326,8 @@ function renderProgramSourceFilePanel(item,program){
       title:interactive?(sourceInlineOpen?'Collapse evaluation':plan.label):null,
       onclick:interactive?event=>activateProgramSourceStatement(item,statement.id,event.currentTarget):null});
     row.appendChild(h('span',{class:'program-source-file-number','aria-hidden':'true'},String(line.number)));
-    row.appendChild(h('code',{class:'program-source-file-text'},...programSourceFragments(line.text,item.language)));
+    const sourceCode=h('code',{class:'program-source-file-text'},...programSourceFragments(line.text,item.language));
+    row.appendChild(sourceCode);flowLineElements.set(Number(line.number),{row,code:sourceCode,line});
     const state=h('span',{class:'program-source-file-state'});
     if(result!==null){
       const resultClass=statement.selectionKind==='switch'?'is-switch':(Boolean(statement.runtime.assignedValue)?'is-true':'is-false');
@@ -353,6 +355,7 @@ function renderProgramSourceFilePanel(item,program){
   if(transition&&transition.phase==='moving'&&transition.destinationId){
     source.appendChild(h('span',{class:'program-source-flow-highlight','aria-hidden':'true'}));
   }
+  if(typeof mountProgramFlowTrail==='function')mountProgramFlowTrail(source,item,program,flowLineElements);
   panel.appendChild(source);
   const invalidSelection=item.practiceInvalidExecution||item.examSequenceFailure;
   if(invalidSelection){
@@ -427,7 +430,9 @@ let sourceFlowTransitionTimer=null;
 
 function stageSourceFlowTransition(item,originStatement,phase='waiting'){
   if(!item||!item.sourceFlow||!item.program||!originStatement||originStatement.status!=='complete') return null;
-  if(typeof strictSequenceEnabled==='function'&&strictSequenceEnabled())return null;
+  const profile=typeof PROFILES!=='undefined'&&PROFILES.find(candidate=>candidate.id===item.profileId);
+  const flowTrailTransition=typeof profileFlowTrailEnabled==='function'&&profileFlowTrailEnabled(profile);
+  if(typeof strictSequenceEnabled==='function'&&strictSequenceEnabled()&&!flowTrailTransition)return null;
   const destination=item.program.status==='running'?item.program.statements[item.program.cursor]:null;
   if(!destination||destination.id===originStatement.id) return null;
   const transition={originId:originStatement.id,destinationId:destination.id,phase,userScrolled:false};

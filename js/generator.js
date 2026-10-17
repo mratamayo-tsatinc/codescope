@@ -380,6 +380,12 @@ function profileShowsCorrectSolution(profile,mode){
 function finalizeProfile(raw){
   if(raw.enabled!==undefined&&typeof raw.enabled!=='boolean')
     throw new Error(`Profile '${raw.meta&&raw.meta.id||'unknown'}': enabled must be a boolean`);
+  if(raw.presentation&&raw.presentation.flowTrail!==undefined
+    &&typeof raw.presentation.flowTrail!=='boolean')
+    throw new Error(`Profile '${raw.meta&&raw.meta.id||'unknown'}': presentation.flowTrail must be a boolean`);
+  if(raw.presentation&&raw.presentation.flowTrail===true&&raw.presentation.workspace!=='source-program'
+    &&!(raw.activity&&raw.activity.kind==='code-ordering'))
+    throw new Error(`Profile '${raw.meta&&raw.meta.id||'unknown'}': presentation.flowTrail requires the source-program workspace or code-ordering activity`);
   // Activity profiles share the shell's global profile catalog and scoring
   // aliases, but their remaining configuration is owned by the activity
   // plugin rather than the legacy expression generator.
@@ -393,6 +399,7 @@ function finalizeProfile(raw){
         values:raw.content.values?Object.assign({},raw.content.values):undefined,
         selection:raw.content.selection?Object.assign({},raw.content.selection):undefined,
       }) : null,
+      presentation: raw.presentation ? Object.assign({},raw.presentation) : null,
       feedback: finalizeProfileFeedback(raw.feedback,raw.meta&&raw.meta.id),
       behavior: finalizeProfileBehavior(raw.behavior,raw.feedback),
       enabled: raw.enabled!==false,

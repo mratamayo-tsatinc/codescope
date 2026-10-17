@@ -57,13 +57,24 @@ const profileResult=JSON.parse(evaluate(`(()=>{
       allVariableOnly:items.every(item=>item.decls.length===collectOperandSpecs(profile._ast,[]).length
         &&item.decls.every(declaration=>declaration.kind==='variable'))};
   });
-  return JSON.stringify({ids:finalized.map(profile=>profile.id),generated});
+  return JSON.stringify({ids:finalized.map(profile=>profile.id),generated,
+    flowTrailIds:finalized.filter(profile=>profile.presentation&&profile.presentation.flowTrail===true)
+      .map(profile=>profile.id)});
 })()`));
 assert.strictEqual(new Set(profileResult.ids).size,20);
 profileResult.generated.forEach(result=>{
   assert.strictEqual(result.items,25);
   assert(result.allVariableOnly,`${result.id} must generate variable-only operands`);
 });
+const orderCategory=profileSet.categories.find(category=>category.id==='semifinals-order-selection');
+assert(orderCategory,'Order Selection Statements category must exist');
+const rawProfilesById=new Map(profileSet.profiles.map(profile=>[profile.meta.id,profile]));
+orderCategory.profileIds.forEach(id=>{
+  const profile=rawProfilesById.get(id);
+  assert(profile&&profile.activity&&profile.activity.kind==='code-ordering',`${id} must use code-ordering`);
+  assert(profile.presentation&&profile.presentation.flowTrail===true,`${id} must enable presentation.flowTrail`);
+});
+assert.deepStrictEqual(profileResult.flowTrailIds,orderCategory.profileIds);
 
 context.state={mode:'exam',examExpired:false};
 context.roundPoints=value=>Math.round(value*100)/100;

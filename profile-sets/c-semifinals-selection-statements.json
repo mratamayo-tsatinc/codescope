@@ -1231,6 +1231,9 @@
           "shuffle": false
         }
       },
+      "presentation": {
+        "flowTrail": true
+      },
       "behavior": {
         "interactionMode": "strict-sequence",
         "allowUndo": false,
@@ -1273,6 +1276,9 @@
           "exerciseSet": "semifinals-order-if",
           "shuffle": false
         }
+      },
+      "presentation": {
+        "flowTrail": true
       },
       "behavior": {
         "interactionMode": "strict-sequence",
@@ -1317,6 +1323,9 @@
           "shuffle": false
         }
       },
+      "presentation": {
+        "flowTrail": true
+      },
       "behavior": {
         "interactionMode": "strict-sequence",
         "allowUndo": false,
@@ -1360,6 +1369,9 @@
           "shuffle": false
         }
       },
+      "presentation": {
+        "flowTrail": true
+      },
       "behavior": {
         "interactionMode": "strict-sequence",
         "allowUndo": false,
@@ -1402,6 +1414,9 @@
           "exerciseSet": "semifinals-order-switch",
           "shuffle": false
         }
+      },
+      "presentation": {
+        "flowTrail": true
       },
       "behavior": {
         "interactionMode": "strict-sequence",

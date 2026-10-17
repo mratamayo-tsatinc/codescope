@@ -38,8 +38,16 @@
 /* Unified source listing: fixed and movable statements share one IDE-like
    gutter and row treatment. Interaction controls alone indicate movability. */
 .co-source-scaffold{padding:0}
-.co-order-list{gap:0;margin:0;padding:7px 0;border:0;border-radius:0;background:transparent}
+.co-order-list{--program-source-code-pad:12px;position:relative;gap:0;margin:0;padding:7px 0;border:0;border-radius:0;background:transparent}
 .co-order-line{grid-template-columns:44px minmax(0,1fr) auto;gap:0;min-height:36px;padding:0 10px 0 6px;border-color:transparent;border-radius:0;background:transparent}
+.co-order-list.has-program-flow-trail .co-order-line{position:relative;z-index:auto}
+.co-order-list.has-program-flow-trail .co-order-number,
+.co-order-list.has-program-flow-trail .co-order-code,
+.co-order-list.has-program-flow-trail .co-line-actions{position:relative;z-index:3}
+.co-order-list .program-flow-trail-skipped .co-order-code{opacity:.42}
+.co-order-list .program-flow-trail-skipped .co-order-number{opacity:.55}
+.co-program-flow-highlight{position:absolute;z-index:1;left:0;box-sizing:border-box;pointer-events:none;background:color-mix(in srgb,var(--op) 9%,transparent);box-shadow:inset 3px 0 0 var(--op);will-change:transform,height;transition:transform var(--co-flow-duration) cubic-bezier(.22,.8,.28,1),height var(--co-flow-duration) cubic-bezier(.22,.8,.28,1)}
+.co-program-flow-highlight.is-moving{transform:translateY(var(--co-flow-distance))}
 .co-fixed-line{opacity:1}
 .co-order-line.is-blank{min-height:28px}
 .co-order-line.is-draggable:hover{background:color-mix(in srgb,var(--op) 4%,var(--panel))}
@@ -72,7 +80,7 @@
   height:3px;
   box-shadow:0 0 0 1px color-mix(in srgb,var(--op) 28%,transparent),0 0 11px color-mix(in srgb,var(--op) 55%,transparent);
 }
-@media(max-width:560px){.co-order-list{margin:0;padding:6px 0}.co-order-line{grid-template-columns:38px minmax(0,1fr) auto;padding-right:6px}.co-order-number{display:flex;padding-right:8px}.co-order-code{padding-left:9px}}
+@media(max-width:560px){.co-order-list{--program-source-code-pad:9px;margin:0;padding:6px 0}.co-order-line{grid-template-columns:38px minmax(0,1fr) auto;padding-right:6px}.co-order-number{display:flex;padding-right:8px}.co-order-code{padding-left:9px}}
 
 /* Main ordering workspace: simultaneous comparison on wide screens and the
    same three views behind compact tabs when horizontal space is limited. */
@@ -156,4 +164,4 @@ button.co-state-status{cursor:pointer}button.co-state-status:hover,button.co-sta
   .co-playback-speed{grid-template-columns:auto minmax(80px,1fr);flex:1 1 190px;margin-left:0}
 }
 @media(max-width:390px){.co-playback-button{min-width:31px;padding:0 7px}.co-playback-controls{gap:7px}}
-@media(prefers-reduced-motion:reduce){.co-workspace-state.student-state .co-memory-playback-write .tok-card{animation:none}}
+@media(prefers-reduced-motion:reduce){.co-workspace-state.student-state .co-memory-playback-write .tok-card{animation:none}.co-program-flow-highlight{transition:opacity 120ms linear}.co-program-flow-highlight.is-moving{transform:none;opacity:0}}

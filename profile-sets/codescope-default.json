@@ -2840,7 +2840,8 @@
       },
       "presentation": {
         "workspace": "source-program",
-        "timeline": "statement-modal"
+        "timeline": "statement-modal",
+        "flowTrail": true
       },
       "feedback": {
         "showCorrectSolution": {

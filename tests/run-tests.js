@@ -138,8 +138,10 @@ function testScriptManifestParses(){
   assert(localScripts.includes('plugins/program-input/statement.js'));
   assert(localScripts.includes('plugins/program-input/renderer.js'));
   assert(localScripts.includes('js/program-terminal.js'));
+  assert(localScripts.includes('js/program-flow-trail.js'));
   assert(localScripts.indexOf('js/dom-helpers.js')<localScripts.indexOf('js/program-terminal.js'));
   assert(localScripts.indexOf('js/program-terminal.js')<localScripts.indexOf('js/render-session.js'));
+  assert(localScripts.indexOf('js/program-flow-trail.js')<localScripts.indexOf('js/render-session.js'));
   assert(html.includes('plugins/program-input/styles.css'));
   assert(html.includes('plugins/code-simulator/styles.css'));
   assert(!html.includes('plugins/program-selection/'));
@@ -2786,6 +2788,30 @@ function testCodeOrderingPartialRecordScoring(){
   assert.strictEqual(result.total,2);
   assert.deepStrictEqual(result.variableResults,[true,false]);
 }
+function testCodeOrderingFlowTrailAdapter(){
+  const ctx=context();ctx.registerActivityPlugin=()=>{};
+  loadRelative(ctx,['plugins/code-ordering/plugin.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const item={profileId:'ordering-flow',source:'if (x) {\\n  y = 1;\\n}\\nelse if (z) {\\n  y = 2;\\n}',
+      orderLines:[],order:[],_coPlayback:{index:3,frames:[
+        {line:1,statementId:'if-1',statementKind:'selection',sourceText:'if (x) {'},
+        {line:4,statementId:'else-if-1',statementKind:'selection',sourceText:'else if (z) {'},
+        {line:5,statementId:'assignment-1',statementKind:'assignment',sourceText:'  y = 2;'}
+      ]}};
+    const adapted=coFlowTrailAdapter(item);
+    return JSON.stringify({selectionKinds:adapted.program.statements.map(statement=>statement.selectionKind),
+      history:adapted.program.executionHistory,cursor:adapted.program.cursor});
+  })()`));
+  assert.deepStrictEqual(result.selectionKinds,['if','else-if',null]);
+  assert.strictEqual(result.history.length,2);
+  assert.strictEqual(result.cursor,2);
+  const orderingStyles=fs.readFileSync(path.join(ROOT,'plugins','code-ordering','styles.css'),'utf8');
+  const sharedStyles=fs.readFileSync(path.join(ROOT,'css','styles.css'),'utf8');
+  assert(orderingStyles.includes('.co-order-list.has-program-flow-trail .co-order-line{position:relative;z-index:auto}'));
+  assert(/\.co-order-list\.has-program-flow-trail \.co-order-number,\s*\.co-order-list\.has-program-flow-trail \.co-order-code,\s*\.co-order-list\.has-program-flow-trail \.co-line-actions\{position:relative;z-index:3\}/.test(orderingStyles));
+  assert(orderingStyles.includes('.co-program-flow-highlight{position:absolute;z-index:1;'));
+  assert(sharedStyles.includes('.program-flow-trail-svg{position:absolute;z-index:2;'));
+}
 function run(){
   const phaseZeroBaseline=assertPhaseZeroBaseline(ROOT);
   testScriptManifestParses();
@@ -2812,6 +2838,7 @@ function run(){
   testFallingTokenSortMultiple();
   testSimulateOutputPlugin();
   testCodeOrderingPartialRecordScoring();
+  testCodeOrderingFlowTrailAdapter();
   testInlineEvaluationActions();
   testLegacyUnaryMutationCards();
   testInvalidExecutionAlertIsStatementScoped();
@@ -4450,6 +4477,9 @@ int main() {
     strictProbe.program.statements[0].status='complete';strictProbe.program.cursor=1;
     strictProbe.program.statements[1].status='active';
     const strictTransitionSuppressed=stageSourceFlowTransition(strictProbe,strictProbe.program.statements[0])===null;
+    const strictProbeProfileId=strictProbe.profileId;strictProbe.profileId='trace-basic-selection';
+    const strictFlowTrailTransitionRestored=!!stageSourceFlowTransition(strictProbe,strictProbe.program.statements[0]);
+    delete strictProbe._sourceFlowTransition;strictProbe.profileId=strictProbeProfileId;
     const strictExamProbe=csBuildItem(profile,{id:'StrictExamFlow',filename:'StrictExamFlow.c',raw:csLiveControlFixture},'c',104);
     state.mode='exam';state.examPolicy=snapshotExamPolicy({exam:{interactionMode:'strict-sequence'}});
     state.items=[strictExamProbe];state.itemIndex=0;
@@ -4603,7 +4633,7 @@ int main() {
       strictConditionPaused,strictConditionModalWarning,strictConditionSourceWarning,strictConditionRecovered,
       strictPrintPaused,strictPrintModalWarning,strictPrintModalReset,strictPrintSourceWarning,
       strictConcatPaused,strictJavaOutputRecovered,
-      strictTransitionSuppressed,strictExamTerminated,
+      strictTransitionSuppressed,strictFlowTrailTransitionRestored,strictExamTerminated,
       manifestVersion:CODE_SIMULATOR_PLUGIN_MANIFEST.version,sourcePanels,sourceRows,firstMemoryNames,
       sourceLineCount:first.sourceDisplay.lines.length,sourceActions,directActions,modalActions,activeSourceRows,oldTimelineRows,inlinePanels,
       contextDocks,contextTabs,memoryDockHosts,
@@ -4751,7 +4781,7 @@ int main() {
   assert.strictEqual(result.strictPrintModalWarning,1);
   assert.strictEqual(result.strictPrintModalReset,0);
   assert.strictEqual(result.strictPrintSourceWarning,1);
-  assert(result.strictTransitionSuppressed&&result.strictExamTerminated);
+  assert(result.strictTransitionSuppressed&&result.strictFlowTrailTransitionRestored&&result.strictExamTerminated);
   assert.deepStrictEqual(result.firstMemoryNames,['score','absences']);
   assert.strictEqual(new Set(result.firstMemoryNames).size,result.firstMemoryNames.length);
   assert.strictEqual(result.sourcePanels,1);
@@ -5157,6 +5187,51 @@ function testProgramInputPlugin(){
   assert(connectorSource.includes("statement.kind==='input'&&typeof programInputFinishedConnectorVisuals==='function'"));
 }
 
+function testProgramFlowTrailModel(){
+  const ctx=context();load(ctx,['program-flow-trail.js']);
+  const result=JSON.parse(evaluate(ctx,`(()=>{
+    const source=[
+      'if (score >= 95) {','    grade = "A+";','}',
+      'else if (score >= 90) {','    grade = "A";','}',
+      'else {','    grade = "B";','}','print(grade);',
+      'switch (level) {','    case 1:','        result = 1;','        break;',
+      '    case 2:','        result = 2;','        break;','}','print(result);'
+    ];
+    const statement=(id,line,extra={})=>Object.assign({id,sourceLine:line,sourceText:source[line-1]},extra);
+    const statements=[
+      statement('if-1',1,{kind:'selection',selectionKind:'if'}),
+      statement('a-plus',2,{kind:'assignment'}),
+      statement('else-if-1',4,{kind:'selection',selectionKind:'else-if'}),
+      statement('a',5,{kind:'assignment'}),statement('b',8,{kind:'assignment'}),
+      statement('print-grade',10,{kind:'output'}),
+      statement('switch-1',11,{kind:'selection',selectionKind:'switch'}),
+      statement('case-1',13,{kind:'assignment'}),statement('break-1',14,{kind:'program-break'}),
+      statement('case-2',16,{kind:'assignment'}),statement('break-2',17,{kind:'program-break'}),
+      statement('print-result',19,{kind:'output'})
+    ];
+    const lines=source.map((text,index)=>({number:index+1,text,statementIds:statements.filter(row=>row.sourceLine===index+1).map(row=>row.id)}));
+    const item={sourceDisplay:{lines}},program={statements,status:'running',cursor:9,
+      executionHistory:['if-1','else-if-1','a','print-grade','switch-1']};
+    const model=buildProgramFlowTrailModel(item,program);
+    item._sourceFlowTransition={phase:'holding'};
+    const holding=buildProgramFlowTrailModel(item,program);
+    return JSON.stringify({model,holding});
+  })()`));
+  const route=(from,to)=>result.model.edges.find(edge=>edge.fromLine===from&&edge.toLine===to);
+  assert.strictEqual(route(1,4).route,'left');
+  assert.strictEqual(route(4,5).route,'inner');
+  assert.strictEqual(route(5,10).route,'left');
+  assert.strictEqual(route(11,15).route,'left');
+  assert.strictEqual(route(15,16).route,'inner');
+  assert(result.model.nodes.some(node=>node.line===15&&node.kind==='case'));
+  assert(result.model.skippedLines.includes(8));
+  assert(!result.holding.edges.some(edge=>edge.fromLine===11&&edge.toLine===15));
+  const profilesSource=fs.readFileSync(path.join(ROOT,'js','profiles.js'),'utf8');
+  const basicSelection=profilesSource.slice(profilesSource.indexOf("id:'trace-basic-selection'"),profilesSource.indexOf("id:'trace-compound-selection'"));
+  assert(basicSelection.includes('flowTrail:true'));
+}
+
+testProgramFlowTrailModel();
 testSourceInlineTimelinePresentation();
 testExerciseLibraryRegistry();
 testProfileCategoriesAndScopedScores();

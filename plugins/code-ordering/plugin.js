@@ -2,6 +2,7 @@ const CODE_ORDERING_MANIFEST=Object.freeze({id:'code-ordering',version:'1.0.0',s
   responsibilities:Object.freeze(['interaction','presentation','feedback','scoring']),
   dependencies:Object.freeze(['language-core:program-semantics','simulate-output:source-answer-adapter'])});
 let coPlaybackTimer=null;
+let coFlowTransitionTimer=null;
 let coPendingSourceViewport=null;
 function coWhitespaceLineNumbers(text,anchors){
   if(!anchors.length)return [];
@@ -148,7 +149,9 @@ function coPlaybackMatchesArrangement(item,playback){
 }
 function coDiscardPlayback(item){
   item.runResult=null;item._coPlayback=null;
-  delete item._coPlaybackTrail;delete item._coTerminalEvent;
+  delete item._coPlaybackTrail;delete item._coTerminalEvent;delete item._coFlowTransition;
+  delete item._programFlowTrailEdgeKeys;
+  if(coFlowTransitionTimer!==null){clearTimeout(coFlowTransitionTimer);coFlowTransitionTimer=null;}
 }
 function coCompletePlayback(item){
   const playback=item._coPlayback;if(!playback)return;
@@ -217,13 +220,15 @@ function coApplyAction({item,action}){
     if(playback.playing&&speed===0)coCompletePlayback(item);return {applied:true};
   }
   if(action.type==='PLAYBACK_RESTART'){
-    playback.index=0;playback.playing=false;item.runResult=null;item._coMobileTab='order';return {applied:true};
+    playback.index=0;playback.playing=false;item.runResult=null;item._coMobileTab='order';
+    delete item._coFlowTransition;delete item._programFlowTrailEdgeKeys;return {applied:true};
   }
   if(action.type==='PLAYBACK_STOP'){
     if(!playback.playing)return {applied:false};playback.playing=false;return {applied:true};
   }
   if(action.type==='PLAYBACK_PREV'){
-    if(playback.index<=0)return {applied:false};playback.playing=false;playback.index--;item.runResult=null;return {applied:true};
+    if(playback.index<=0)return {applied:false};playback.playing=false;playback.index--;item.runResult=null;
+    delete item._coFlowTransition;if(playback.index===0)delete item._programFlowTrailEdgeKeys;return {applied:true};
   }
   if(action.type==='PLAYBACK_NEXT'||action.type==='PLAYBACK_TICK'){
     if(action.type==='PLAYBACK_TICK'&&!playback.playing)return {applied:false};
@@ -490,9 +495,27 @@ function coAnimateLineSwitch(snapshot,movedId){
 }
 function coDo(item,action){
   const moving=action&&action.type==='MOVE',movedId=moving?item.order[action.from]:null;
+  const previousFrame=coCurrentPlaybackFrame(item);
   const viewport=coCaptureSourceViewport(),layout=moving?coCaptureLineLayout():null;
   const result=applyActivityAction(item,action);
   if(result.applied){
+    const currentFrame=coCurrentPlaybackFrame(item);
+    if(previousFrame&&currentFrame&&previousFrame.line!==currentFrame.line
+      &&['PLAYBACK_PLAY','PLAYBACK_NEXT','PLAYBACK_TICK'].includes(action.type)){
+      const profile=typeof PROFILES!=='undefined'&&PROFILES.find(candidate=>candidate.id===item.profileId);
+      if(typeof profileFlowTrailEnabled==='function'&&profileFlowTrailEnabled(profile)){
+        const duration=Math.max(120,Math.round((item._coPlayback&&item._coPlayback.speed||.6)*1000));
+        item._coFlowTransition={fromLine:previousFrame.line,toLine:currentFrame.line,
+          duration,token:(item._coFlowTransitionToken||0)+1};
+        item._coFlowTransitionToken=item._coFlowTransition.token;
+        if(coFlowTransitionTimer!==null)clearTimeout(coFlowTransitionTimer);
+        const transition=item._coFlowTransition;
+        coFlowTransitionTimer=setTimeout(()=>{
+          if(item._coFlowTransition===transition)delete item._coFlowTransition;
+          coFlowTransitionTimer=null;
+        },duration+50);
+      }
+    }
     if(movedId&&action.focus){item._coFocusId=movedId;item._coFocusMove=action.focus;}
     if(action.type!=='PLAYBACK_TICK')saveSessionProgress();
     coPendingSourceViewport={item,viewport,revealCurrent:/^PLAYBACK_(?:PLAY|NEXT|TICK|PREV)$/.test(action.type||'')};
@@ -579,15 +602,75 @@ function coSourceRows(item){
     return ordered?{lineNumber,orderIndex:ordered.index,line:byId.get(ordered.id)}:{lineNumber,text};
   });
 }
+function coFlowSelectionKind(text){
+  text=String(text||'');
+  if(/^\s*(?:}\s*)?else\s+if\b/.test(text))return 'else-if';
+  if(/^\s*if\b/.test(text))return 'if';
+  if(/^\s*switch\b/.test(text))return 'switch';
+  return null;
+}
+function coFlowTrailAdapter(item){
+  const playback=item&&item._coPlayback,index=playback?Math.min(playback.index,playback.frames.length):0;
+  if(!playback||index<=0)return null;
+  const source=coSource(item).split('\n');
+  const statements=playback.frames.map((frame,frameIndex)=>{
+    const text=source[frame.line-1]||frame.sourceText||'',selectionKind=coFlowSelectionKind(text);
+    return {id:`co-flow-${frameIndex}-${frame.statementId||frame.line}`,sourceLine:frame.line,
+      sourceText:text,kind:selectionKind?'selection':frame.statementKind,selectionKind};
+  });
+  const visible=statements.slice(0,index),statementIdsByLine=new Map();
+  statements.forEach(statement=>{
+    if(!statementIdsByLine.has(statement.sourceLine))statementIdsByLine.set(statement.sourceLine,[]);
+    statementIdsByLine.get(statement.sourceLine).push(statement.id);
+  });
+  return {
+    trailItem:{profileId:item.profileId,sourceDisplay:{lines:source.map((text,lineIndex)=>({
+      number:lineIndex+1,text,statementIds:statementIdsByLine.get(lineIndex+1)||[]}))},
+      _sourceFlowTransition:item._coFlowTransition?{phase:'moving'}:null,
+      _programFlowTrailEdgeKeys:item._programFlowTrailEdgeKeys},
+    program:{statements,status:'running',cursor:index-1,executionHistory:visible.slice(0,-1).map(statement=>statement.id)}
+  };
+}
+function coMountFlowTrail(item,list){
+  if(typeof mountProgramFlowTrail!=='function')return;
+  const adapted=coFlowTrailAdapter(item);if(!adapted)return;
+  const lineElements=new Map();
+  list.querySelectorAll('.co-order-line[data-source-line]').forEach(row=>{
+    const code=row.querySelector('.co-order-code'),line=Number(row.dataset.sourceLine);
+    if(code&&line)lineElements.set(line,{row,code,line:{number:line,text:code.textContent||''}});
+  });
+  const mounted=mountProgramFlowTrail(list,adapted.trailItem,adapted.program,lineElements);
+  item._programFlowTrailEdgeKeys=adapted.trailItem._programFlowTrailEdgeKeys;
+  return mounted;
+}
+function coMountFlowHighlight(item,list){
+  const transition=item&&item._coFlowTransition;
+  if(!transition||typeof requestAnimationFrame!=='function')return;
+  const highlight=h('span',{class:'co-program-flow-highlight','aria-hidden':'true'});list.appendChild(highlight);
+  requestAnimationFrame(()=>{
+    if(!list.isConnected||item._coFlowTransition!==transition)return;
+    const origin=list.querySelector(`.co-order-line[data-source-line="${transition.fromLine}"]`);
+    const destination=list.querySelector(`.co-order-line[data-source-line="${transition.toLine}"]`);
+    if(!origin||!destination)return;
+    highlight.style.top=`${origin.offsetTop}px`;highlight.style.height=`${origin.offsetHeight}px`;
+    highlight.style.width=`${Math.max(list.scrollWidth,origin.offsetWidth,destination.offsetWidth)}px`;
+    highlight.style.setProperty('--co-flow-distance',`${destination.offsetTop-origin.offsetTop}px`);
+    requestAnimationFrame(()=>highlight.classList.add('is-moving'));
+  });
+}
 function coOrderingPanel(item){
   const rows=coSourceRows(item).map(row=>row.line
     ?coCard(item,row.line,row.orderIndex,row.lineNumber):coFixed(row.text,row.lineNumber,item));
-  return h('section',{class:'co-source-panel'},
+  const duration=item._coFlowTransition&&item._coFlowTransition.duration
+    ||Math.max(120,Math.round((item._coPlayback&&item._coPlayback.speed||.6)*1000));
+  const list=h('div',{class:'co-order-list',role:'list','aria-describedby':'co-order-help',
+    style:`--program-flow-duration:${duration}ms;--co-flow-duration:${duration}ms;`},...rows);
+  const panel=h('section',{class:'co-source-panel'},
     h('div',{class:'so-panel-heading'},h('i',{class:'fa-solid fa-code'}),item.filename),
     h('p',{class:'co-order-hint',id:'co-order-help'},
       h('i',{class:'fa-solid fa-hand-pointer','aria-hidden':'true'}),' Drag any statement or blank line, or use the arrow buttons.'),
-    h('div',{class:'co-source-scaffold'},
-      h('div',{class:'co-order-list',role:'list','aria-describedby':'co-order-help'},...rows)));
+    h('div',{class:'co-source-scaffold'},list));
+  coMountFlowHighlight(item,list);coMountFlowTrail(item,list);return panel;
 }
 const CO_MOBILE_TABS=['order','run','answer'];
 function coSelectMobileTab(item,tab){

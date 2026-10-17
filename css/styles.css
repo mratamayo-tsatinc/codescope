@@ -2381,6 +2381,7 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   color:var(--text-dim);font:700 10px/1.35 var(--mono);
 }
 .program-source-file-code{
+  --program-source-code-pad:15px;
   position:relative;max-height:min(64vh,720px);overflow:auto;padding:10px 0;
   background:color-mix(in srgb,var(--panel-alt) 68%,var(--panel));
   font:500 12.5px/1.55 var(--mono);tab-size:4;
@@ -2396,6 +2397,33 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   border-right:1px solid var(--line-soft);color:var(--text-mute);font:500 12px/1 var(--mono);user-select:none;
 }
 .program-source-file-text{padding-left:15px;color:var(--text);font:inherit;white-space:pre;}
+.has-program-flow-trail .program-source-file-line{position:relative;z-index:3;}
+.has-program-flow-trail .program-source-file-text{position:relative;}
+.program-flow-trail-svg{position:absolute;z-index:2;left:0;top:0;overflow:visible;pointer-events:none;}
+.program-flow-trail-path{
+  fill:none;stroke:color-mix(in srgb,var(--text-mute) 58%,transparent);stroke-width:1.35;
+  stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;
+}
+.program-flow-trail-path.is-latest{stroke:color-mix(in srgb,var(--op) 86%,var(--text));stroke-width:1.8;}
+.program-flow-trail-path.is-entering{
+  stroke-dasharray:var(--program-flow-trail-length);stroke-dashoffset:var(--program-flow-trail-length);
+}
+.program-flow-trail-path.is-entering.is-drawing{
+  animation:program-flow-trail-draw var(--program-flow-duration) cubic-bezier(.22,.8,.28,1) forwards;
+}
+@keyframes program-flow-trail-draw{to{stroke-dashoffset:0;}}
+.program-flow-trail-port{
+  position:absolute;z-index:5;left:calc(var(--program-source-code-pad) + var(--program-flow-indent,0) * 1ch - 12px);top:50%;
+  width:7px;height:7px;border:1.5px solid color-mix(in srgb,var(--text-mute) 70%,var(--panel));
+  border-radius:50%;background:var(--panel-alt);transform:translateY(-50%);box-sizing:border-box;pointer-events:none;
+}
+.program-source-file-line.is-active .program-flow-trail-port,
+.program-flow-trail-port.is-case,.program-flow-trail-port.is-default,.program-flow-trail-port.is-else{
+  border-color:var(--op);background:color-mix(in srgb,var(--op) 25%,var(--panel-alt));
+}
+.program-flow-trail-skipped .program-source-file-text{opacity:.42;}
+.program-flow-trail-skipped .program-source-file-number{opacity:.55;}
+.program-flow-trail-skipped .program-flow-trail-port{opacity:.55;}
 .program-source-file-state{position:sticky;right:0;display:flex;align-items:center;justify-content:flex-end;gap:7px;min-width:36px;padding:0 10px 0 14px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--panel-alt) 92%,var(--panel)) 24%);}
 .program-source-file-line.is-context .program-source-file-text{opacity:.82;}
 .program-source-file-line.is-active{cursor:pointer;background:color-mix(in srgb,var(--op) 9%,transparent);box-shadow:inset 3px 0 0 var(--op);}
@@ -2468,7 +2496,7 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
 .program-source-syntax-type{color:#e5c66e;}.program-source-syntax-keyword{color:#f2a45f;}.program-source-syntax-function{color:#8ebdf0;}.program-source-syntax-comment{color:var(--text-mute);font-style:italic;}
 @media(max-width:600px){
   .program-source-file-panel{margin:11px;}
-  .program-source-file-code{max-height:58vh;font-size:11.5px;}
+  .program-source-file-code{--program-source-code-pad:11px;max-height:58vh;font-size:11.5px;}
   .program-source-file-line{grid-template-columns:42px max-content minmax(34px,1fr);}
   .program-source-file-number{padding-right:9px;}
   .program-source-file-text{padding-left:11px;}
@@ -2482,6 +2510,7 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   .program-source-file-line.is-flow-origin.is-holding .program-source-file-result{animation:none;}
   .program-source-flow-highlight{transition:opacity var(--program-flow-duration) linear;}
   .program-source-flow-highlight.is-moving{transform:none;height:var(--program-flow-target-height) !important;opacity:0;}
+  .program-flow-trail-path.is-entering.is-drawing{animation-duration:120ms;}
 }
 .program-statement{
   border:0;border-radius:0;background:transparent;
