@@ -1,0 +1,16 @@
+{
+  "title": "Java - While Basics",
+  "exercises": [
+    "CountUp.java",
+    "CountDown.java",
+    "StartAtValue.java",
+    "StepByTwo.java",
+    "RunningTotal.java",
+    "RunningProduct.java",
+    "ZeroIterations.java",
+    "OneIteration.java",
+    "MultipleStatements.java",
+    "FinalValue.java"
+  ]
+}
+

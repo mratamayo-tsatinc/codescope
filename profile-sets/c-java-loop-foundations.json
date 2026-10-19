@@ -1,0 +1,759 @@
+{
+  "schemaVersion": 1,
+  "id": "c-java-loop-foundations",
+  "name": "C and Java: Loop Foundations",
+  "version": "1",
+  "description": "A student-friendly foundation sequence for while, do while, for, counters, and accumulators. The same 10 sourced exercises per topic are shared by guided trace, simulation, and ordering, with parallel C and Java banks.",
+  "session": {
+    "language": "c",
+    "availableLanguages": [
+      "c",
+      "java"
+    ],
+    "timing": {
+      "allowReset": true,
+      "enabled": false,
+      "minutes": 120
+    },
+    "persistence": {
+      "enabled": true
+    },
+    "results": {
+      "unified": false
+    }
+  },
+  "categories": [
+    {
+      "id": "loop-foundations-trace",
+      "name": "Learn Loop Flow",
+      "enabled": true,
+      "profileIds": [
+        "foundations-trace-while-basics",
+        "foundations-trace-do-while-basics",
+        "foundations-trace-for-basics",
+        "foundations-trace-counters-accumulators"
+      ]
+    },
+    {
+      "id": "loop-foundations-simulate",
+      "name": "Predict Loop Results",
+      "enabled": true,
+      "profileIds": [
+        "foundations-simulate-while-basics",
+        "foundations-simulate-do-while-basics",
+        "foundations-simulate-for-basics",
+        "foundations-simulate-counters-accumulators"
+      ]
+    },
+    {
+      "id": "loop-foundations-order",
+      "name": "Build Loop Programs",
+      "enabled": true,
+      "profileIds": [
+        "foundations-order-while-basics",
+        "foundations-order-do-while-basics",
+        "foundations-order-for-basics",
+        "foundations-order-counters-accumulators"
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-trace-while-basics",
+        "name": "While Loop Basics",
+        "description": "Trace build confidence with test-before-body repetition, zero iterations, and loop exit values."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 0,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/",
+          "%",
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!="
+        ]
+      },
+      "template": "loop source program",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "loop-while-basics"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": true
+        }
+      },
+      "lesson": {
+        "focus": "program-flow",
+        "constructs": [
+          "loop"
+        ]
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal",
+        "flowTrail": true
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-trace-do-while-basics",
+        "name": "Do While Loop Basics",
+        "description": "Trace practice body-before-test repetition and the guaranteed first iteration."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 0,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/",
+          "%",
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!="
+        ]
+      },
+      "template": "loop source program",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "loop-do-while-basics"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": true
+        }
+      },
+      "lesson": {
+        "focus": "program-flow",
+        "constructs": [
+          "loop"
+        ]
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal",
+        "flowTrail": true
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-trace-for-basics",
+        "name": "For Loop Basics",
+        "description": "Trace trace initialization, condition, body, update, and exit in a complete for-loop cycle."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 0,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/",
+          "%",
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!="
+        ]
+      },
+      "template": "loop source program",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "loop-for-basics"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": true
+        }
+      },
+      "lesson": {
+        "focus": "program-flow",
+        "constructs": [
+          "loop"
+        ]
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal",
+        "flowTrail": true
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-trace-counters-accumulators",
+        "name": "Counters and Accumulators",
+        "description": "Trace use counters and running totals or products across simple loops."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 0,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/",
+          "%",
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!="
+        ]
+      },
+      "template": "loop source program",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "loop-counters-accumulators"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": true
+        }
+      },
+      "lesson": {
+        "focus": "program-flow",
+        "constructs": [
+          "loop"
+        ]
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal",
+        "flowTrail": true
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-simulate-while-basics",
+        "name": "While Loop Basics",
+        "description": "Predict output and final values while you build confidence with test-before-body repetition, zero iterations, and loop exit values."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read the loop program, predict its complete output and final variable values, then check your answer.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "loop-while-basics",
+          "shuffle": true
+        }
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-simulate-do-while-basics",
+        "name": "Do While Loop Basics",
+        "description": "Predict output and final values while you practice body-before-test repetition and the guaranteed first iteration."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read the loop program, predict its complete output and final variable values, then check your answer.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "loop-do-while-basics",
+          "shuffle": true
+        }
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-simulate-for-basics",
+        "name": "For Loop Basics",
+        "description": "Predict output and final values while you trace initialization, condition, body, update, and exit in a complete for-loop cycle."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read the loop program, predict its complete output and final variable values, then check your answer.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "loop-for-basics",
+          "shuffle": true
+        }
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-simulate-counters-accumulators",
+        "name": "Counters and Accumulators",
+        "description": "Predict output and final values while you use counters and running totals or products across simple loops."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read the loop program, predict its complete output and final variable values, then check your answer.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "loop-counters-accumulators",
+          "shuffle": true
+        }
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-order-while-basics",
+        "name": "While Loop Basics",
+        "description": "Arrange complete programs as you build confidence with test-before-body repetition, zero iterations, and loop exit values."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the program lines, run the program, and compare the loop flow with the target output and final values.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "loop-while-basics",
+          "shuffle": true
+        }
+      },
+      "presentation": {
+        "flowTrail": true
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-order-do-while-basics",
+        "name": "Do While Loop Basics",
+        "description": "Arrange complete programs as you practice body-before-test repetition and the guaranteed first iteration."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the program lines, run the program, and compare the loop flow with the target output and final values.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "loop-do-while-basics",
+          "shuffle": true
+        }
+      },
+      "presentation": {
+        "flowTrail": true
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-order-for-basics",
+        "name": "For Loop Basics",
+        "description": "Arrange complete programs as you trace initialization, condition, body, update, and exit in a complete for-loop cycle."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the program lines, run the program, and compare the loop flow with the target output and final values.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "loop-for-basics",
+          "shuffle": true
+        }
+      },
+      "presentation": {
+        "flowTrail": true
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "foundations-order-counters-accumulators",
+        "name": "Counters and Accumulators",
+        "description": "Arrange complete programs as you use counters and running totals or products across simple loops."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": "generated-answer"
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the program lines, run the program, and compare the loop flow with the target output and final values.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "loop-counters-accumulators",
+          "shuffle": true
+        }
+      },
+      "presentation": {
+        "flowTrail": true
+      },
+      "behavior": {
+        "interactionMode": "guided",
+        "allowUndo": true,
+        "allowRetry": true,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": true,
+        "showScores": true,
+        "feedbackRelease": "immediate",
+        "lockItemAfterCheck": false,
+        "showCorrectSolution": true,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    }
+  ]
+}
+

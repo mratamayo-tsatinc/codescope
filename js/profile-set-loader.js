@@ -1,5 +1,6 @@
 const PROFILE_SET_CATALOG_URL='profile-sets/manifest.json';
 const PROFILE_SET_SELECTION_KEY='codescopeSelectedProfileSet';
+const PROFILE_SET_LANGUAGE_KEY='codescopeProfileSetLanguage';
 let profileSetCatalog=null;
 
 function profileSetEntry(id){return profileSetCatalog&&profileSetCatalog.sets.find(entry=>entry.id===id&&entry.enabled!==false);}
@@ -17,6 +18,35 @@ function renderProfileSetSelector(){
   select.value=ACTIVE_PROFILE_SET.id;
   const entry=profileSetEntry(ACTIVE_PROFILE_SET.id);
   if(details)details.textContent=entry&&entry.description||ACTIVE_PROFILE_SET.description||'';
+  renderProfileSetLanguageSelector();
+}
+function profileSetLanguagePreference(){
+  try{return JSON.parse(localStorage.getItem(PROFILE_SET_LANGUAGE_KEY)||'{}');}catch(error){return {};}
+}
+function renderProfileSetLanguageSelector(){
+  const group=document.getElementById('profileLanguageGroup'),select=document.getElementById('profileLanguageSelect');
+  if(!group||!select||!ACTIVE_PROFILE_SESSION)return;
+  const languages=ACTIVE_PROFILE_SESSION.availableLanguages||[ACTIVE_PROFILE_SESSION.language];
+  const preferred=profileSetLanguagePreference()[ACTIVE_PROFILE_SET.id];
+  state.language=languages.includes(preferred)?preferred:ACTIVE_PROFILE_SESSION.language;
+  select.textContent='';languages.forEach(language=>{
+    const option=document.createElement('option');option.value=language;
+    option.textContent=language==='java'?'Java':'C';select.appendChild(option);
+  });
+  select.value=state.language;group.hidden=languages.length<2;
+}
+async function handleProfileLanguageChange(event){
+  const select=event.currentTarget,error=document.getElementById('loginError'),begin=document.getElementById('beginSessionBtn');
+  const languages=ACTIVE_PROFILE_SESSION.availableLanguages||[ACTIVE_PROFILE_SESSION.language];
+  if(!languages.includes(select.value))return;
+  select.disabled=true;if(begin)begin.disabled=true;state.language=select.value;activityContentReadyPromise=null;
+  try{
+    const preferences=profileSetLanguagePreference();preferences[ACTIVE_PROFILE_SET.id]=state.language;
+    localStorage.setItem(PROFILE_SET_LANGUAGE_KEY,JSON.stringify(preferences));
+    await ensureActivityContentReady();if(error){error.textContent='';error.style.display='none';}
+  }catch(loadError){
+    if(error){error.textContent=`Exercise content could not be loaded: ${loadError.message}`;error.style.display='block';}
+  }finally{select.disabled=false;if(begin)begin.disabled=false;}
 }
 async function activateProfileSet(id,{remember=true}={}){
   const entry=profileSetEntry(id);if(!entry)throw new Error(`Unknown Profile Set '${id}'`);

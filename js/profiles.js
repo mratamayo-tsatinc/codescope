@@ -756,7 +756,7 @@ const PROFILES_RAW = [
     interaction:{declarations:'interactive'},
     manualResponses:{enabled:true,namedValueRate:50,operatorRate:50,
       output:{enabled:true,mode:'complete-emission',rate:100}},
-    presentation:{workspace:'source-program',timeline:'statement-modal'},
+    presentation:{workspace:'source-program',timeline:'statement-modal',flowTrail:true},
     feedback: {
       showCorrectSolution: {
         practice: false,

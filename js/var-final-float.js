@@ -668,9 +668,14 @@ function findVarFinalOriginEl(id, statementId){
   }
   // Direct declarations such as `int score;` have no value token. Their
   // semantic origin is the active authored source line itself.
-  return statementId
-    ? document.querySelector('.program-source-file-line[data-statement-id="'+statementId+'"]')
-    : null;
+  if(!statementId)return null;
+  const sourceLine=document.querySelector('.program-source-file-line[data-statement-id="'+statementId+'"]');
+  if(sourceLine)return sourceLine;
+  const item=typeof currentItem==='function'?currentItem():null;
+  const statement=item&&item.program&&item.program.statements.find(candidate=>candidate.id===statementId);
+  return statement&&statement.forPhase
+    ?document.querySelector('.program-source-for-clause[data-for-phase="'+statement.forPhase+'"]')
+    :null;
 }
 
 function spawnVarFinalComet(f, originRect, destRect){

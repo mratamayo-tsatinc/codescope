@@ -30,7 +30,7 @@ function programSemanticServices(program){
       if(typeof evaluateAndApplyCoreStatement!=='function') return unavailable('evaluateAndApplyStatement');
       options=options||{};
       return evaluateAndApplyCoreStatement(statement,memory||activeProgram.memory||{},
-        options.language||activeProgram.language||'c',options.statementId||statement.id,options.mode);
+        options.language||activeProgram.language||'c',options.statementId||statement.id,options.mode,options.phase);
     },
     applyEffects(memory,effects,statementId,mode){
       if(typeof applyCoreStatementEffects!=='function') return unavailable('applyStatementEffects');
@@ -360,6 +360,8 @@ function resetProgramAction(item, services){
   program.events = [];
   program.executionHistory = [];
   if(item._sourceFlowTransition) delete item._sourceFlowTransition;
+  delete item._strictFlowAwaitingSelection;
+  delete item._strictFlowSelectedStatementId;
   return {applied:changed};
 }
 

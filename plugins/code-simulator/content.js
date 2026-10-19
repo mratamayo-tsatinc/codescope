@@ -53,6 +53,104 @@ function csBuildSelection(id,kind,statement,lineIndex,lines,memory,kinds,branche
   return statement;
 }
 
+function csBuildLoopFrame(coreStatement,frame,frameIndex,lines,kinds,dataTypes,language){
+  const id=`loop-frame-${frameIndex+1}`,statement=Object.assign({},coreStatement,{id});
+  statement.branches=(coreStatement.branches||[]).map(branch=>Object.assign({},branch));
+  statement.sourceLine=frame.sourceLine;statement.sourceEndLine=frame.sourceEndLine||frame.sourceLine;
+  statement.sourceText=lines[frame.sourceLine-1]||frame.sourceText||coreStatement.sourceText||'';
+  statement.sourceIndent=(statement.sourceText.match(/^\s*/)||[''])[0];
+  const conditionStep=(frame.trace||[]).find(step=>step.action==='LOOP_CONDITION');
+  const phase=coreStatement.loopKind==='for'?'condition':(coreStatement.loopKind==='do'?'entry':'condition');
+  if(coreStatement.loopKind==='for')statement.forPhase='condition';
+  if(coreStatement.loopKind==='do')statement.runtime={checked:false,trace:[],history:[],loopPhase:phase,
+    expectedValue:true,expectedEffects:(frame.effects||[]).filter(effect=>effect.kind!=='flow')};
+  else{
+    const conditionMemory=csRuntimeMemoryValues(frame.memoryAfter||frame.memoryBefore||{});
+    const tree=coreExpressionIrToEngineTree(coreStatement.condition,
+      poExpressionSymbols(conditionMemory,kinds,dataTypes));
+    statement.runtime=buildDeclarationRuntime(tree,conditionStep?conditionStep.value:null);
+    statement.runtime.loopPhase=phase;
+    statement.runtime.expectedEffects=(frame.effects||[]).filter(effect=>effect.kind!=='flow');
+    statement.runtime.semanticTrace=(frame.trace||[]).slice();
+  }
+  return statement;
+}
+
+function csBuildForControlFrame(coreStatement,frame,frameIndex,kinds,dataTypes,language){
+  const phase=frame.forPhase||frame.phase,control=phase==='initialize'?coreStatement.initializer:coreStatement.update;
+  if(!control)throw new Error(`for source:${frame.sourceLine}: missing ${phase} statement`);
+  const memory=csRuntimeMemoryValues(frame.memoryBefore||{});
+  let statement;
+  if(control.kind==='declaration'){
+    statement=Object.assign({},control,{id:`for-${phase}-frame-${frameIndex+1}`});
+    statement.binding=Object.assign({},control.binding,{kind:control.binding.mutable===false?'constant':'variable'});
+    if(control.initialized!==false){
+      const tree=coreExpressionIrToEngineTree(control.initializer,poExpressionSymbols(memory,kinds,dataTypes));
+      const declared=(frame.effects||[]).find(effect=>effect.kind==='declare');
+      statement.runtime=buildDeclarationRuntime(tree,declared&&declared.nextValue);
+      statement.runtime.expectedEffects=(frame.effects||[]).filter(effect=>effect.scope==='expression');
+    }else statement.runtime=buildUninitializedDeclarationRuntime();
+  }else if(control.kind==='assignment'){
+    const tree=coreExpressionIrToEngineTree(control.value,poExpressionSymbols(memory,kinds,dataTypes));
+    statement=buildAssignmentStatementRuntime(control.target,control.operator,tree,memory,frameIndex);
+    statement.id=`for-${phase}-frame-${frameIndex+1}`;statement.targetDataType=dataTypes[control.target];
+  }else if(control.kind==='unary-update'){
+    statement=buildUnaryUpdateStatementRuntime(control.target,control.operator,control.form,memory,frameIndex);
+    statement.id=`for-${phase}-frame-${frameIndex+1}`;
+  }else throw new Error(`for source:${frame.sourceLine}: unsupported ${phase} statement '${control.kind}'`);
+  statement.forPhase=phase;statement.forLoopStatementId=coreStatement.id;
+  return statement;
+}
+
+function csBuildExecutedLoopStatements(coreProgram,lines,kinds,dataTypes,language,supported){
+  const frames=coreProgram&&coreProgram.metadata&&coreProgram.metadata.executionFrames||[];
+  const canonical=coreProgram&&coreProgram.statements||[];
+  if(!canonical.some(statement=>statement.kind==='loop')||!frames.length)return null;
+  supported.clear();
+  const byId=new Map(canonical.map(statement=>[statement.id,statement]));
+  const statements=[];
+  frames.filter(frame=>!frame.error).forEach((frame,frameIndex)=>{
+    const coreStatement=byId.get(frame.statementId);if(!coreStatement)return;
+    const memory=csRuntimeMemoryValues(frame.memoryBefore||{}),line=frame.sourceLine;
+    let statement=null;
+    if(coreStatement.kind==='loop'&&coreStatement.loopKind==='for'
+      &&(frame.forPhase==='initialize'||frame.forPhase==='update'))
+      statement=csBuildForControlFrame(coreStatement,frame,frameIndex,kinds,dataTypes,language);
+    else if(coreStatement.kind==='loop')statement=csBuildLoopFrame(coreStatement,frame,frameIndex,lines,kinds,dataTypes,language);
+    else if(coreStatement.kind==='declaration'){
+      statement=Object.assign({},coreStatement,{id:`declaration-frame-${frameIndex+1}`});
+      statement.binding=Object.assign({},coreStatement.binding,{kind:coreStatement.binding.mutable===false?'constant':'variable'});
+      if(coreStatement.initialized!==false){
+        const tree=coreExpressionIrToEngineTree(coreStatement.initializer,poExpressionSymbols(memory,kinds,dataTypes));
+        const declared=(frame.effects||[]).find(effect=>effect.kind==='declare');
+        statement.runtime=buildDeclarationRuntime(tree,declared&&declared.nextValue);
+        statement.runtime.expectedEffects=(frame.effects||[]).filter(effect=>effect.scope==='expression');
+      }else statement.runtime=buildUninitializedDeclarationRuntime();
+    }else if(coreStatement.kind==='assignment'){
+      const tree=coreExpressionIrToEngineTree(coreStatement.value,poExpressionSymbols(memory,kinds,dataTypes));
+      statement=buildAssignmentStatementRuntime(coreStatement.target,coreStatement.operator,tree,memory,frameIndex);
+      statement.id=`assignment-frame-${frameIndex+1}`;statement.targetDataType=dataTypes[coreStatement.target];
+    }else if(coreStatement.kind==='unary-update'){
+      statement=buildUnaryUpdateStatementRuntime(coreStatement.target,coreStatement.operator,
+        coreStatement.form,memory,frameIndex);statement.id=`unary-frame-${frameIndex+1}`;
+    }else if(coreStatement.kind==='output'){
+      statement=buildOutputStatementRuntime(coreStatement,frameIndex,memory);statement.id=`output-frame-${frameIndex+1}`;
+    }else if(coreStatement.kind==='program-return')statement=Object.assign({},coreStatement,{id:`return-frame-${frameIndex+1}`,runtime:{checked:false}});
+    else if(coreStatement.kind==='program-break')statement=Object.assign({},coreStatement,{id:`break-frame-${frameIndex+1}`,runtime:{checked:false}});
+    if(!statement)return;
+    statement.sourceSpan=coreStatement.sourceSpan;statement.sourceLine=line;
+    statement.sourceEndLine=frame.sourceEndLine||line;statement.sourceText=lines[line-1]||frame.sourceText||'';
+    statement.sourceIndent=(statement.sourceText.match(/^\s*/)||[''])[0];
+    if(frame.forPhase)statement.forPhase=frame.forPhase;
+    statements.push(statement);
+    const support=supported.get(line)||{statementId:statement.id,statementIds:[],primary:true};
+    if(!support.statementIds.includes(statement.id))support.statementIds.push(statement.id);
+    supported.set(line,support);
+  });
+  statements.forEach((statement,index)=>statement.nextStatementId=statements[index+1]?statements[index+1].id:'$end');
+  return statements;
+}
+
 function csParseExercise(exercise,language,sourceValueMode='authored',inputValueMode='authored'){
   if(sourceValueMode!=='authored'&&sourceValueMode!=='seeded')
     throw new Error(`${exercise.filename}: sourceValueMode must be 'authored' or 'seeded'`);
@@ -70,6 +168,8 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
     if(!coreStatementGroupsByLine.has(statement.sourceLine))coreStatementGroupsByLine.set(statement.sourceLine,[]);
     coreStatementGroupsByLine.get(statement.sourceLine).push(statement);
   });
+  const hasLoops=(coreProgramResult.ir&&coreProgramResult.ir.statements||[])
+    .some(statement=>statement.kind==='loop');
   const memory={},kinds={},dataTypes={},declarations=[],statements=[],supported=new Map(),declarationsByLine=new Map();
   let declarationIndex=0,assignmentIndex=0,unaryIndex=0,outputIndex=0,inputIndex=0,breakIndex=0;
   const mark=statement=>{
@@ -118,9 +218,9 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
         if(definition)memory[read.target]=definition.materializedValue;});
       return;
     }
-    if(coreStatement&&coreStatement.kind==='assignment'){
+    if(!hasLoops&&coreStatement&&coreStatement.kind==='assignment'){
       evaluateAndApplyCoreStatement(coreStatement,memory,language,`assignment-preview-${index+1}`,'raw');
-    }else if(coreStatement&&coreStatement.kind==='unary-update'){
+    }else if(!hasLoops&&coreStatement&&coreStatement.kind==='unary-update'){
       evaluateAndApplyCoreStatement(coreStatement,memory,language,`unary-preview-${index+1}`,'raw');
     }
   });
@@ -135,7 +235,7 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
     mark(statement);statements.push(statement);
   });
   const executionMemory={};
-  lines.forEach((raw,index)=>{
+  if(!hasLoops)lines.forEach((raw,index)=>{
     const declarationEntries=declarationsByLine.get(index+1);
     if(declarationEntries){
       declarationEntries.forEach(({declaration,statement,initializer})=>{
@@ -210,13 +310,18 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
   const expectedMemory=coreProgramResult.ir.metadata&&coreProgramResult.ir.metadata.expectedMemory||{};
   Object.keys(memory).forEach(name=>delete memory[name]);Object.assign(memory,csRuntimeMemoryValues(expectedMemory));
   statements.sort((left,right)=>left.sourceLine-right.sourceLine);
+  const executedLoopStatements=csBuildExecutedLoopStatements(coreProgramResult.ir,lines,kinds,dataTypes,language,supported);
+  if(executedLoopStatements){
+    statements.length=0;statements.push(...executedLoopStatements);
+  }
   if(!statements.length) throw new Error(`${exercise.filename}: no supported executable statements were found`);
-  const controlFlow=coreBuildProgramControlFlow({source:details.source,lines,language,
+  const controlFlow=executedLoopStatements?{diagnostics:[]}:coreBuildProgramControlFlow({source:details.source,lines,language,
     filename:exercise.filename,statements,symbols:poExpressionSymbols(executionMemory,kinds,dataTypes)});
   if(controlFlow.diagnostics.length)throw new Error(controlFlow.diagnostics.map(row=>row.message).join('; '));
   const sourceDisplay={filename:exercise.filename,lines:lines.map((text,index)=>{const support=supported.get(index+1);return {number:index+1,text,supported:!!support,statementId:support&&support.statementId||null,statementIds:support&&support.statementIds||[],primary:!!support};})};
   return {details,lines,memory,kinds,dataTypes,declarations,statements,sourceDisplay,
-    coreProgram:coreProgramResult.ir,coreDiagnostics:coreProgramResult.diagnostics};
+    coreProgram:coreProgramResult.ir,coreDiagnostics:coreProgramResult.diagnostics,
+    unrolledExecution:!!executedLoopStatements};
 }
 
 function csBuildItem(profile,exercise,language,itemNumber){
@@ -237,7 +342,8 @@ function csBuildItem(profile,exercise,language,itemNumber){
     source:parsed.details.source,sourceTemplate:parsed.details.templateSource,sourceSeedValues:parsed.details.seedValues,
     sourceValueMode:parsed.details.sourceValueMode,sourceInputValues:parsed.details.inputValues,
     inputValueMode:parsed.details.inputValueMode,programAnswerKey,sourceDisplay:parsed.sourceDisplay,sourceFlow:true,language,originalTree,originalFlat,
-    canonicalStatementIds:sourceProgramCanonicalStatementIds(parsed.statements,parsed.coreProgram),
+    canonicalStatementIds:parsed.unrolledExecution?parsed.statements.map(statement=>statement.id)
+      :sourceProgramCanonicalStatementIds(parsed.statements,parsed.coreProgram),
     decls:parsed.declarations,resultName,correctFinalValue:last?resultValue:0,canonicalTrace:buildCanonicalTrace(originalTree),
     workingFlat:deepCloneFlat(originalFlat),history:[deepCloneFlat(originalFlat)],trace:[],checked:false,itemScore:null,points:null,maxPoints:null,
     correctSteps:0,totalOpSteps:0,wasCorrectFinal:null,showSolution:false,playback:null,flagged:false,lockedAt:null,examActionLog:[],

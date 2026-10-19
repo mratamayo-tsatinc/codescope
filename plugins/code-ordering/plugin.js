@@ -12,6 +12,43 @@ function coWhitespaceLineNumbers(text,anchors){
   const lines=[];for(let line=first;line<=last;line++)if(!text[line-1].trim())lines.push(line);
   return lines;
 }
+function coBlockEndLine(lines,start){
+  let depth=0,opened=false,quote=null,escaped=false;
+  for(let index=start;index<lines.length;index++){
+    for(const character of lines[index]){
+      if(quote){
+        if(escaped)escaped=false;
+        else if(character==='\\')escaped=true;
+        else if(character===quote)quote=null;
+        continue;
+      }
+      if(character==='"'||character==="'"){quote=character;continue;}
+      if(!opened){if(character==='{'){opened=true;depth=1;}continue;}
+      if(character==='{')depth++;
+      else if(character==='}'&&--depth===0)return index;
+    }
+  }
+  return start;
+}
+function coStructureBoundaryLines(lines,statements){
+  const boundaries=new Set();
+  (statements||[]).forEach(statement=>{
+    if(!['selection','loop'].includes(statement.kind))return;
+    const start=Number(statement.sourceSpan&&statement.sourceSpan.start&&statement.sourceSpan.start.line
+      ||statement.sourceLine)-1;
+    if(start<0||!String(lines[start]||'').includes('{'))return;
+    const end=coBlockEndLine(lines,start);if(end>start)boundaries.add(end+1);
+  });
+  lines.forEach((line,index)=>{
+    if(/^\s*(?:(?:if|else\s+if|switch|for|while)\s*\(|do\b)/.test(line)&&line.includes('{')){
+      const end=coBlockEndLine(lines,index);if(end>index)boundaries.add(end+1);
+    }
+    if(!/^\s*(?:}\s*)?else\s*{/.test(line))return;
+    boundaries.add(index+1);
+    const end=coBlockEndLine(lines,index);if(end>index)boundaries.add(end+1);
+  });
+  return [...boundaries];
+}
 function coCandidates(parsed){
   const text=parsed.source.split('\n'),seen=new Set(),statements=parsed.coreProgram.statements||[];
   const candidates=statements.map(s=>{
@@ -19,6 +56,11 @@ function coCandidates(parsed){
     if(!a||a!==b||seen.has(a)||['return','break','continue'].includes(s.kind)||!text[a-1].trim())return null;
     seen.add(a);return {id:'line-'+a,slotLine:a,text:text[a-1]};
   }).filter(Boolean);
+  coStructureBoundaryLines(text,statements).forEach(line=>{
+    if(!seen.has(line)&&text[line-1]&&text[line-1].trim()){
+      seen.add(line);candidates.push({id:'line-'+line,slotLine:line,text:text[line-1],structural:true});
+    }
+  });
   const anchors=statements.flatMap(s=>{
     const span=s.sourceSpan;if(!span||!span.start||!span.end)return [];
     return [span.start.line,span.end.line].filter(Boolean);
@@ -31,6 +73,13 @@ function coCandidates(parsed){
 function coEnsureWhitespaceCandidates(item){
   if(!item||!Array.isArray(item.orderLines)||!item.orderLines.length)return;
   const text=item.source.split('\n');
+  const known=new Set(item.orderLines.map(line=>line.slotLine));
+  coStructureBoundaryLines(text,[]).sort((a,b)=>a-b).forEach(line=>{if(!known.has(line)){
+    const candidate={id:'line-'+line,slotLine:line,text:text[line-1],structural:true};
+    const at=item.orderLines.findIndex(existing=>existing.slotLine>line),index=at<0?item.orderLines.length:at;
+    item.orderLines.splice(index,0,candidate);item.order.splice(index,0,candidate.id);
+    if(Array.isArray(item.initialOrder))item.initialOrder.splice(index,0,candidate.id);known.add(line);
+  }});
   const anchors=item.orderLines.filter(line=>!line.whitespace).map(line=>line.slotLine);
   text.forEach((line,index)=>{if(/^\s*return\b/.test(line))anchors.push(index+1);});
   const allowed=new Set(coWhitespaceLineNumbers(text,anchors));
@@ -40,7 +89,6 @@ function coEnsureWhitespaceCandidates(item){
     item.order=item.order.filter(id=>!removed.has(id));
     if(Array.isArray(item.initialOrder))item.initialOrder=item.initialOrder.filter(id=>!removed.has(id));
   }
-  const known=new Set(item.orderLines.map(line=>line.slotLine));
   [...allowed].sort((a,b)=>a-b).forEach(line=>{if(!known.has(line)){
     const candidate={id:'line-'+line,slotLine:line,text:text[line-1],whitespace:true};
     const at=item.orderLines.findIndex(existing=>existing.slotLine>line),index=at<0?item.orderLines.length:at;
@@ -84,7 +132,8 @@ function coPlaybackFrames(parsed){
       else if(effect.kind==='input')output+=String(effect.rawText==null?'':effect.rawText)+'\n';
     });
     return {index,line:frame.sourceLine,endLine:frame.sourceEndLine,statementId:frame.statementId,
-      statementKind:frame.statementKind,sourceText:frame.sourceText,error:frame.error||null,
+      statementKind:frame.statementKind,forPhase:frame.forPhase||frame.phase||null,
+      sourceText:frame.sourceText,error:frame.error||null,
       reads:[...new Set((frame.effects||[]).filter(effect=>effect.kind==='read').map(effect=>effect.target))],
       writes:[...new Set((frame.effects||[]).filter(effect=>effect.kind==='write'||effect.kind==='declare').map(effect=>effect.target))],
       consoleActive:(frame.effects||[]).some(effect=>effect.kind==='output'||effect.kind==='input'),
@@ -616,7 +665,7 @@ function coFlowTrailAdapter(item){
   const statements=playback.frames.map((frame,frameIndex)=>{
     const text=source[frame.line-1]||frame.sourceText||'',selectionKind=coFlowSelectionKind(text);
     return {id:`co-flow-${frameIndex}-${frame.statementId||frame.line}`,sourceLine:frame.line,
-      sourceText:text,kind:selectionKind?'selection':frame.statementKind,selectionKind};
+      sourceText:text,kind:selectionKind?'selection':frame.statementKind,selectionKind,forPhase:frame.forPhase||null};
   });
   const visible=statements.slice(0,index),statementIdsByLine=new Map();
   statements.forEach(statement=>{

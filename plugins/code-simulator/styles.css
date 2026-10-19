@@ -11,6 +11,8 @@
 .selection-compact-line{position:absolute;left:15px;top:27px;color:var(--text-mute);font:700 9px/1 var(--ui);}
 .selection-compact-code{color:var(--text);font:inherit;white-space:pre;}
 .selection-result-value{position:absolute;left:50%;bottom:-18px;min-width:62px;padding:3px 8px;transform:translateX(-50%);border:0;background:transparent;color:currentColor;text-align:center;font:800 11px/1 var(--mono);font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0;}
+.loop-phase-label{display:block;margin:0 0 4px;color:var(--text-dim);font:700 10px/1.35 var(--ui);letter-spacing:.04em;text-transform:uppercase;}
+.selection-compact-source>.loop-phase-label{min-width:150px;margin:0 10px 0 0;}
 
 .statement-trace-overlay{z-index:11990;background:rgba(4,7,12,.78);backdrop-filter:blur(3px);}
 .statement-trace-modal{z-index:12000;padding:24px;}

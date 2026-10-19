@@ -1,0 +1,16 @@
+{
+  "title": "C - While Basics",
+  "exercises": [
+    "CountUp.c",
+    "CountDown.c",
+    "StartAtValue.c",
+    "StepByTwo.c",
+    "RunningTotal.c",
+    "RunningProduct.c",
+    "ZeroIterations.c",
+    "OneIteration.c",
+    "MultipleStatements.c",
+    "FinalValue.c"
+  ]
+}
+

@@ -1,0 +1,16 @@
+{
+  "title": "Java - Counters Accumulators",
+  "exercises": [
+    "SumFirstNumbers.java",
+    "ProductSequence.java",
+    "CountdownTotal.java",
+    "DoubleAccumulator.java",
+    "DifferenceTracker.java",
+    "RepeatedAddition.java",
+    "SquareSum.java",
+    "DecreasingBalance.java",
+    "CounterAndTotal.java",
+    "SummaryReport.java"
+  ]
+}
+

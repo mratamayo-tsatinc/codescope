@@ -1,0 +1,16 @@
+{
+  "title": "C - For Basics",
+  "exercises": [
+    "CountUp.c",
+    "CountDown.c",
+    "InclusiveRange.c",
+    "StepByTwo.c",
+    "StepByThree.c",
+    "RunningTotal.c",
+    "RunningProduct.c",
+    "MultipleStatements.c",
+    "StartOffset.c",
+    "FinalCounter.c"
+  ]
+}
+

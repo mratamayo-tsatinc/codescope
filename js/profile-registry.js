@@ -11,11 +11,16 @@ function normalizeProfileSession(session){
   session=session&&typeof session==='object'?session:{};
   const language=String(session.language||'c').trim().toLowerCase();
   if(!['c','java'].includes(language))throw new Error("Profile Set session language must be 'c' or 'java'");
+  const availableLanguages=Array.isArray(session.availableLanguages)&&session.availableLanguages.length
+    ?[...new Set(session.availableLanguages.map(value=>String(value).trim().toLowerCase()))]:[language];
+  if(availableLanguages.some(value=>!['c','java'].includes(value)))
+    throw new Error("Profile Set availableLanguages may contain only 'c' and 'java'");
+  if(!availableLanguages.includes(language))availableLanguages.unshift(language);
   const timing=session.timing&&typeof session.timing==='object'?session.timing:{};
   const persistence=session.persistence;
   const results=session.results&&typeof session.results==='object'?session.results:{};
   return Object.freeze({
-    language,
+    language,availableLanguages:Object.freeze(availableLanguages),
     timing:Object.freeze({enabled:!!timing.enabled,
       minutes:Math.max(1,Math.min(999,Math.round(Number(timing.minutes)||120))),
       allowReset:timing.allowReset===true}),

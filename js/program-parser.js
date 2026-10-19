@@ -160,10 +160,30 @@ function coreBuildProgramControlFlow(spec){
     structures.push({type:'switch',statement,cases,end});
   });
 
+  // Loops participate in the same canonical graph as selections. A for/while
+  // header owns the block below it; a do header owns both its body and the
+  // trailing while condition on the closing line.
+  const loopAt=index=>(byLine.get(index+1)||[]).find(statement=>statement.kind==='loop')||null;
+  const doWhileTails=new Set();
+  lines.forEach((line,index)=>{
+    const statement=loopAt(index);
+    if(!statement||statement.loopKind==='do-while'||doWhileTails.has(statement.id))return;
+    const end=coreProgramBlockEnd(lines,index);
+    if(end<=index)return;
+    if(statement.loopKind==='do'){
+      const tail=(byLine.get(end+1)||[]).find(candidate=>candidate.kind==='loop'&&candidate.loopKind==='do-while')
+        ||(byLine.get(coreProgramNextMeaningfulLine(lines,end)+1)||[])
+          .find(candidate=>candidate.kind==='loop'&&candidate.loopKind==='do-while');
+      if(!tail)return;
+      doWhileTails.add(tail.id);structures.push({type:'loop',statement,tail,index,end,loopKind:'do'});return;
+    }
+    structures.push({type:'loop',statement,index,end,loopKind:statement.loopKind});
+  });
+
   statements.forEach((statement,index)=>{
     statement.nextStatementId=statement.kind==='program-return'?'$end'
       :(statements[index+1]?statements[index+1].id:'$end');
-    if(statement.kind==='selection')statement.branches=[];
+    if(statement.kind==='selection'||statement.kind==='loop')statement.branches=[];
   });
   const structureStart=structure=>structure.type==='if-chain'
     ?structure.clauses[0].index:structure.statement.sourceLine-1;
@@ -172,14 +192,19 @@ function coreBuildProgramControlFlow(spec){
     if(owner.type==='if-chain'){
       owner.clauses.forEach(clause=>regions.push({owner,start:clause.index+1,end:clause.end-1}));
       if(owner.elseClause)regions.push({owner,start:owner.elseClause.index+1,end:owner.elseClause.end-1});
-    }else owner.cases.forEach(entry=>regions.push({owner,start:entry.index+1,end:entry.end}));
+    }else if(owner.type==='switch')owner.cases.forEach(entry=>regions.push({owner,start:entry.index+1,end:entry.end}));
+    else if(owner.type==='loop')regions.push({owner,start:owner.index+1,end:owner.end-1});
   });
   const containingRegion=structure=>regions
     .filter(region=>region.owner!==structure&&structureStart(structure)>=region.start&&structure.end<=region.end)
     .sort((left,right)=>(left.end-left.start)-(right.end-right.start))[0]||null;
+  const loopContinuation=structure=>structure.loopKind==='do'?structure.tail:structure.statement;
   const continuationAfter=structure=>{
-    const candidate=firstStatementAfter(structure.end),region=containingRegion(structure);
+    const boundary=structure.type==='loop'&&structure.loopKind==='do'&&structure.tail
+      ?structure.tail.sourceLine:structure.end;
+    const candidate=firstStatementAfter(boundary),region=containingRegion(structure);
     if(!region||!candidate||candidate.sourceLine-1<=region.end)return candidate;
+    if(region.owner.type==='loop')return loopContinuation(region.owner);
     return region.owner.type==='if-chain'?continuationAfter(region.owner):candidate;
   };
 
@@ -203,6 +228,33 @@ function coreBuildProgramControlFlow(spec){
       if(structure.elseClause){
         const body=statementsIn(structure.elseClause.index+2,structure.elseClause.end);
         if(body.length)body[body.length-1].nextStatementId=afterTarget.id;
+      }
+      return;
+    }
+    if(structure.type==='loop'){
+      const after=continuationAfter(structure),afterTarget=targetDetails(after);
+      const body=statementsIn(structure.index+2,structure.end)
+        .filter(statement=>statement!==structure.tail);
+      const bodyTarget=targetDetails(body[0]||(structure.loopKind==='do'?structure.tail:structure.statement));
+      if(structure.loopKind==='do'){
+        structure.statement.branches=[{when:true,label:'ENTER',targetLine:bodyTarget.line,
+          targetText:bodyTarget.text,nextStatementId:bodyTarget.id,targetStatementId:bodyTarget.id}];
+        structure.statement.nextStatementId=bodyTarget.id;
+        structure.tail.branches=[
+          {when:true,label:'REPEAT',targetLine:bodyTarget.line,targetText:bodyTarget.text,
+            nextStatementId:bodyTarget.id,targetStatementId:bodyTarget.id},
+          {when:false,label:'EXIT',targetLine:afterTarget.line,targetText:afterTarget.text,
+            nextStatementId:afterTarget.id,targetStatementId:afterTarget.id}
+        ];
+        if(body.length)body[body.length-1].nextStatementId=structure.tail.id;
+      }else{
+        structure.statement.branches=[
+          {when:true,label:'CONTINUE',targetLine:bodyTarget.line,targetText:bodyTarget.text,
+            nextStatementId:bodyTarget.id,targetStatementId:bodyTarget.id},
+          {when:false,label:'EXIT',targetLine:afterTarget.line,targetText:afterTarget.text,
+            nextStatementId:afterTarget.id,targetStatementId:afterTarget.id}
+        ];
+        if(body.length)body[body.length-1].nextStatementId=structure.statement.id;
       }
       return;
     }
@@ -239,6 +291,7 @@ function coreExecuteParsedProgram(spec){
     binding&&typeof binding==='object'&&!Array.isArray(binding)
       ?Object.assign({},binding,{value:Array.isArray(binding.value)?binding.value.slice():binding.value})
       :binding]));
+  const loopVisits=new Map();
   let current=statements[0]||null,steps=0;
   while(current&&current.id!=='$end'){
     if(++steps>10000){
@@ -249,16 +302,44 @@ function coreExecuteParsedProgram(spec){
     try{
       if(!memoryBeforeByStatementId[current.id])memoryBeforeByStatementId[current.id]=[];
       memoryBeforeByStatementId[current.id].push(before);
-      const executed=evaluateAndApplyCoreStatement(current,memory,language,current.id,'bindings');
+      let executed,forPhaseFrames=null;
+      if(current.kind==='loop'&&current.loopKind==='for'){
+        const visits=loopVisits.get(current.id)||0,parts=[];forPhaseFrames=[];
+        const executeForPhase=phase=>{
+          const phaseBefore=snapshotMemory();
+          const result=evaluateAndApplyCoreStatement(current,memory,language,current.id,'bindings',phase);
+          parts.push(result);forPhaseFrames.push({phase,result,memoryBefore:phaseBefore,memoryAfter:snapshotMemory()});
+          return result;
+        };
+        if(visits===0&&current.initializer){
+          executeForPhase('initialize');
+        }else if(visits>0&&current.update){
+          executeForPhase('update');
+        }
+        const condition=executeForPhase('condition');loopVisits.set(current.id,visits+1);
+        executed={value:condition.value,
+          dependencies:[...new Set(parts.flatMap(part=>part.dependencies||[]))],
+          effects:parts.flatMap(part=>part.effects||[]),trace:parts.flatMap(part=>part.trace||[])};
+      }else executed=evaluateAndApplyCoreStatement(current,memory,language,current.id,'bindings');
       const statementEffects=executed.effects.map(effect=>Object.assign({statementId:current.id},effect));
       const statementTrace=executed.trace.map(step=>Object.assign({statementId:current.id},step));
       effects.push(...statementEffects);trace.push(...statementTrace);
       const flow=statementEffects.find(effect=>effect.kind==='flow');
       const nextId=flow&&flow.nextStatementId!==undefined?flow.nextStatementId:current.nextStatementId;
-      executionFrames.push({index:executionFrames.length,statementId:current.id,statementKind:current.kind,
-        sourceLine:current.sourceLine||1,sourceEndLine:current.sourceEndLine||current.sourceLine||1,
-        sourceText:current.sourceText||'',memoryBefore:before,memoryAfter:snapshotMemory(),
-        effects:statementEffects,trace:statementTrace,nextStatementId:nextId,error:null});
+      if(forPhaseFrames&&forPhaseFrames.length)forPhaseFrames.forEach(phaseFrame=>{
+        const phaseEffects=phaseFrame.result.effects.map(effect=>Object.assign({statementId:current.id},effect));
+        const phaseTrace=phaseFrame.result.trace.map(step=>Object.assign({statementId:current.id},step));
+        executionFrames.push({index:executionFrames.length,statementId:current.id,statementKind:current.kind,
+          phase:phaseFrame.phase,forPhase:phaseFrame.phase,
+          sourceLine:current.sourceLine||1,sourceEndLine:current.sourceEndLine||current.sourceLine||1,
+          sourceText:current.sourceText||'',memoryBefore:phaseFrame.memoryBefore,memoryAfter:phaseFrame.memoryAfter,
+          effects:phaseEffects,trace:phaseTrace,
+          nextStatementId:phaseFrame.phase==='condition'?nextId:current.id,error:null});
+      });
+      else executionFrames.push({index:executionFrames.length,statementId:current.id,statementKind:current.kind,
+          sourceLine:current.sourceLine||1,sourceEndLine:current.sourceEndLine||current.sourceLine||1,
+          sourceText:current.sourceText||'',memoryBefore:before,memoryAfter:snapshotMemory(),
+          effects:statementEffects,trace:statementTrace,nextStatementId:nextId,error:null});
       current=nextId==='$end'?null:(byId.get(nextId)||null);
     }catch(error){
       const diagnostic=coreProgramDiagnostic(error,rowFor(current),filename,'PROGRAM_STATE_UNAVAILABLE');

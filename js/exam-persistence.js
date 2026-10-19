@@ -12,7 +12,9 @@
 function examProgressKey(email){ return 'precedifyExamProgress:' + email; }
 function practiceProgressKey(email){ return 'precedifyPracticeProgress:' + email; }
 function sessionProgressKey(mode,email){
-  return 'codescopeSessionProgress:' + email + ':' + ACTIVE_PROFILE_SET.id;
+  const languages=ACTIVE_PROFILE_SESSION&&ACTIVE_PROFILE_SESSION.availableLanguages||[];
+  const languageScope=languages.length>1?':' + state.language:'';
+  return 'codescopeSessionProgress:' + email + ':' + ACTIVE_PROFILE_SET.id + languageScope;
 }
 
 function parseSavedProgress(raw){

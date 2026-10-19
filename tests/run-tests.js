@@ -2799,17 +2799,41 @@ function testCodeOrderingFlowTrailAdapter(){
         {line:5,statementId:'assignment-1',statementKind:'assignment',sourceText:'  y = 2;'}
       ]}};
     const adapted=coFlowTrailAdapter(item);
+    const candidateSource=['int main(void) {','  int x = 1;','  if (x) {','    x = 2;',
+      '  } else {','    x = 3;','  }','  return 0;','}'].join('\\n');
+    const span=line=>({start:{line},end:{line}});
+    const candidates=coCandidates({source:candidateSource,coreProgram:{statements:[
+      {kind:'declaration',sourceSpan:span(2)},{kind:'selection',sourceSpan:span(3)},
+      {kind:'assignment',sourceSpan:span(4)},{kind:'assignment',sourceSpan:span(6)},
+      {kind:'return',sourceSpan:span(8)}
+    ]}});
+    const legacyLines=candidates.filter(candidate=>!candidate.structural).map(candidate=>Object.assign({},candidate));
+    const legacyItem={source:candidateSource,orderLines:legacyLines,
+      order:legacyLines.map(candidate=>candidate.id),initialOrder:legacyLines.map(candidate=>candidate.id)};
+    const beforeMigration=coSource(legacyItem);coEnsureWhitespaceCandidates(legacyItem);
     return JSON.stringify({selectionKinds:adapted.program.statements.map(statement=>statement.selectionKind),
-      history:adapted.program.executionHistory,cursor:adapted.program.cursor});
+      history:adapted.program.executionHistory,cursor:adapted.program.cursor,
+      candidateLines:candidates.map(candidate=>candidate.slotLine),
+      structuralLines:candidates.filter(candidate=>candidate.structural).map(candidate=>candidate.slotLine),
+      migratedLines:legacyItem.orderLines.map(candidate=>candidate.slotLine),
+      migrationPreservedSource:coSource(legacyItem)===beforeMigration});
   })()`));
   assert.deepStrictEqual(result.selectionKinds,['if','else-if',null]);
   assert.strictEqual(result.history.length,2);
   assert.strictEqual(result.cursor,2);
+  assert.deepStrictEqual(result.candidateLines,[2,3,4,5,6,7]);
+  assert.deepStrictEqual(result.structuralLines,[5,7]);
+  assert.deepStrictEqual(result.migratedLines,[2,3,4,5,6,7]);
+  assert.strictEqual(result.migrationPreservedSource,true);
   const orderingStyles=fs.readFileSync(path.join(ROOT,'plugins','code-ordering','styles.css'),'utf8');
   const sharedStyles=fs.readFileSync(path.join(ROOT,'css','styles.css'),'utf8');
   assert(orderingStyles.includes('.co-order-list.has-program-flow-trail .co-order-line{position:relative;z-index:auto}'));
   assert(/\.co-order-list\.has-program-flow-trail \.co-order-number,\s*\.co-order-list\.has-program-flow-trail \.co-order-code,\s*\.co-order-list\.has-program-flow-trail \.co-line-actions\{position:relative;z-index:3\}/.test(orderingStyles));
   assert(orderingStyles.includes('.co-program-flow-highlight{position:absolute;z-index:1;'));
+  assert(sharedStyles.includes('.has-program-flow-trail .program-source-file-line{position:relative;z-index:auto;}'));
+  assert(/\.has-program-flow-trail \.program-source-file-number,\s*\.has-program-flow-trail \.program-source-file-text,\s*\.has-program-flow-trail \.program-source-file-state\{position:relative;z-index:3;\}/.test(sharedStyles));
+  assert(sharedStyles.includes('.has-program-flow-trail .program-source-file-state{background:transparent!important;}'));
+  assert(sharedStyles.includes('.program-source-flow-highlight{\n  position:absolute;z-index:1;'));
   assert(sharedStyles.includes('.program-flow-trail-svg{position:absolute;z-index:2;'));
 }
 function run(){
@@ -4478,8 +4502,14 @@ int main() {
     strictProbe.program.statements[1].status='active';
     const strictTransitionSuppressed=stageSourceFlowTransition(strictProbe,strictProbe.program.statements[0])===null;
     const strictProbeProfileId=strictProbe.profileId;strictProbe.profileId='trace-basic-selection';
-    const strictFlowTrailTransitionRestored=!!stageSourceFlowTransition(strictProbe,strictProbe.program.statements[0]);
-    delete strictProbe._sourceFlowTransition;strictProbe.profileId=strictProbeProfileId;
+    const strictFlowTrailTransitionDeferred=stageSourceFlowTransition(strictProbe,strictProbe.program.statements[0])===null
+      &&strictProbe._strictFlowAwaitingSelection.originId===strictProbe.program.statements[0].id;
+    const strictSelectedTransition=stageStrictSourceSelectionTransition(strictProbe,strictProbe.program.statements[1]);
+    const strictFlowTrailSelectedDestination=strictSelectedTransition&&strictSelectedTransition.destinationId===strictProbe.program.statements[1].id;
+    delete strictProbe._sourceFlowTransition;
+    const strictFlowTrailHost=h('div',{});renderProgramItem(strictFlowTrailHost,strictProbe,{});
+    const strictFlowTrailActiveRows=countNodesWithClass(strictFlowTrailHost,'is-active');
+    strictProbe.profileId=strictProbeProfileId;
     const strictExamProbe=csBuildItem(profile,{id:'StrictExamFlow',filename:'StrictExamFlow.c',raw:csLiveControlFixture},'c',104);
     state.mode='exam';state.examPolicy=snapshotExamPolicy({exam:{interactionMode:'strict-sequence'}});
     state.items=[strictExamProbe];state.itemIndex=0;
@@ -4532,6 +4562,10 @@ int main() {
     const transitionDestinations=countNodesWithClass(transitionHost,'is-flow-destination');
     const transitionHighlights=countNodesWithClass(transitionHost,'program-source-flow-highlight');
     const transitionActiveRows=countNodesWithClass(transitionHost,'is-active');
+    const transitionProfileId=first.profileId;first.profileId='trace-basic-selection';
+    const flowTrailTransitionHost=h('div',{});renderProgramItem(flowTrailTransitionHost,first,{});
+    const flowTrailTransitionActiveRows=countNodesWithClass(flowTrailTransitionHost,'is-active');
+    first.profileId=transitionProfileId;
     const visibleViewport={scrollTop:100,scrollLeft:7,clientHeight:200,scrollCalls:[],
       scrollTo(options){this.scrollCalls.push(options);this.scrollTop=options.top;}};
     const visibleReveal=revealSourceFlowLine(visibleViewport,{offsetTop:120,offsetHeight:30},'smooth');
@@ -4633,7 +4667,8 @@ int main() {
       strictConditionPaused,strictConditionModalWarning,strictConditionSourceWarning,strictConditionRecovered,
       strictPrintPaused,strictPrintModalWarning,strictPrintModalReset,strictPrintSourceWarning,
       strictConcatPaused,strictJavaOutputRecovered,
-      strictTransitionSuppressed,strictFlowTrailTransitionRestored,strictExamTerminated,
+      strictTransitionSuppressed,strictFlowTrailTransitionDeferred,strictFlowTrailSelectedDestination,
+      strictFlowTrailActiveRows,strictExamTerminated,
       manifestVersion:CODE_SIMULATOR_PLUGIN_MANIFEST.version,sourcePanels,sourceRows,firstMemoryNames,
       sourceLineCount:first.sourceDisplay.lines.length,sourceActions,directActions,modalActions,activeSourceRows,oldTimelineRows,inlinePanels,
       contextDocks,contextTabs,memoryDockHosts,
@@ -4646,7 +4681,7 @@ int main() {
       expressionOnlyParens:countNodesWithClass(expressionOnlyHost,'selection-paren'),
       completedModalPanels:countNodesWithClass(completedModalHost,'program-expression-panel'),
       completedModalCompacts:countNodesWithClass(completedModalHost,'selection-compact'),
-      transitionOrigins,transitionDestinations,transitionHighlights,transitionActiveRows,
+      transitionOrigins,transitionDestinations,transitionHighlights,transitionActiveRows,flowTrailTransitionActiveRows,
       visibleReveal,distantReveal,scrollCalls:visibleViewport.scrollCalls,scrollIntentRecorded,
       sourceFlowTiming:DEFAULT_APP_SETTINGS.shell.sourceFlow,
       sourceProgramText:sourceHost.textContent,
@@ -4781,7 +4816,9 @@ int main() {
   assert.strictEqual(result.strictPrintModalWarning,1);
   assert.strictEqual(result.strictPrintModalReset,0);
   assert.strictEqual(result.strictPrintSourceWarning,1);
-  assert(result.strictTransitionSuppressed&&result.strictFlowTrailTransitionRestored&&result.strictExamTerminated);
+  assert(result.strictTransitionSuppressed&&result.strictFlowTrailTransitionDeferred
+    &&result.strictFlowTrailSelectedDestination&&result.strictExamTerminated);
+  assert.strictEqual(result.strictFlowTrailActiveRows,1);
   assert.deepStrictEqual(result.firstMemoryNames,['score','absences']);
   assert.strictEqual(new Set(result.firstMemoryNames).size,result.firstMemoryNames.length);
   assert.strictEqual(result.sourcePanels,1);
@@ -4818,6 +4855,7 @@ int main() {
   assert.strictEqual(result.transitionDestinations,1);
   assert.strictEqual(result.transitionHighlights,1);
   assert.strictEqual(result.transitionActiveRows,0);
+  assert.strictEqual(result.flowTrailTransitionActiveRows,0);
   assert.strictEqual(result.visibleReveal,false);
   assert.strictEqual(result.distantReveal,true);
   assert.deepStrictEqual(result.scrollCalls,[{top:200,left:7,behavior:'smooth'}]);
@@ -5215,7 +5253,53 @@ function testProgramFlowTrailModel(){
     const model=buildProgramFlowTrailModel(item,program);
     item._sourceFlowTransition={phase:'holding'};
     const holding=buildProgramFlowTrailModel(item,program);
-    return JSON.stringify({model,holding});
+    delete item._sourceFlowTransition;item._strictFlowAwaitingSelection={originId:'switch-1'};
+    const awaitingSelection=buildProgramFlowTrailModel(item,program);
+    const loopSource=['while (i <= limit) {','    print(i);','    i++;','}'];
+    const loopStatements=[
+      {id:'while-1',kind:'loop',loopKind:'while',sourceLine:1,sourceText:loopSource[0]},
+      {id:'print-1',kind:'output',sourceLine:2,sourceText:loopSource[1]},
+      {id:'increment-1',kind:'unary-update',sourceLine:3,sourceText:loopSource[2]},
+      {id:'while-2',kind:'loop',loopKind:'while',sourceLine:1,sourceText:loopSource[0]}
+    ];
+    const loopItem={sourceDisplay:{lines:loopSource.map((text,index)=>({number:index+1,text,
+      statementIds:loopStatements.filter(statement=>statement.sourceLine===index+1).map(statement=>statement.id)}))}};
+    const loopProgram={statements:loopStatements,status:'running',cursor:3,
+      executionHistory:['while-1','print-1','increment-1']};
+    const loopModel=buildProgramFlowTrailModel(loopItem,loopProgram);
+    const doSource=['do {','    total += i;','} while (i <= limit);'];
+    const doStatements=[
+      {id:'do-1',kind:'loop',loopKind:'do',sourceLine:1,sourceText:doSource[0]},
+      {id:'do-body-1',kind:'assignment',sourceLine:2,sourceText:doSource[1]},
+      {id:'do-test-1',kind:'loop',loopKind:'do-while',sourceLine:3,sourceText:doSource[2]},
+      {id:'do-body-2',kind:'assignment',sourceLine:2,sourceText:doSource[1]}
+    ];
+    const doItem={sourceDisplay:{lines:doSource.map((text,index)=>({number:index+1,text,
+      statementIds:doStatements.filter(statement=>statement.sourceLine===index+1).map(statement=>statement.id)}))}};
+    const doProgram={statements:doStatements,status:'running',cursor:3,
+      executionHistory:['do-1','do-body-1','do-test-1']};
+    const doModel=buildProgramFlowTrailModel(doItem,doProgram);
+    const forSource=['for (i = 1; i <= limit; i++) {','    print(i);','}','print("done");'];
+    const forStatements=[
+      {id:'for-init',kind:'assignment',forPhase:'initialize',sourceLine:1,sourceText:forSource[0]},
+      {id:'for-condition-1',kind:'loop',loopKind:'for',forPhase:'condition',sourceLine:1,sourceText:forSource[0]},
+      {id:'for-body',kind:'output',sourceLine:2,sourceText:forSource[1]},
+      {id:'for-update',kind:'unary-update',forPhase:'update',sourceLine:1,sourceText:forSource[0]},
+      {id:'for-condition-2',kind:'loop',loopKind:'for',forPhase:'condition',sourceLine:1,sourceText:forSource[0]},
+      {id:'for-after',kind:'output',sourceLine:4,sourceText:forSource[3]}
+    ];
+    const forItem={sourceDisplay:{lines:forSource.map((text,index)=>({number:index+1,text,
+      statementIds:forStatements.filter(statement=>statement.sourceLine===index+1).map(statement=>statement.id)}))}};
+    const forProgram={statements:forStatements,status:'running',cursor:5,
+      executionHistory:['for-init','for-condition-1','for-body','for-update','for-condition-2']};
+    const forModel=buildProgramFlowTrailModel(forItem,forProgram);
+    return JSON.stringify({model,holding,awaitingSelection,loopModel,doModel,forModel,
+      whileEnd:programFlowTrailStatementEnd(loopSource[0]),
+      forEnd:programFlowTrailStatementEnd('for (i = 0; i < limit; i++) {'),
+      forCenters:programFlowTrailForClauseCenters(forSource[0]),
+      renderedCenter:programFlowTrailRenderedCenter({offsetWidth:200,offsetHeight:100,clientLeft:1,clientTop:1,
+        scrollLeft:10,scrollTop:5,getBoundingClientRect:()=>({left:100,top:50,width:400,height:200})},
+        {getBoundingClientRect:()=>({left:155,top:83,width:14,height:14})})});
   })()`));
   const route=(from,to)=>result.model.edges.find(edge=>edge.fromLine===from&&edge.toLine===to);
   assert.strictEqual(route(1,4).route,'left');
@@ -5226,9 +5310,50 @@ function testProgramFlowTrailModel(){
   assert(result.model.nodes.some(node=>node.line===15&&node.kind==='case'));
   assert(result.model.skippedLines.includes(8));
   assert(!result.holding.edges.some(edge=>edge.fromLine===11&&edge.toLine===15));
+  assert(!result.awaitingSelection.edges.some(edge=>edge.fromLine===11));
+  const loopBack=result.loopModel.edges.find(edge=>edge.fromLine===3&&edge.toLine===1);
+  assert(loopBack&&loopBack.route==='right');
+  assert.strictEqual(loopBack.toAnchor,'statement-end');
+  assert.strictEqual(result.whileEnd,'while (i <= limit) {'.length);
+  assert.strictEqual(result.forEnd,'for (i = 0; i < limit; i++) {'.length);
+  const forHeaderEdges=result.forModel.edges.filter(edge=>edge.route==='for-header');
+  assert.strictEqual(forHeaderEdges.length,2);
+  assert(forHeaderEdges.every(edge=>edge.toAnchor==='for-condition-in'));
+  assert(forHeaderEdges.some(edge=>edge.fromAnchor==='for-initialize'));
+  assert(forHeaderEdges.some(edge=>edge.fromAnchor==='for-update'));
+  const forBody=result.forModel.edges.find(edge=>edge.fromLine===1&&edge.toLine===2);
+  assert(forBody&&forBody.fromAnchor==='for-condition-out'&&forBody.route==='inner');
+  const forBack=result.forModel.edges.find(edge=>edge.fromLine===2&&edge.toLine===1);
+  assert(forBack&&forBack.route==='right'&&forBack.toAnchor==='for-update');
+  const forExit=result.forModel.edges.find(edge=>edge.fromLine===1&&edge.toLine===4);
+  assert(forExit&&forExit.route==='left'&&forExit.fromAnchor==='for-condition-out');
+  assert(result.forCenters.initialize<result.forCenters.condition&&result.forCenters.condition<result.forCenters.update);
+  assert.deepStrictEqual(result.renderedCenter,{x:40,y:24});
+  const doBack=result.doModel.edges.find(edge=>edge.fromLine===3&&edge.toLine===1);
+  assert(doBack&&doBack.route==='right');
+  assert.strictEqual(doBack.toAnchor,'statement-end');
+  assert(!result.doModel.edges.some(edge=>edge.fromLine===3&&edge.toLine===2));
   const profilesSource=fs.readFileSync(path.join(ROOT,'js','profiles.js'),'utf8');
   const basicSelection=profilesSource.slice(profilesSource.indexOf("id:'trace-basic-selection'"),profilesSource.indexOf("id:'trace-compound-selection'"));
+  const compoundSelection=profilesSource.slice(profilesSource.indexOf("id:'trace-compound-selection'"),profilesSource.indexOf("id:'trace-output-variables'"));
   assert(basicSelection.includes('flowTrail:true'));
+  assert(compoundSelection.includes('flowTrail:true'));
+  const defaultSet=JSON.parse(fs.readFileSync(path.join(ROOT,'profile-sets','codescope-default.json'),'utf8'));
+  const traceCategory=defaultSet.categories.find(category=>category.id==='trace-selection-commands');
+  const compoundProfile=defaultSet.profiles.find(profile=>profile.meta&&profile.meta.id==='trace-compound-selection');
+  assert(traceCategory&&traceCategory.profileIds.includes('trace-compound-selection'));
+  assert(compoundProfile&&compoundProfile.presentation&&compoundProfile.presentation.flowTrail===true);
+  const renderSessionSource=fs.readFileSync(path.join(ROOT,'js','render-session.js'),'utf8');
+  const codeSimulatorRenderer=fs.readFileSync(path.join(ROOT,'plugins','code-simulator','renderer.js'),'utf8');
+  const sharedStyles=fs.readFileSync(path.join(ROOT,'css','styles.css'),'utf8');
+  assert(renderSessionSource.includes('const isCurrent=!!(statement&&active&&statement.id===active.id'));
+  assert(renderSessionSource.includes('const strictFlowSelected=!!(statement&&item._strictFlowSelectedStatementId===statement.id);'));
+  assert(renderSessionSource.includes('const activeVisual=isExpected&&(!strictStatements||flowTrailEnabled&&strictFlowSelected);'));
+  assert(renderSessionSource.includes("selection:'Condition',loop:'Condition'"));
+  const loopRenderer=codeSimulatorRenderer.slice(codeSimulatorRenderer.indexOf('function renderLoopStatement'));
+  assert(loopRenderer.includes('const expressionOnly=!!(ctx.services&&ctx.services.expressionOnly);'));
+  assert(loopRenderer.includes('const preserveCompletedTimeline=!!(ctx.services&&ctx.services.preserveCompletedTimeline);'));
+  assert(loopRenderer.includes('renderPrefix:expressionOnly?()=>[]'));
 }
 
 testProgramFlowTrailModel();

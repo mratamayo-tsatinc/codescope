@@ -1,0 +1,16 @@
+{
+  "title": "Java - For Basics",
+  "exercises": [
+    "CountUp.java",
+    "CountDown.java",
+    "InclusiveRange.java",
+    "StepByTwo.java",
+    "StepByThree.java",
+    "RunningTotal.java",
+    "RunningProduct.java",
+    "MultipleStatements.java",
+    "StartOffset.java",
+    "FinalCounter.java"
+  ]
+}
+

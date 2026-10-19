@@ -1,0 +1,16 @@
+{
+  "title": "C - Counters Accumulators",
+  "exercises": [
+    "SumFirstNumbers.c",
+    "ProductSequence.c",
+    "CountdownTotal.c",
+    "DoubleAccumulator.c",
+    "DifferenceTracker.c",
+    "RepeatedAddition.c",
+    "SquareSum.c",
+    "DecreasingBalance.c",
+    "CounterAndTotal.c",
+    "SummaryReport.c"
+  ]
+}
+

@@ -1,0 +1,16 @@
+{
+  "title": "Java - Do While Basics",
+  "exercises": [
+    "AtLeastOnce.java",
+    "CountUp.java",
+    "CountDown.java",
+    "RunningTotal.java",
+    "StepByTwo.java",
+    "OnePassFalse.java",
+    "MultipleStatements.java",
+    "ThresholdTotal.java",
+    "FinalCounter.java",
+    "SmallReport.java"
+  ]
+}
+

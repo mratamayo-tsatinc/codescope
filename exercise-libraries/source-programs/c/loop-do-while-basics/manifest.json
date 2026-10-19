@@ -1,0 +1,16 @@
+{
+  "title": "C - Do While Basics",
+  "exercises": [
+    "AtLeastOnce.c",
+    "CountUp.c",
+    "CountDown.c",
+    "RunningTotal.c",
+    "StepByTwo.c",
+    "OnePassFalse.c",
+    "MultipleStatements.c",
+    "ThresholdTotal.c",
+    "FinalCounter.c",
+    "SmallReport.c"
+  ]
+}
+

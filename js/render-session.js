@@ -221,6 +221,132 @@ function programSourceFragments(line,language){
   return fragments.length?fragments:['\u00a0'];
 }
 
+function programForPhaseStatement(program,statementIds,phase,active){
+  const candidates=statementIds.map(id=>program.statements.find(statement=>statement.id===id))
+    .filter(statement=>statement&&statement.forPhase===phase);
+  if(active&&active.forPhase===phase&&candidates.includes(active))return active;
+  const cursor=Math.max(0,program.cursor||0);
+  const selectable=candidates.find(statement=>program.statements.indexOf(statement)>=cursor
+    &&statement.status!=='complete'&&statement.status!=='invalid');
+  if(selectable)return selectable;
+  return candidates.slice().reverse().find(statement=>statement.status==='complete')||candidates[0]||null;
+}
+
+function programLoopConditionPart(text,forParts){
+  if(forParts&&forParts.condition)return forParts.condition;
+  text=String(text||'');
+  const whileIndex=text.search(/\bwhile\s*\(/);if(whileIndex<0)return null;
+  const open=text.indexOf('(',whileIndex);let depth=0,quote=null,escaped=false;
+  for(let index=open+1;index<text.length;index++){
+    const char=text[index];
+    if(quote){if(escaped)escaped=false;else if(char==='\\')escaped=true;else if(char===quote)quote=null;continue;}
+    if(char==='"'||char==="'"){quote=char;continue;}
+    if(char==='('){depth++;continue;}
+    if(char===')'){
+      if(depth===0){let start=open+1,end=index;while(start<end&&/\s/.test(text[start]))start++;
+        while(end>start&&/\s/.test(text[end-1]))end--;return {start,end,center:start+(end-start)/2};}
+      depth--;
+    }
+  }
+  return null;
+}
+
+function programSelectionConditionPart(text){
+  text=String(text||'');
+  const ifIndex=text.search(/\bif\s*\(/);if(ifIndex<0)return null;
+  const open=text.indexOf('(',ifIndex);let depth=0,quote=null,escaped=false;
+  for(let index=open+1;index<text.length;index++){
+    const char=text[index];
+    if(quote){if(escaped)escaped=false;else if(char==='\\')escaped=true;else if(char===quote)quote=null;continue;}
+    if(char==='"'||char==="'"){quote=char;continue;}
+    if(char==='('){depth++;continue;}
+    if(char===')'){
+      if(depth===0){let start=open+1,end=index;while(start<end&&/\s/.test(text[start]))start++;
+        while(end>start&&/\s/.test(text[end-1]))end--;return {start,end,center:start+(end-start)/2};}
+      depth--;
+    }
+  }
+  return null;
+}
+
+function programLatestConditionResult(program,lineNumber,active,transition,predicate){
+  const statements=program&&Array.isArray(program.statements)?program.statements:[];
+  const conditions=statements.filter(statement=>Number(statement.sourceLine)===Number(lineNumber)&&predicate(statement));
+  if(!conditions.length)return null;
+  const incomingId=transition&&transition.destinationId;
+  const incoming=incomingId&&statements.find(statement=>statement.id===incomingId);
+  const awaitingCondition=(active&&conditions.includes(active)&&(!active.runtime||!active.runtime.checked))
+    ||(incoming&&conditions.includes(incoming)&&(!incoming.runtime||!incoming.runtime.checked));
+  if(awaitingCondition)return null;
+  const evaluated=conditions.slice().reverse().find(statement=>statement.status==='complete'
+    &&statement.runtime&&statement.runtime.checked);
+  if(!evaluated)return null;
+  const value=Boolean(evaluated.runtime.assignedValue);
+  return {statement:evaluated,value,text:formatValue(value)};
+}
+
+function programLoopConditionResult(program,lineNumber,active,transition){
+  return programLatestConditionResult(program,lineNumber,active,transition,statement=>statement.kind==='loop'
+    &&statement.loopKind!=='do'&&(!statement.forPhase||statement.forPhase==='condition'));
+}
+
+function programSelectionConditionResult(program,lineNumber,active,transition){
+  return programLatestConditionResult(program,lineNumber,active,transition,statement=>statement.kind==='selection'
+    &&(statement.selectionKind==='if'||statement.selectionKind==='else-if'));
+}
+
+function renderProgramConditionResult(result){
+  if(!result)return null;
+  return h('span',{class:`program-source-file-result program-condition-result ${result.value?'is-true':'is-false'}`,
+    'aria-label':`Condition evaluated ${result.text}`},result.text);
+}
+
+function renderProgramConditionSource(line,item,conditionPart,result){
+  if(!conditionPart)return h('code',{class:'program-source-file-text'},...programSourceFragments(line.text,item.language));
+  return h('code',{class:'program-source-file-text'},
+    ...programSourceFragments(line.text.slice(0,conditionPart.start),item.language),
+    h('span',{class:'program-source-condition'},
+      ...programSourceFragments(line.text.slice(conditionPart.start,conditionPart.end),item.language),
+      renderProgramConditionResult(result)),
+    ...programSourceFragments(line.text.slice(conditionPart.end),item.language));
+}
+
+function renderProgramForHeaderSource(line,item,program,statementIds,active,transition,conditionResult){
+  const parts=typeof programFlowTrailForClauseParts==='function'
+    ?programFlowTrailForClauseParts(line.text):null;
+  if(!parts)return null;
+  const code=h('code',{class:'program-source-file-text program-source-for-header'});
+  const appendFragments=value=>programSourceFragments(value,item.language).forEach(fragment=>
+    code.appendChild(typeof fragment==='string'?document.createTextNode(fragment):fragment));
+  let cursor=0;
+  ['initialize','condition','update'].forEach(phase=>{
+    const part=parts[phase];
+    if(part.start>cursor)appendFragments(line.text.slice(cursor,part.start));
+    const statement=programForPhaseStatement(program,statementIds,phase,active);
+    const expected=!!(statement&&active&&statement.id===active.id);
+    const strict=typeof strictSequenceEnabled==='function'&&strictSequenceEnabled();
+    const candidate=!!(strict&&statement&&program.status==='running'&&!transition&&!item.checked
+      &&!item.practiceInvalidExecution&&!examInteractionLocked()&&strictProgramStatementSelectable(item,statement));
+    const interactive=!!(statement&&!transition&&!item.checked&&!item.practiceInvalidExecution
+      &&!examInteractionLocked()&&(expected||candidate));
+    const plan=interactive?statementInteractionPlan(item,statement):null;
+    const attrs={class:`program-source-for-clause is-${phase}${phase==='condition'?' program-source-condition':''}${expected?' is-active':''}${candidate?' strict-sequence-statement-candidate':''}`,
+      'data-for-phase':phase,'data-statement-id':statement&&statement.id||null};
+    if(interactive){
+      attrs.type='button';attrs.title=plan.label;
+      attrs['aria-label']=`${plan.label}: ${line.text.slice(part.start,part.end)}`;
+      attrs.onclick=event=>{if(event&&event.stopPropagation)event.stopPropagation();
+        activateProgramSourceStatement(item,statement.id,event.currentTarget);};
+    }
+    const children=programSourceFragments(line.text.slice(part.start,part.end),item.language);
+    if(phase==='condition')children.push(renderProgramConditionResult(conditionResult));
+    const clause=h(interactive?'button':'span',attrs,...children);
+    code.appendChild(clause);cursor=part.end;
+  });
+  if(cursor<line.text.length)appendFragments(line.text.slice(cursor));
+  return code;
+}
+
 const sourceFlowViewportStates=new WeakMap();
 const sourceFlowScrollKeys=new Set(['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' ']);
 
@@ -271,9 +397,17 @@ function completedProgramUndoStatementId(item,program){
   return history.length?history[history.length-1]:null;
 }
 
+function programSourceTransitionRoles(statementIds,transition){
+  const ids=Array.isArray(statementIds)?statementIds:[];
+  return {origin:!!(transition&&transition.originId&&ids.includes(transition.originId)),
+    destination:!!(transition&&transition.destinationId&&ids.includes(transition.destinationId))};
+}
+
 function renderProgramSourceFilePanel(item,program){
   const display=item.sourceDisplay,statements=new Map(program.statements.map((statement,index)=>[statement.id,{statement,index}]));
   const active=program.statements[program.cursor],transition=item._sourceFlowTransition||null;
+  const activeProfile=typeof PROFILES!=='undefined'&&PROFILES.find(candidate=>candidate.id===item.profileId);
+  const flowTrailEnabled=typeof profileFlowTrailEnabled==='function'&&profileFlowTrailEnabled(activeProfile);
   const completedUndoStatementId=completedProgramUndoStatementId(item,program);
   const flowTiming=sourceFlowTimings(),viewport=sourceFlowViewportState(item);
   const markUserScroll=()=>markSourceFlowUserScroll(item,source);
@@ -295,9 +429,12 @@ function renderProgramSourceFilePanel(item,program){
     const displayedStatementId=active&&lineStatementIds.includes(active.id)?active.id:lineStatementIds[0];
     const entry=line.primary&&displayedStatementId?statements.get(displayedStatementId):null;
     const statement=entry&&entry.statement;
-    const isOrigin=!!(statement&&transition&&statement.id===transition.originId);
-    const isDestination=!!(statement&&transition&&statement.id===transition.destinationId);
-    const isExpected=!!(statement&&active&&statement.id===active.id&&program.status!=='complete'&&!transition);
+    const forHeaderParts=line.primary&&typeof programFlowTrailForClauseParts==='function'
+      ?programFlowTrailForClauseParts(line.text):null;
+    const transitionRoles=programSourceTransitionRoles(lineStatementIds,transition);
+    const isOrigin=transitionRoles.origin,isDestination=transitionRoles.destination;
+    const isCurrent=!!(statement&&active&&statement.id===active.id&&program.status!=='complete');
+    const isExpected=!!(isCurrent&&!transition);
     const strictStatements=typeof strictSequenceEnabled==='function'&&strictSequenceEnabled();
     const strictCandidate=!!(strictStatements&&statement&&program.status==='running'&&!transition
       &&!item.checked&&!examInteractionLocked()
@@ -305,28 +442,41 @@ function renderProgramSourceFilePanel(item,program){
     const strictPaused=!!(strictCandidate&&item.practiceInvalidExecution);
     const interactive=!!(statement&&!transition&&!item.checked&&!item.practiceInvalidExecution
       &&!examInteractionLocked()&&(isExpected||strictCandidate));
-    const activeVisual=isExpected&&!strictStatements;
+    const strictFlowSelected=!!(statement&&item._strictFlowSelectedStatementId===statement.id);
+    const activeVisual=isExpected&&(!strictStatements||flowTrailEnabled&&strictFlowSelected);
     const plan=(interactive||strictPaused)?statementInteractionPlan(item,statement):null;
     const sourceInline=!!(plan&&plan.mode==='modal'&&programUsesSourceInlineTrace(item));
     const sourceInlineOpen=!!(sourceInline&&programSourceInlineTraceOpenFor(item,statement.id));
     const interactionMode=sourceInline?'source-inline':plan&&plan.mode;
-    const interactionClass=interactionMode?` interaction-${interactionMode}`:'',result=statementTraceResult(statement);
+    const interactionClass=interactionMode?` interaction-${interactionMode}`:'';
+    const loopConditionResult=programLoopConditionResult(program,line.number,active,transition);
+    const selectionConditionResult=programSelectionConditionResult(program,line.number,active,transition);
+    const conditionResult=loopConditionResult||selectionConditionResult;
+    const ownsConditionResult=!!(statement&&(statement.kind==='loop'
+      ||statement.kind==='selection'&&statement.selectionKind!=='switch'));
+    const result=ownsConditionResult?null:statementTraceResult(statement);
     const visualStatus=strictStatements&&program.status==='running'&&statement
       &&statement.status!=='complete'&&statement.status!=='invalid'?'waiting':statement&&statement.status;
     const stateClass=statement
       ?(statement.status==='active'&&transition?'is-pending':`is-${visualStatus}`)
       :'is-context';
-    const transitionClass=isOrigin?` is-flow-origin is-${transition.phase}`:(isDestination?' is-flow-destination':'');
-    const row=h(interactive?'button':'div',{class:`program-source-file-line ${stateClass}${activeVisual?' is-active':''}${strictCandidate?' strict-sequence-statement-candidate':''}${strictPaused?' strict-sequence-candidate-paused':''}${interactionClass}${transitionClass}`,
-      type:interactive?'button':null,'data-source-line':String(line.number),
+    const transitionClass=`${isOrigin?` is-flow-origin is-${transition.phase}`:''}${isDestination?' is-flow-destination':''}`;
+    const rowInteractive=interactive&&!forHeaderParts;
+    const row=h(rowInteractive?'button':'div',{class:`program-source-file-line ${stateClass}${activeVisual?' is-active':''}${strictCandidate&&!forHeaderParts?' strict-sequence-statement-candidate':''}${strictPaused?' strict-sequence-candidate-paused':''}${interactionClass}${transitionClass}${forHeaderParts?' is-for-header':''}${conditionResult?' has-program-condition-result':''}`,
+      type:rowInteractive?'button':null,'data-source-line':String(line.number),
       'data-statement-id':statement&&statement.id||null,
       'aria-disabled':strictPaused?'true':null,
-      'aria-expanded':sourceInline?String(sourceInlineOpen):null,
-      'aria-label':interactive?(sourceInlineOpen?`Collapse line ${line.number} evaluation`:`${plan.label}, line ${line.number}`):null,
-      title:interactive?(sourceInlineOpen?'Collapse evaluation':plan.label):null,
-      onclick:interactive?event=>activateProgramSourceStatement(item,statement.id,event.currentTarget):null});
+      'aria-expanded':rowInteractive&&sourceInline?String(sourceInlineOpen):null,
+      'aria-label':rowInteractive?(sourceInlineOpen?`Collapse line ${line.number} evaluation`:`${plan.label}, line ${line.number}`):null,
+      title:rowInteractive?(sourceInlineOpen?'Collapse evaluation':plan.label):null,
+      onclick:rowInteractive?event=>activateProgramSourceStatement(item,statement.id,event.currentTarget):null});
     row.appendChild(h('span',{class:'program-source-file-number','aria-hidden':'true'},String(line.number)));
-    const sourceCode=h('code',{class:'program-source-file-text'},...programSourceFragments(line.text,item.language));
+    const conditionPart=forHeaderParts?programLoopConditionPart(line.text,forHeaderParts)
+      :(loopConditionResult?programLoopConditionPart(line.text,null)
+        :(selectionConditionResult?programSelectionConditionPart(line.text):null));
+    const sourceCode=forHeaderParts
+      ?renderProgramForHeaderSource(line,item,program,lineStatementIds,active,transition,conditionResult)
+      :renderProgramConditionSource(line,item,conditionPart,conditionResult);
     row.appendChild(sourceCode);flowLineElements.set(Number(line.number),{row,code:sourceCode,line});
     const state=h('span',{class:'program-source-file-state'});
     if(result!==null){
@@ -341,7 +491,7 @@ function renderProgramSourceFilePanel(item,program){
         onclick:event=>{if(event&&event.stopPropagation)event.stopPropagation();handleUndo();}},
       h('i',{class:'fa-solid fa-rotate-left','aria-hidden':'true'})));
     }
-    if(plan){
+    if(plan&&!forHeaderParts){
       const icon=plan.mode==='direct'?'fa-play':(sourceInline?(sourceInlineOpen?'fa-chevron-up':'fa-chevron-down'):'fa-up-right-and-down-left-from-center');
       state.appendChild(h('i',{class:`fa-solid ${icon} program-source-file-action ${interactionMode}-action`,'aria-hidden':'true'}));
     }
@@ -432,7 +582,14 @@ function stageSourceFlowTransition(item,originStatement,phase='waiting'){
   if(!item||!item.sourceFlow||!item.program||!originStatement||originStatement.status!=='complete') return null;
   const profile=typeof PROFILES!=='undefined'&&PROFILES.find(candidate=>candidate.id===item.profileId);
   const flowTrailTransition=typeof profileFlowTrailEnabled==='function'&&profileFlowTrailEnabled(profile);
-  if(typeof strictSequenceEnabled==='function'&&strictSequenceEnabled()&&!flowTrailTransition)return null;
+  if(typeof strictSequenceEnabled==='function'&&strictSequenceEnabled()){
+    if(flowTrailTransition){
+      item._strictFlowAwaitingSelection={originId:originStatement.id};
+      delete item._strictFlowSelectedStatementId;
+      delete item._sourceFlowTransition;
+    }
+    return null;
+  }
   const destination=item.program.status==='running'?item.program.statements[item.program.cursor]:null;
   if(!destination||destination.id===originStatement.id) return null;
   const transition={originId:originStatement.id,destinationId:destination.id,phase,userScrolled:false};
@@ -445,29 +602,44 @@ function sourceFlowTimings(){
   return configured||{resultHoldMs:300,modalCloseSettleMs:320,movementDurationMs:500,reducedMotionDurationMs:120};
 }
 
-function beginSourceFlowTransition(item,settleMs=0){
+function beginSourceFlowTransition(item,settleMs=0,options){
   const transition=item&&item._sourceFlowTransition;if(!transition)return false;
+  options=options||{};
   if(sourceFlowTransitionTimer){clearTimeout(sourceFlowTransitionTimer);sourceFlowTransitionTimer=null;}
   const timing=sourceFlowTimings();
   const reduced=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const holdMs=Math.max(0,Number(settleMs)||0)+(reduced?Math.min(timing.resultHoldMs,450):timing.resultHoldMs);
+  const holdMs=options.skipHold?0:Math.max(0,Number(settleMs)||0)+(reduced?Math.min(timing.resultHoldMs,450):timing.resultHoldMs);
   const movementMs=reduced?timing.reducedMotionDurationMs:timing.movementDurationMs;
-  transition.phase='holding';render();
-  sourceFlowTransitionTimer=setTimeout(()=>{
+  const finish=()=>{
+    const preserveViewport=!!(transition.userScrolled||sourceFlowViewportState(item).userOverride);
+    if(item._sourceFlowTransition===transition)delete item._sourceFlowTransition;
+    sourceFlowTransitionTimer=null;render();
+    if(typeof document!=='undefined'&&document.querySelector){
+      const next=document.querySelector('.program-source-file-line.is-active');
+      if(next&&typeof next.focus==='function')next.focus({preventScroll:true});
+    }
+    if(!preserveViewport)sourceFlowViewportState(item).userOverride=false;
+    if(typeof options.onComplete==='function')options.onComplete();
+  };
+  const move=()=>{
     if(item._sourceFlowTransition!==transition){sourceFlowTransitionTimer=null;return;}
     transition.phase='moving';render();
-    sourceFlowTransitionTimer=setTimeout(()=>{
-      const preserveViewport=!!(transition.userScrolled||sourceFlowViewportState(item).userOverride);
-      if(item._sourceFlowTransition===transition)delete item._sourceFlowTransition;
-      sourceFlowTransitionTimer=null;render();
-      if(typeof document!=='undefined'&&document.querySelector){
-        const next=document.querySelector('.program-source-file-line.is-active');
-        if(next&&typeof next.focus==='function')next.focus({preventScroll:true});
-      }
-      if(!preserveViewport)sourceFlowViewportState(item).userOverride=false;
-    },movementMs);
-  },holdMs);
+    sourceFlowTransitionTimer=setTimeout(finish,movementMs);
+  };
+  if(options.skipHold)move();
+  else{transition.phase='holding';render();sourceFlowTransitionTimer=setTimeout(move,holdMs);}
   return true;
+}
+
+function stageStrictSourceSelectionTransition(item,statement){
+  if(!item||!statement||typeof strictSequenceEnabled!=='function'||!strictSequenceEnabled())return null;
+  const profile=typeof PROFILES!=='undefined'&&PROFILES.find(candidate=>candidate.id===item.profileId);
+  if(typeof profileFlowTrailEnabled!=='function'||!profileFlowTrailEnabled(profile))return null;
+  const pending=item._strictFlowAwaitingSelection;delete item._strictFlowAwaitingSelection;
+  item._strictFlowSelectedStatementId=statement.id;
+  if(!pending||!pending.originId||pending.originId===statement.id)return null;
+  const transition={originId:pending.originId,destinationId:statement.id,phase:'moving',userScrolled:false,strictSelection:true};
+  sourceFlowViewportState(item).userOverride=false;item._sourceFlowTransition=transition;return transition;
 }
 
 function programTimelinePresentation(item){
@@ -506,7 +678,7 @@ function programStatementEvaluationOwnsCompletion(item,statementId){
 }
 
 function statementTraceResult(statement){
-  if(!statement||statement.kind!=='selection'||statement.status!=='complete'||!statement.runtime||!statement.runtime.checked) return null;
+  if(!statement||!['selection','loop'].includes(statement.kind)||statement.status!=='complete'||!statement.runtime||!statement.runtime.checked) return null;
   if(statement.selectionKind==='switch') return `${formatValue(statement.runtime.assignedValue)} · ${statement.runtime.selectedLabel}`;
   return formatValue(Boolean(statement.runtime.assignedValue));
 }
@@ -518,14 +690,16 @@ function activateProgramSourceStatement(item,statementId,trigger){
   const selection=typeof attemptProgramStatementSelection==='function'
     ?attemptProgramStatementSelection(item,statementId):{applied:false,ignored:true};
   if(!selection.applied)return false;
-  const statement=selection.statement,plan=statementInteractionPlan(item,statement);
-  if(plan.mode==='direct'){
-    handleTokenClick(plan.action);return true;
-  }
-  if(programUsesSourceInlineTrace(item)){
-    openProgramSourceInlineTrace(item,statement.id,trigger);return true;
-  }
-  openProgramStatementTrace(item,statement.id,trigger);return true;
+  const statement=selection.statement;
+  const proceed=()=>{
+    const plan=statementInteractionPlan(item,statement);
+    if(plan.mode==='direct'){handleTokenClick(plan.action);return;}
+    if(programUsesSourceInlineTrace(item)){openProgramSourceInlineTrace(item,statement.id,trigger);return;}
+    openProgramStatementTrace(item,statement.id,trigger);
+  };
+  const transition=stageStrictSourceSelectionTransition(item,statement);
+  if(transition){beginSourceFlowTransition(item,0,{skipHold:true,onComplete:proceed});return true;}
+  proceed();return true;
 }
 
 function openProgramSourceInlineTrace(item,statementId,trigger){
@@ -727,6 +901,11 @@ function renderProgramContextShell(memoryPanel,outputPanel,surface){
   return context;
 }
 
+function resetStatementTraceViewport(body){
+  if(!body)return false;
+  body.scrollTop=0;body.scrollLeft=0;return true;
+}
+
 function syncStatementTraceModal(item,moveFocus=false){
   const modal=document.getElementById('statementTraceModal');
   const overlay=document.getElementById('statementTraceOverlay');
@@ -766,8 +945,9 @@ function syncStatementTraceModal(item,moveFocus=false){
   layout.appendChild(trace);
   if(typeof applyActivityZoomToElement==='function') applyActivityZoomToElement(layout);
   body.appendChild(layout);
+  if(moveFocus)resetStatementTraceViewport(body);
   const line=programStatementDisplayNumber(statement,statementIndex);
-  const kindLabel={declaration:'Declaration',assignment:'Assignment','unary-update':'Update',output:'Output',input:'Input',selection:'Condition'}[statement.kind]||'Statement';
+  const kindLabel={declaration:'Declaration',assignment:'Assignment','unary-update':'Update',output:'Output',input:'Input',selection:'Condition',loop:'Condition'}[statement.kind]||'Statement';
   title.textContent=`${kindLabel} trace · Line ${line}${completed?' · Complete':''}`;
   modal.classList.toggle('is-complete',completed);
   if(back){back.disabled=false;back.querySelector('span').textContent=completed?'Back to source':'Close evaluation';}
@@ -776,9 +956,10 @@ function syncStatementTraceModal(item,moveFocus=false){
     const label=continueButton.querySelector('span');if(label)label.textContent=waitingForOutput?'Finishing output…':'Continue program';}
   modal.style.display='flex';overlay.style.display='block';
   if(document.body&&document.body.classList) document.body.classList.add('statement-trace-open');
-  if(moveFocus&&back&&typeof back.focus==='function') back.focus();
-  else if(completed&&continueButton&&typeof continueButton.focus==='function') continueButton.focus();
+  if(moveFocus&&back&&typeof back.focus==='function') back.focus({preventScroll:true});
+  else if(completed&&continueButton&&typeof continueButton.focus==='function') continueButton.focus({preventScroll:true});
   if(typeof requestAnimationFrame==='function') requestAnimationFrame(()=>{
+    if(moveFocus)resetStatementTraceViewport(body);
     if(typeof drawConnectorLines==='function') drawConnectorLines(item);
     if(typeof drawDeclarationConnectorLines==='function') drawDeclarationConnectorLines(item);
   });

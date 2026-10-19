@@ -95,3 +95,63 @@ registerStatementPlugin({
     return runtime.canonicalTrace.steps.map(step=>Object.assign({statementId:ctx.statement.id},step))
       .concat({type:'BRANCH',action:'BRANCH',statementId:ctx.statement.id,value:runtime.expectedValue});}
 });
+
+function loopExpressionResolved(statement){
+  if(statement.loopKind==='do')return true;
+  return selectionExpressionResolved(statement);
+}
+
+function completeLoopFrame(ctx,value){
+  const {statement,program}=ctx,runtime=statement.runtime,semantics=programSemanticsForContext(ctx);
+  runtime.checked=true;runtime.assignedValue=value;
+  const evaluations=(runtime.trace||[]).filter(step=>step.action==='EVALUATE');
+  runtime.correctSteps=evaluations.filter(step=>step.wasCorrect).length;
+  runtime.totalOpSteps=evaluations.length;runtime.wasCorrectAssignment=value===runtime.expectedValue;
+  const effects=(runtime.expectedEffects||[]).map(effect=>Object.assign({},effect));
+  runtime.beforeEffectMemory=typeof captureCoreMemoryTargets==='function'
+    ?captureCoreMemoryTargets(program.memory,effects.map(effect=>effect.target).filter(Boolean)):null;
+  semantics.applyEffects(program.memory,effects,statement.id,'bindings');
+  return {applied:true,completed:true,nextStatementId:statement.nextStatementId,event:{
+    type:'LOOP',action:'LOOP',statementId:statement.id,loopKind:statement.loopKind,
+    phase:runtime.loopPhase,value,wasCorrect:runtime.wasCorrectAssignment,effects}};
+}
+
+registerStatementPlugin({
+  kind:'loop',scoresCommit:true,
+  interactionPlan(ctx){
+    return ctx.statement.loopKind==='do'
+      ?{mode:'direct',action:{type:'commit-loop-entry',statementId:ctx.statement.id},label:'Enter loop body'}
+      :{mode:'modal',focus:'condition-expression',label:'Evaluate loop condition'};
+  },
+  classifyRejectedAction(ctx){
+    if(ctx.action&&ctx.action.type==='commit-loop'&&!loopExpressionResolved(ctx.statement))return 'condition-unresolved';
+    return null;
+  },
+  applyAction(ctx){
+    const {statement,action}=ctx,runtime=statement.runtime;
+    if(!runtime||runtime.checked)return {applied:false};
+    if(statement.loopKind==='do'&&action.type==='commit-loop-entry')return completeLoopFrame(ctx,true);
+    if(action.type==='commit-loop')return loopExpressionResolved(statement)
+      ?completeLoopFrame(ctx,flatOperandValue(runtime.workingFlat.operands[0])):{applied:false};
+    const apply=ctx.services&&ctx.services.applyExpressionAction;
+    if(typeof apply!=='function'||!apply(runtime,action))return {applied:false};
+    return loopExpressionResolved(statement)
+      ?completeLoopFrame(ctx,flatOperandValue(runtime.workingFlat.operands[0])):{applied:true};
+  },
+  canUndo(ctx){const runtime=ctx.statement.runtime;return !!(runtime&&!runtime.checked&&runtime.history&&runtime.history.length>1);},
+  undo(ctx){const undo=ctx.services&&ctx.services.undoExpressionAction;
+    return typeof undo==='function'?{applied:!!undo(ctx.statement.runtime)}:{applied:false};},
+  rollbackCompletion(ctx){const runtime=ctx.statement.runtime;if(!runtime||!runtime.checked)return {applied:false};
+    if(typeof restoreCoreMemoryTargets==='function')restoreCoreMemoryTargets(ctx.program.memory,runtime.beforeEffectMemory);
+    runtime.checked=false;runtime.assignedValue=null;runtime.correctSteps=0;runtime.totalOpSteps=0;
+    runtime.wasCorrectAssignment=null;runtime.beforeEffectMemory=null;return {applied:true,reopenFocus:'condition-expression'};},
+  reset(ctx){const runtime=ctx.statement.runtime;if(!runtime)return {applied:false};
+    const changed=runtime.checked||(runtime.trace&&runtime.trace.length>0);
+    if(runtime.originalFlat){runtime.workingFlat=deepCloneFlat(runtime.originalFlat);runtime.history=[deepCloneFlat(runtime.originalFlat)];}
+    runtime.trace=[];runtime.checked=false;runtime.assignedValue=null;runtime.correctSteps=0;
+    runtime.totalOpSteps=0;runtime.wasCorrectAssignment=null;runtime.beforeEffectMemory=null;return {applied:changed};},
+  buildCanonicalTrace(ctx){const runtime=ctx.statement.runtime;
+    if(ctx.statement.loopKind==='do')return [{type:'LOOP',action:'LOOP',statementId:ctx.statement.id,value:true}];
+    return runtime.canonicalTrace.steps.map(step=>Object.assign({statementId:ctx.statement.id},step))
+      .concat({type:'LOOP',action:'LOOP',statementId:ctx.statement.id,value:runtime.expectedValue});}
+});

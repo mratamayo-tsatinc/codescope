@@ -2397,8 +2397,27 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   border-right:1px solid var(--line-soft);color:var(--text-mute);font:500 12px/1 var(--mono);user-select:none;
 }
 .program-source-file-text{padding-left:15px;color:var(--text);font:inherit;white-space:pre;}
-.has-program-flow-trail .program-source-file-line{position:relative;z-index:3;}
-.has-program-flow-trail .program-source-file-text{position:relative;}
+.program-source-file-line.is-for-header{min-height:52px;padding-top:18px;padding-bottom:14px;cursor:default;}
+.program-source-for-clause{
+  display:inline;padding:1px 2px;margin:0 -2px;border:0;border-radius:4px;background:transparent;
+  color:inherit;font:inherit;line-height:inherit;text-align:left;white-space:pre;
+}
+button.program-source-for-clause{cursor:pointer;box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--op) 65%,transparent);}
+button.program-source-for-clause:hover,
+button.program-source-for-clause:focus-visible{background:color-mix(in srgb,var(--op) 15%,transparent);outline:1px solid color-mix(in srgb,var(--op) 55%,transparent);}
+.program-source-for-clause.is-active{background:color-mix(in srgb,var(--op) 10%,transparent);}
+.program-source-condition{position:relative;display:inline-block;}
+.program-condition-result{
+  position:absolute;z-index:6;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);
+  box-sizing:border-box;white-space:nowrap;pointer-events:none;
+}
+.program-source-file-line.has-program-condition-result:not(.is-for-header){min-height:40px;padding-top:14px;}
+/* Keep row feedback behind the trail so a highlighted line cannot visually
+   splice a continuous path. Source content stays above both layers. */
+.has-program-flow-trail .program-source-file-line{position:relative;z-index:auto;}
+.has-program-flow-trail .program-source-file-number,
+.has-program-flow-trail .program-source-file-text,
+.has-program-flow-trail .program-source-file-state{position:relative;z-index:3;}
 .program-flow-trail-svg{position:absolute;z-index:2;left:0;top:0;overflow:visible;pointer-events:none;}
 .program-flow-trail-path{
   fill:none;stroke:color-mix(in srgb,var(--text-mute) 58%,transparent);stroke-width:1.35;
@@ -2417,9 +2436,29 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
   width:7px;height:7px;border:1.5px solid color-mix(in srgb,var(--text-mute) 70%,var(--panel));
   border-radius:50%;background:var(--panel-alt);transform:translateY(-50%);box-sizing:border-box;pointer-events:none;
 }
+.program-flow-trail-port.is-statement-end{
+  left:calc(15px + var(--program-flow-statement-end,0) * 1ch + 9px);top:50%;
+  transform:translate(-50%,-50%);
+}
+.program-flow-trail-port.is-for-initialize,
+.program-flow-trail-port.is-for-update,
+.program-flow-trail-port.is-for-condition-in{
+  left:calc(15px + var(--program-flow-anchor,0) * 1ch);top:-4px;
+  transform:translate(-50%,-50%);
+}
+.program-flow-trail-port.is-for-condition-out{
+  left:calc(15px + var(--program-flow-anchor,0) * 1ch);top:calc(100% + 4px);
+  transform:translate(-50%,-50%);
+}
 .program-source-file-line.is-active .program-flow-trail-port,
 .program-flow-trail-port.is-case,.program-flow-trail-port.is-default,.program-flow-trail-port.is-else{
   border-color:var(--op);background:color-mix(in srgb,var(--op) 25%,var(--panel-alt));
+}
+.program-source-file-line.is-active .program-flow-trail-port.is-for-initialize:not(.is-active),
+.program-source-file-line.is-active .program-flow-trail-port.is-for-condition-in:not(.is-active),
+.program-source-file-line.is-active .program-flow-trail-port.is-for-condition-out:not(.is-active),
+.program-source-file-line.is-active .program-flow-trail-port.is-for-update:not(.is-active){
+  border-color:color-mix(in srgb,var(--text-mute) 70%,var(--panel));background:var(--panel-alt);
 }
 .program-flow-trail-skipped .program-source-file-text{opacity:.42;}
 .program-flow-trail-skipped .program-source-file-number{opacity:.55;}
@@ -2430,6 +2469,13 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
 .program-source-file-line.is-active .program-source-file-state{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--op) 9%,var(--panel-alt)) 24%);}
 .program-source-file-line.is-active:hover,.program-source-file-line.is-active:focus-visible{background:color-mix(in srgb,var(--op) 15%,transparent);outline:0;}
 .program-source-file-line.is-active:hover .program-source-file-state,.program-source-file-line.is-active:focus-visible .program-source-file-state{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--op) 15%,var(--panel-alt)) 24%);}
+.program-source-file-line.is-active.is-for-header{cursor:default;}
+.program-source-file-line.is-active.is-for-header:hover{
+  background:color-mix(in srgb,var(--op) 9%,transparent);box-shadow:inset 3px 0 0 var(--op);
+}
+.program-source-file-line.is-active.is-for-header:hover .program-source-file-state{
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--op) 9%,var(--panel-alt)) 24%);
+}
 .program-source-file-line.is-active:focus-visible{box-shadow:inset 3px 0 0 var(--op),inset 0 0 0 2px color-mix(in srgb,var(--op) 72%,transparent);}
 .program-source-file-line.is-active .program-source-file-number{color:var(--op);font-weight:800;}
 .program-source-file-line.strict-sequence-statement-candidate{cursor:pointer;}
@@ -2457,8 +2503,12 @@ button:focus-visible, [tabindex]:focus-visible{outline:2px solid var(--op-glow);
 .program-source-file-line.is-flow-origin.is-moving{background:transparent;box-shadow:none;}
 .program-source-file-line.is-flow-origin.is-moving .program-source-file-number{color:var(--text-mute);font-weight:500;}
 .program-source-file-line.is-flow-origin.is-moving .program-source-file-state{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--panel-alt) 92%,var(--panel)) 24%);}
+/* The sticky state-column scrim sits above the shared SVG and would fade a
+   right-routed trail once on every row it crosses. Trail-enabled listings do
+   not need that masking layer; their action controls already own backgrounds. */
+.has-program-flow-trail .program-source-file-state{background:transparent!important;}
 .program-source-flow-highlight{
-  position:absolute;z-index:4;left:0;box-sizing:border-box;pointer-events:none;
+  position:absolute;z-index:1;left:0;box-sizing:border-box;pointer-events:none;
   background:color-mix(in srgb,var(--op) 9%,transparent);box-shadow:inset 3px 0 0 var(--op);
   will-change:transform,height;
   transition:transform var(--program-flow-duration) cubic-bezier(.22,.8,.28,1),height var(--program-flow-duration) cubic-bezier(.22,.8,.28,1);

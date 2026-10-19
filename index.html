@@ -42,6 +42,11 @@
           <select id="profileSetSelect" class="settings-select" onchange="handleProfileSetChange(event)" aria-describedby="profileSetDetails"></select>
           <small id="profileSetDetails" class="input-hint"></small>
         </div>
+        <div id="profileLanguageGroup" class="form-group" hidden>
+          <label for="profileLanguageSelect">Programming Language</label>
+          <select id="profileLanguageSelect" class="settings-select" onchange="handleProfileLanguageChange(event)"></select>
+          <small class="input-hint">All three activity types use the same exercises in the selected language.</small>
+        </div>
         <div class="form-group">
           <label for="emailInput">Email Address</label>
           <input 

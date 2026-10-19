@@ -114,8 +114,8 @@ function applyCoreStatementEffects(memory,effects,statementId,mode){
   return memory;
 }
 
-function evaluateAndApplyCoreStatement(statement,memory,language,statementId,mode){
-  const result=coreExecuteStatement({language:language||'c',statement,memory});
+function evaluateAndApplyCoreStatement(statement,memory,language,statementId,mode,phase){
+  const result=coreExecuteStatement({language:language||'c',statement,memory,phase});
   applyCoreStatementEffects(memory,result.effects,statementId,mode);
   return result;
 }

@@ -726,6 +726,8 @@ function undoStrictBranchChoice(item){
   selected.status='locked';expected.status='active';
   program.cursor=program.statements.indexOf(expected);program.status='running';
   runtime.studentSelectedTargetStatementId=null;runtime.studentSelectedLabel=null;runtime.branchChoiceCorrect=null;
+  item._strictFlowAwaitingSelection={originId:selection.id};
+  delete item._strictFlowSelectedStatementId;delete item._sourceFlowTransition;
   return true;
 }
 

@@ -14,6 +14,46 @@ function programFlowTrailLabel(text){
   return null;
 }
 
+function programFlowTrailForPhase(statement){
+  const phase=statement&&statement.forPhase;
+  return phase==='initialize'||phase==='condition'||phase==='update'?phase:null;
+}
+
+function programFlowTrailForAnchor(statement,direction){
+  const phase=programFlowTrailForPhase(statement);
+  if(phase==='condition')return direction==='to'?'for-condition-in':'for-condition-out';
+  return phase?`for-${phase}`:'entry';
+}
+
+function programFlowTrailForClauseParts(text){
+  text=String(text||'');
+  const forIndex=text.search(/\bfor\s*\(/);if(forIndex<0)return null;
+  const open=text.indexOf('(',forIndex),cuts=[];let depth=0,quote=null,escaped=false,close=-1;
+  for(let index=open+1;index<text.length;index++){
+    const char=text[index];
+    if(quote){if(escaped)escaped=false;else if(char==='\\')escaped=true;else if(char===quote)quote=null;continue;}
+    if(char==='"'||char==="'"){quote=char;continue;}
+    if(char==='('||char==='['||char==='{'){depth++;continue;}
+    if(char===')'){
+      if(depth===0){close=index;break;}depth--;continue;
+    }
+    if(char===']'||char==='}')depth=Math.max(0,depth-1);
+    else if(char===';'&&depth===0)cuts.push(index);
+  }
+  if(cuts.length!==2||close<0)return null;
+  const part=(start,end)=>{
+    while(start<end&&/\s/.test(text[start]))start++;
+    while(end>start&&/\s/.test(text[end-1]))end--;
+    return {start,end,center:start+(end-start)/2};
+  };
+  return {initialize:part(open+1,cuts[0]),condition:part(cuts[0]+1,cuts[1]),update:part(cuts[1]+1,close)};
+}
+
+function programFlowTrailForClauseCenters(text){
+  const parts=programFlowTrailForClauseParts(text);if(!parts)return null;
+  return {initialize:parts.initialize.center,condition:parts.condition.center,update:parts.update.center};
+}
+
 function buildProgramFlowTrailModel(item,program){
   const lines=item&&item.sourceDisplay&&Array.isArray(item.sourceDisplay.lines)?item.sourceDisplay.lines:[];
   const statements=program&&Array.isArray(program.statements)?program.statements:[];
@@ -24,12 +64,15 @@ function buildProgramFlowTrailModel(item,program){
   const current=program.status==='running'&&program.cursor>=0?statements[program.cursor]:null;
   const transition=item&&item._sourceFlowTransition;
   const revealDestination=!transition||transition.phase==='moving';
-  if(current&&revealDestination&&history[history.length-1]!==current.id)history.push(current.id);
+  const awaitingStrictSelection=!!(item&&item._strictFlowAwaitingSelection);
+  if(current&&revealDestination&&!awaitingStrictSelection&&history[history.length-1]!==current.id)history.push(current.id);
   const routeIds=history.filter((id,index)=>byId.has(id)&&(index===0||id!==history[index-1]));
   const route=[];
   routeIds.forEach(id=>{
     const statement=byId.get(id),line=Number(statement.sourceLine);
-    if(line&&(!route.length||route[route.length-1].line!==line))route.push({id,line,statement});
+    const previous=route[route.length-1];
+    if(line&&(!previous||previous.line!==line||programFlowTrailForPhase(previous.statement)!==programFlowTrailForPhase(statement)))
+      route.push({id,line,statement});
   });
   const nodes=new Map();
   const addNode=(line,kind,statement)=>{
@@ -40,9 +83,10 @@ function buildProgramFlowTrailModel(item,program){
   };
   route.forEach(entry=>addNode(entry.line,'statement',entry.statement));
   const rawEdges=[];
-  const addEdge=(from,to,routeKind)=>{
-    if(!from||!to||from.line===to.line)return;
-    rawEdges.push({fromLine:from.line,toLine:to.line,route:routeKind});
+  const addEdge=(from,to,routeKind,toAnchor,fromAnchor)=>{
+    fromAnchor=fromAnchor||'entry';toAnchor=toAnchor||'entry';
+    if(!from||!to||(from.line===to.line&&fromAnchor===toAnchor))return;
+    rawEdges.push({fromLine:from.line,toLine:to.line,route:routeKind,fromAnchor,toAnchor});
   };
   const labelBetween=(fromLine,toLine)=>{
     if(toLine<=fromLine)return null;
@@ -56,23 +100,46 @@ function buildProgramFlowTrailModel(item,program){
   for(let index=0;index<route.length-1;index++){
     const from=route[index],to=route[index+1];
     const fromNode=nodes.get(from.line),toNode=nodes.get(to.line);
+    const fromAnchor=programFlowTrailForAnchor(from.statement,'from'),toAnchor=programFlowTrailForAnchor(to.statement,'to');
+    if(from.line===to.line&&fromAnchor!=='entry'&&toAnchor!=='entry'){
+      addEdge(fromNode,toNode,'for-header',toAnchor,fromAnchor);continue;
+    }
     const selection=from.statement&&from.statement.kind==='selection';
     const via=selection?labelBetween(from.line,to.line):null;
     if(via){
       const viaNode=addNode(via.line,via.kind,null);
-      addEdge(fromNode,viaNode,'left');addEdge(viaNode,toNode,'inner');continue;
+      addEdge(fromNode,viaNode,'left','entry',fromAnchor);addEdge(viaNode,toNode,'inner',toAnchor);continue;
     }
-    if(to.line<from.line){addEdge(fromNode,toNode,'right');continue;}
+    if(to.line<from.line&&from.statement&&from.statement.kind==='loop'&&from.statement.loopKind==='do-while'){
+      let headerLine=null;
+      for(let number=from.line-1;number>=1;number--){
+        const candidate=byLine.get(number);
+        if(candidate&&/^\s*do\s*\{/.test(String(candidate.text||''))
+          &&programFlowTrailIndent(candidate.text)===fromNode.indent){headerLine=number;break;}
+      }
+      if(headerLine!==null){
+        const headerStatement=statements.find(statement=>statement.kind==='loop'&&statement.loopKind==='do'
+          &&Number(statement.sourceLine)===headerLine)||null;
+        const headerNode=addNode(headerLine,'statement',headerStatement);
+        addEdge(fromNode,headerNode,'right','statement-end',fromAnchor);continue;
+      }
+    }
+    if(to.line<from.line){
+      const target=toAnchor!=='entry'?toAnchor:(to.statement&&to.statement.kind==='loop'?'statement-end':'entry');
+      addEdge(fromNode,toNode,'right',target,fromAnchor);continue;
+    }
     if(selection&&to.statement&&to.statement.selectionKind==='else-if'){
-      addEdge(fromNode,toNode,'left');continue;
+      addEdge(fromNode,toNode,'left',toAnchor,fromAnchor);continue;
     }
     const exitsBlock=toNode.indent<fromNode.indent
       ||selection&&toNode.indent<=fromNode.indent
+      ||from.statement&&from.statement.kind==='loop'&&toNode.indent<=fromNode.indent
       ||from.statement&&from.statement.kind==='program-break';
-    addEdge(fromNode,toNode,exitsBlock?'left':'inner');
+    addEdge(fromNode,toNode,exitsBlock?'left':'inner',toAnchor,fromAnchor);
   }
   const edgeMap=new Map();
-  rawEdges.forEach((edge,index)=>edgeMap.set(`${edge.fromLine}:${edge.toLine}:${edge.route}`,Object.assign({},edge,{order:index})));
+  rawEdges.forEach((edge,index)=>edgeMap.set(`${edge.fromLine}:${edge.fromAnchor}:${edge.toLine}:${edge.route}:${edge.toAnchor}`,
+    Object.assign({},edge,{order:index})));
   const edges=[...edgeMap.values()].sort((left,right)=>left.order-right.order);
   if(edges.length)edges[edges.length-1].latest=true;
   const executedLines=new Set(route.map(entry=>entry.line));
@@ -86,8 +153,36 @@ function buildProgramFlowTrailModel(item,program){
   return {nodes:[...nodes.values()].sort((a,b)=>a.line-b.line),edges,skippedLines:[...skipped].sort((a,b)=>a-b)};
 }
 
+function programFlowTrailStatementEnd(text){return String(text||'').trimEnd().length;}
+
+function programFlowTrailRightExtent(source,fromY,toY){
+  if(!source||typeof source.querySelectorAll!=='function'||typeof source.getBoundingClientRect!=='function')return 0;
+  const sourceRect=source.getBoundingClientRect();
+  const scaleX=source.offsetWidth?sourceRect.width/source.offsetWidth:1;
+  const scaleY=source.offsetHeight?sourceRect.height/source.offsetHeight:1;
+  const originX=sourceRect.left+(source.clientLeft||0)*scaleX;
+  const originY=sourceRect.top+(source.clientTop||0)*scaleY;
+  const scrollLeft=source.scrollLeft||0,scrollTop=source.scrollTop||0;
+  const top=Math.min(fromY,toY),bottom=Math.max(fromY,toY);
+  let extent=0;
+  source.querySelectorAll('.program-source-file-text,.co-order-code').forEach(code=>{
+    if(!code||typeof code.getBoundingClientRect!=='function')return;
+    const rect=code.getBoundingClientRect();
+    const codeTop=(rect.top-originY)/scaleY+scrollTop;
+    const codeBottom=(rect.bottom-originY)/scaleY+scrollTop;
+    if(codeBottom<top||codeTop>bottom)return;
+    extent=Math.max(extent,(rect.right-originX)/scaleX+scrollLeft);
+  });
+  return extent;
+}
+
 function programFlowTrailRoundedPath(from,to,route,source){
   const direction=to.y>=from.y?1:-1,radius=Math.min(8,Math.max(3,Math.abs(to.y-from.y)/4));
+  if(route==='for-header'){
+    const lane=Math.min(from.y,to.y)-11,r=Math.min(6,Math.max(3,Math.abs(to.x-from.x)/6));
+    const horizontal=to.x>=from.x?1:-1;
+    return `M ${from.x} ${from.y} V ${lane+r} Q ${from.x} ${lane} ${from.x+horizontal*r} ${lane} H ${to.x-horizontal*r} Q ${to.x} ${lane} ${to.x} ${lane+r} V ${to.y}`;
+  }
   if(route==='left'){
     const gutter=source.querySelector&&source.querySelector('.program-source-file-number,.co-order-number');
     const boundary=gutter?gutter.offsetLeft+gutter.offsetWidth:36;
@@ -97,11 +192,24 @@ function programFlowTrailRoundedPath(from,to,route,source){
     return `M ${from.x} ${from.y} H ${lane+radius} Q ${lane} ${from.y} ${lane} ${from.y+direction*radius} V ${to.y-direction*radius} Q ${lane} ${to.y} ${lane+radius} ${to.y} H ${to.x}`;
   }
   if(route==='right'){
-    const lane=Math.max(from.right||from.x,to.right||to.x)+18;
+    const crossedStatementRight=programFlowTrailRightExtent(source,from.y,to.y);
+    const lane=Math.max(from.right||from.x,to.right||to.x,crossedStatementRight)+18;
     return `M ${from.right||from.x} ${from.y} H ${lane-radius} Q ${lane} ${from.y} ${lane} ${from.y+direction*radius} V ${to.y-direction*radius} Q ${lane} ${to.y} ${lane-radius} ${to.y} H ${to.x}`;
   }
   const middle=from.y+(to.y-from.y)/2;
   return `M ${from.x} ${from.y} C ${from.x} ${middle}, ${to.x} ${middle}, ${to.x} ${to.y}`;
+}
+
+function programFlowTrailRenderedCenter(source,element){
+  if(!source||!element||typeof source.getBoundingClientRect!=='function'
+    ||typeof element.getBoundingClientRect!=='function')return null;
+  const sourceRect=source.getBoundingClientRect(),elementRect=element.getBoundingClientRect();
+  const scaleX=source.offsetWidth?sourceRect.width/source.offsetWidth:1;
+  const scaleY=source.offsetHeight?sourceRect.height/source.offsetHeight:1;
+  const originX=sourceRect.left+(source.clientLeft||0)*scaleX;
+  const originY=sourceRect.top+(source.clientTop||0)*scaleY;
+  return {x:(elementRect.left+elementRect.width/2-originX)/scaleX+(source.scrollLeft||0),
+    y:(elementRect.top+elementRect.height/2-originY)/scaleY+(source.scrollTop||0)};
 }
 
 function mountProgramFlowTrail(source,item,program,lineElements){
@@ -117,23 +225,57 @@ function mountProgramFlowTrail(source,item,program,lineElements){
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   svg.setAttribute('class','program-flow-trail-svg');svg.setAttribute('aria-hidden','true');
   const seenEdges=item._programFlowTrailEdgeKeys instanceof Set?item._programFlowTrailEdgeKeys:null;
-  const modelEdgeKeys=new Set(model.edges.map(edge=>`${edge.fromLine}:${edge.toLine}:${edge.route}`));
+  const edgeKey=edge=>`${edge.fromLine}:${edge.fromAnchor||'entry'}:${edge.toLine}:${edge.route}:${edge.toAnchor||'entry'}`;
+  const modelEdgeKeys=new Set(model.edges.map(edgeKey));
   if(seenEdges)[...seenEdges].forEach(key=>{if(!modelEdgeKeys.has(key))seenEdges.delete(key);});
   const latest=model.edges[model.edges.length-1]||null;
-  const latestKey=latest?`${latest.fromLine}:${latest.toLine}:${latest.route}`:null;
+  const latestKey=latest?edgeKey(latest):null;
   const enteringKey=latestKey&&((seenEdges&&!seenEdges.has(latestKey))
     ||(!seenEdges&&item._sourceFlowTransition&&item._sourceFlowTransition.phase==='moving'))?latestKey:null;
   const nextSeen=seenEdges||new Set();
+  const statementEndTargets=new Set(model.edges.filter(edge=>edge.toAnchor==='statement-end').map(edge=>edge.toLine));
+  const activeForPhase=program&&program.status==='running'&&program.statements&&program.statements[program.cursor]
+    ?programFlowTrailForPhase(program.statements[program.cursor]):null;
+  const forAnchorsByLine=new Map();
+  model.edges.forEach(edge=>{
+    [[edge.fromLine,edge.fromAnchor],[edge.toLine,edge.toAnchor]].forEach(([line,anchor])=>{
+      if(!String(anchor||'').startsWith('for-'))return;
+      if(!forAnchorsByLine.has(line))forAnchorsByLine.set(line,new Set());
+      forAnchorsByLine.get(line).add(anchor);
+    });
+  });
   const ports=new Map();
   model.nodes.forEach(node=>{
     const entry=lineElements.get(node.line);if(!entry)return;
-    const port=document.createElement('span');port.className=`program-flow-trail-port is-${node.kind}`;
-    port.setAttribute('aria-hidden','true');port.style.setProperty('--program-flow-indent',String(node.indent));
-    entry.code.appendChild(port);ports.set(node.line,{port,entry});
+    const specialAnchors=forAnchorsByLine.get(node.line),anchorPorts=new Map();
+    let port=null;
+    if(!specialAnchors||!specialAnchors.size){
+      port=document.createElement('span');port.className=`program-flow-trail-port is-${node.kind}`;
+      port.setAttribute('aria-hidden','true');port.style.setProperty('--program-flow-indent',String(node.indent));
+      entry.code.appendChild(port);anchorPorts.set('entry',port);
+    }else{
+      if(entry.row.classList)entry.row.classList.add('program-flow-trail-for-header');
+      const centers=programFlowTrailForClauseCenters(node.text);
+      specialAnchors.forEach(anchor=>{
+        const phase=anchor.startsWith('for-condition')?'condition':anchor.slice(4),phasePort=document.createElement('span');
+        phasePort.className=`program-flow-trail-port is-${anchor}${phase===activeForPhase?' is-active':''}`;
+        phasePort.setAttribute('aria-hidden','true');
+        phasePort.style.setProperty('--program-flow-anchor',String(centers&&centers[phase]!=null?centers[phase]:node.indent));
+        entry.code.appendChild(phasePort);anchorPorts.set(anchor,phasePort);
+      });
+    }
+    let statementEndPort=null;
+    if(statementEndTargets.has(node.line)){
+      statementEndPort=document.createElement('span');statementEndPort.className='program-flow-trail-port is-statement-end';
+      statementEndPort.setAttribute('aria-hidden','true');
+      statementEndPort.style.setProperty('--program-flow-statement-end',String(programFlowTrailStatementEnd(node.text)));
+      entry.code.appendChild(statementEndPort);
+    }
+    ports.set(node.line,{port,anchorPorts,statementEndPort,entry});
   });
   model.edges.forEach(edge=>{
     const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-    const key=`${edge.fromLine}:${edge.toLine}:${edge.route}`;
+    const key=edgeKey(edge);
     path.setAttribute('class',`program-flow-trail-path is-${edge.route}${edge.latest?' is-latest':''}${key===enteringKey?' is-entering':''}`);
     path.dataset.fromLine=String(edge.fromLine);path.dataset.toLine=String(edge.toLine);svg.appendChild(path);
     nextSeen.add(key);
@@ -144,14 +286,27 @@ function mountProgramFlowTrail(source,item,program,lineElements){
     if(!source.isConnected)return;
     const width=Math.max(source.clientWidth,source.scrollWidth),height=Math.max(source.clientHeight,source.scrollHeight);
     svg.setAttribute('width',String(width));svg.setAttribute('height',String(height));svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
-    const pointFor=line=>{
+    const pointFor=(line,anchor)=>{
       const record=ports.get(line);if(!record)return null;
-      const {port,entry}=record;
-      return {x:entry.code.offsetLeft+port.offsetLeft+port.offsetWidth/2,y:entry.row.offsetTop+entry.row.offsetHeight/2,
+      const {entry}=record,port=anchor==='statement-end'&&record.statementEndPort?record.statementEndPort
+        :(record.anchorPorts.get(anchor)||record.port);
+      if(!port)return null;
+      const measured=programFlowTrailRenderedCenter(source,port);
+      if(measured){
+        const sourceRect=source.getBoundingClientRect();
+        const scaleX=source.offsetWidth?sourceRect.width/source.offsetWidth:1;
+        const sourceOriginX=sourceRect.left+(source.clientLeft||0)*scaleX;
+        const codeRect=entry.code&&typeof entry.code.getBoundingClientRect==='function'
+          ?entry.code.getBoundingClientRect():port.getBoundingClientRect();
+        return {x:measured.x,y:measured.y,
+          right:(codeRect.right-sourceOriginX)/scaleX+(source.scrollLeft||0)};
+      }
+      const y=entry.row.offsetTop+entry.code.offsetTop+port.offsetTop+port.offsetHeight/2;
+      return {x:entry.code.offsetLeft+port.offsetLeft+port.offsetWidth/2,y,
         right:entry.code.offsetLeft+entry.code.scrollWidth};
     };
     Array.from(svg.querySelectorAll('path')).forEach((path,index)=>{
-      const edge=model.edges[index],from=pointFor(edge.fromLine),to=pointFor(edge.toLine);
+      const edge=model.edges[index],from=pointFor(edge.fromLine,edge.fromAnchor),to=pointFor(edge.toLine,edge.toAnchor);
       if(from&&to){
         path.setAttribute('d',programFlowTrailRoundedPath(from,to,edge.route,source));
         if(path.classList.contains('is-entering')&&typeof path.getTotalLength==='function'){

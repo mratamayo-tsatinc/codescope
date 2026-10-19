@@ -46,6 +46,12 @@
 .co-order-list.has-program-flow-trail .co-line-actions{position:relative;z-index:3}
 .co-order-list .program-flow-trail-skipped .co-order-code{opacity:.42}
 .co-order-list .program-flow-trail-skipped .co-order-number{opacity:.55}
+.co-order-list .program-flow-trail-port.is-statement-end{left:calc(var(--program-flow-statement-end,0) * 1ch + 9px)}
+.co-order-list .program-flow-trail-port.is-for-initialize,
+.co-order-list .program-flow-trail-port.is-for-condition-in,
+.co-order-list .program-flow-trail-port.is-for-condition-out,
+.co-order-list .program-flow-trail-port.is-for-update{left:calc(var(--program-flow-anchor,0) * 1ch)}
+.co-order-list .co-order-line.program-flow-trail-for-header{min-height:52px;padding-top:18px;padding-bottom:14px}
 .co-program-flow-highlight{position:absolute;z-index:1;left:0;box-sizing:border-box;pointer-events:none;background:color-mix(in srgb,var(--op) 9%,transparent);box-shadow:inset 3px 0 0 var(--op);will-change:transform,height;transition:transform var(--co-flow-duration) cubic-bezier(.22,.8,.28,1),height var(--co-flow-duration) cubic-bezier(.22,.8,.28,1)}
 .co-program-flow-highlight.is-moving{transform:translateY(var(--co-flow-distance))}
 .co-fixed-line{opacity:1}
