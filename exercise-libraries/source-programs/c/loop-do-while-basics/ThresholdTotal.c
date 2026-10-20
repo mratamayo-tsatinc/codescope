@@ -11,12 +11,14 @@ int main(void) {
     int total = 0;
     int limit = 6;
 
+    printf("TOTALS TOWARD %d\n\n", limit);
+
     do {
         total += amount;
         printf("%d\n", total);
     } while (total < limit);
 
-    printf("final %d\n", total);
+    printf("\nTHRESHOLD REACHED: %d\n", total);
 
     return 0;
 }

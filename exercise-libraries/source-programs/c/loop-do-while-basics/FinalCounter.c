@@ -11,9 +11,10 @@ int main(void) {
 
     do {
         count++;
+        printf("%d\n", count);
     } while (count <= limit);
 
-    printf("count %d\n", count);
+    printf("FINAL COUNT: %d\n", count);
 
     return 0;
 }

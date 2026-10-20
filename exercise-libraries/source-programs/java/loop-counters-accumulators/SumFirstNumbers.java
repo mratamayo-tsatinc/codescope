@@ -10,8 +10,10 @@ public class SumFirstNumbers {
         int total = 0;
 
         while (i <= limit) {
+            System.out.println("add next counting number");
             total += i;
             i++;
+            System.out.println("sum now updated");
         }
 
         System.out.println("count " + i + " total " + total);

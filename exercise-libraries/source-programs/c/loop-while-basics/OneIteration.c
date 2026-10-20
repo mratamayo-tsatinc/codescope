@@ -9,10 +9,14 @@ int main(void) {
     int count = 0;
     int limit = 1;
 
+    printf(">>>>>><<<<<<\n");
+
     while (count < limit) {
+        printf("HELLO LOOP!\n");
         count++;
     }
 
+    printf(">>>>>><<<<<<\n");
     printf("count %d\n", count);
 
     return 0;

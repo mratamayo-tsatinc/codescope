@@ -11,11 +11,13 @@ int main(void) {
     int start = 3;
     int limit = 6;
 
+    printf("START AT %d\n\n", start);
+
     for (i = start; i < limit; i++) {
         printf("%d\n", i);
     }
 
-    printf("final %d\n", i);
+    printf("FINAL VALUE: %d\n", i);
 
     return 0;
 }

@@ -2,6 +2,7 @@
   "title": "Java - Do While Basics",
   "exercises": [
     "AtLeastOnce.java",
+    "RepeatMessage.java",
     "CountUp.java",
     "CountDown.java",
     "RunningTotal.java",

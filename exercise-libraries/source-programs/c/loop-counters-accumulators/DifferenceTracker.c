@@ -15,7 +15,7 @@ int main(void) {
         balance -= 3;
     }
 
-    printf("balance %d\n", balance);
+    printf("FINAL BALANCE: %d\n", balance);
 
     return 0;
 }

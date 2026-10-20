@@ -12,9 +12,10 @@ int main(void) {
 
     for (i = 1; i <= limit; i++) {
         product *= i;
+        printf("%d\n", product);
     }
 
-    printf("product %d\n", product);
+    printf("FINAL PRODUCT: %d\n", product);
 
     return 0;
 }

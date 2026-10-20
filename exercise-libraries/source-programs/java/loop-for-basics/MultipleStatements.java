@@ -16,7 +16,7 @@ public class MultipleStatements {
             System.out.println(value);
         }
 
-        System.out.println("total " + total);
+        System.out.println("TOTAL: " + total);
     }
 }
 

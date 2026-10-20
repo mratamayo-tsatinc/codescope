@@ -10,12 +10,15 @@ int main(void) {
     int i = 1;
     int limit = 4;
 
+    printf("COUNT UP -> START!\n\n");
+
     while (i <= limit) {
         printf("%d\n", i);
         i++;
     }
 
-    printf("done %d\n", i);
+    printf("\n");
+    printf("COUNT UP -> END\n");
 
     return 0;
 }

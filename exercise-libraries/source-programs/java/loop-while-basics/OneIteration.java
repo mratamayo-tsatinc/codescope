@@ -9,7 +9,9 @@ public class OneIteration {
         int limit = 1;
 
         while (count < limit) {
+            System.out.println("single pass begins");
             count++;
+            System.out.println("single pass complete");
         }
 
         System.out.println("count " + count);

@@ -12,8 +12,10 @@ public class SummaryReport {
         int total = 0;
 
         for (i = 1; i <= limit; i++) {
+            System.out.println("apply report amount");
             total += amount;
             System.out.println("step " + i + " total " + total);
+            System.out.println("report row ready");
         }
 
         System.out.println("steps " + limit + " final " + total);

@@ -28,6 +28,7 @@
 .program-output-token.output-combine{color:var(--op);}
 .program-output-string{color:color-mix(in srgb,var(--text) 74%,var(--text-dim));white-space:pre;}.program-output-resolved-value{color:var(--binding-color,var(--good));}.program-output-escape{color:#7cb7ff;}.program-output-punctuation{color:var(--text-dim);}
 .program-output-consumed-source{display:inline-flex;align-items:center;gap:5px;}
+.program-output-consumed-source-muted .tok-card{opacity:.42;box-shadow:none;}
 .program-output-derived-value{padding:0 4px;border:1px solid color-mix(in srgb,var(--binding-color,var(--var)) 40%,transparent);border-radius:4px;color:var(--binding-color,var(--var));font-size:.9em;}
 .program-output-timeline .program-collapse-action{margin-left:10px;}
 .program-output-timeline .output-substitution-row{padding-bottom:30px;}

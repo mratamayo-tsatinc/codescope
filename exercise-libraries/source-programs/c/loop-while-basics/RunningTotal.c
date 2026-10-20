@@ -11,6 +11,7 @@ int main(void) {
     int total = 0;
 
     while (i <= limit) {
+        printf("++++++++\n");
         total += i;
         i++;
     }

@@ -10,8 +10,10 @@ public class RunningTotal {
         int total = 0;
 
         while (i <= limit) {
+            System.out.println("add current count");
             total += i;
             i++;
+            System.out.println("total updated");
         }
 
         System.out.println("total " + total);

@@ -8,12 +8,14 @@ public class CountUp {
         int i = 1;
         int limit = 4;
 
+        System.out.println("DO-WHILE COUNT UP\n");
+
         do {
             System.out.println(i);
             i++;
         } while (i <= limit);
 
-        System.out.println("done " + i);
+        System.out.println("\nCOUNTING COMPLETE: " + i);
     }
 }
 

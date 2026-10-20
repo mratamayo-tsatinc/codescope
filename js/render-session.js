@@ -477,6 +477,15 @@ function renderProgramSourceFilePanel(item,program){
     const sourceCode=forHeaderParts
       ?renderProgramForHeaderSource(line,item,program,lineStatementIds,active,transition,conditionResult)
       :renderProgramConditionSource(line,item,conditionPart,conditionResult);
+    // Literal-only output runs directly from the source row. Keep a precise
+    // emitter on the rendered command after completion re-renders the row so
+    // the source-to-terminal trail can still start from the statement text,
+    // including on repeated visits to output statements inside loop bodies.
+    const directOutputEmitter=statement&&statement.kind==='output'
+      &&typeof programOutputDynamicParts==='function'
+      &&programOutputDynamicParts(statement).length===0;
+    if(directOutputEmitter&&sourceCode&&typeof sourceCode.setAttribute==='function')
+      sourceCode.setAttribute('data-terminal-emitter',statement.id);
     row.appendChild(sourceCode);flowLineElements.set(Number(line.number),{row,code:sourceCode,line});
     const state=h('span',{class:'program-source-file-state'});
     if(result!==null){
@@ -687,13 +696,25 @@ function activateProgramSourceStatement(item,statementId,trigger){
   if(programSourceInlineTraceOpenFor(item,statementId)){
     closeProgramSourceInlineTrace(item,true);return true;
   }
+  // Preserve the exact source-row geometry before a strict flow transition can
+  // re-render the loop at its next execution frame. Repeated direct outputs use
+  // a new statement id on every iteration, so looking the source up only after
+  // dispatch is too late when the prior row has already been replaced.
+  const activationEmitter=trigger&&typeof trigger.querySelector==='function'
+    ?trigger.querySelector(`[data-terminal-emitter="${statementId}"]`):null;
+  const activationSourceRect=typeof programTerminalRectSnapshot==='function'
+    ?programTerminalRectSnapshot(activationEmitter||trigger):null;
   const selection=typeof attemptProgramStatementSelection==='function'
     ?attemptProgramStatementSelection(item,statementId):{applied:false,ignored:true};
   if(!selection.applied)return false;
   const statement=selection.statement;
   const proceed=()=>{
     const plan=statementInteractionPlan(item,statement);
-    if(plan.mode==='direct'){handleTokenClick(plan.action);return;}
+    if(plan.mode==='direct'){
+      if(plan.action&&plan.action.type==='emit-output'&&activationSourceRect)
+        item._pendingTerminalSourceRect=activationSourceRect;
+      handleTokenClick(plan.action);return;
+    }
     if(programUsesSourceInlineTrace(item)){openProgramSourceInlineTrace(item,statement.id,trigger);return;}
     openProgramStatementTrace(item,statement.id,trigger);
   };

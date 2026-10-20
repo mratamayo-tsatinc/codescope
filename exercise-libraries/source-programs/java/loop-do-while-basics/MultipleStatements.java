@@ -17,7 +17,7 @@ public class MultipleStatements {
             i++;
         } while (i <= limit);
 
-        System.out.println("total " + total);
+        System.out.println("TOTAL: " + total);
     }
 }
 

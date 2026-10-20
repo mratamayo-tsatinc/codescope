@@ -10,7 +10,9 @@ public class DoubleAccumulator {
         int total = 0;
 
         for (i = 0; i < limit; i++) {
+            System.out.println("add two to total");
             total += 2;
+            System.out.println("fixed addition complete");
         }
 
         System.out.println("total " + total);

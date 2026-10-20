@@ -11,7 +11,9 @@ public class DifferenceTracker {
         int balance = 20;
 
         for (i = 0; i < limit; i++) {
+            System.out.println("subtract from balance");
             balance -= 3;
+            System.out.println("balance step complete");
         }
 
         System.out.println("balance " + balance);

@@ -9,12 +9,14 @@ int main(void) {
     int i = 1;
     int limit = 4;
 
+    printf("DO-WHILE COUNT UP\n\n");
+
     do {
         printf("%d\n", i);
         i++;
     } while (i <= limit);
 
-    printf("done %d\n", i);
+    printf("\nCOUNTING COMPLETE: %d\n", i);
 
     return 0;
 }

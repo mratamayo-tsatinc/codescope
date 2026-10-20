@@ -10,7 +10,9 @@ public class SquareSum {
         int total = 0;
 
         for (i = 1; i <= limit; i++) {
+            System.out.println("add the next square");
             total += i * i;
+            System.out.println("square total updated");
         }
 
         System.out.println("total " + total);

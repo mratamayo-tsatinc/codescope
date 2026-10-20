@@ -9,12 +9,14 @@ public class AtLeastOnce {
         int value = 5;
         int limit = 3;
 
+        System.out.println("BODY RUNS BEFORE THE TEST\n");
+
         do {
             System.out.println(value);
             value++;
         } while (value < limit);
 
-        System.out.println("final " + value);
+        System.out.println("\nFINAL VALUE: " + value);
     }
 }
 

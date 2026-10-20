@@ -10,9 +10,10 @@ public class FinalCounter {
 
         do {
             count++;
+            System.out.println(count);
         } while (count <= limit);
 
-        System.out.println("count " + count);
+        System.out.println("FINAL COUNT: " + count);
     }
 }
 

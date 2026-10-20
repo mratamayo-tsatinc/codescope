@@ -2,6 +2,7 @@
   "title": "C - Do While Basics",
   "exercises": [
     "AtLeastOnce.c",
+    "RepeatMessage.c",
     "CountUp.c",
     "CountDown.c",
     "RunningTotal.c",

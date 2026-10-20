@@ -10,8 +10,10 @@ public class ProductSequence {
         int product = 1;
 
         while (i <= limit) {
+            System.out.println("multiply next factor");
             product *= i;
             i++;
+            System.out.println("product now updated");
         }
 
         System.out.println("product " + product);

@@ -10,12 +10,14 @@ int main(void) {
     int score = 8;
     int target = 5;
 
+    printf("ONE PASS EVEN WHEN FALSE\n\n");
+
     do {
+        printf("BODY EXECUTED\n");
         score++;
-        printf("%d\n", score);
     } while (score < target);
 
-    printf("stopped %d\n", score);
+    printf("\nFINAL SCORE: %d\n", score);
 
     return 0;
 }

@@ -99,6 +99,11 @@ function installFakeDom(ctx){
     const own=String(root.className||'').split(/\s+/).includes(className)?1:0;
     return own+(root.children||[]).reduce((sum,child)=>sum+countNodesWithClass(child,className),0);
   };
+  ctx.countNodesWithAttributeValue = function countNodesWithAttributeValue(root,name,value){
+    if(!root) return 0;
+    const own=root.attributes&&root.attributes[name]===String(value)?1:0;
+    return own+(root.children||[]).reduce((sum,child)=>sum+countNodesWithAttributeValue(child,name,value),0);
+  };
 }
 
 function testScriptManifestParses(){
@@ -2790,6 +2795,7 @@ function testCodeOrderingPartialRecordScoring(){
 }
 function testCodeOrderingFlowTrailAdapter(){
   const ctx=context();ctx.registerActivityPlugin=()=>{};
+  ctx.sourceProgramTerminalScreen=()=>[];ctx.sourceProgramAnswerValue=binding=>binding&&binding.value;
   loadRelative(ctx,['plugins/code-ordering/plugin.js']);
   const result=JSON.parse(evaluate(ctx,`(()=>{
     const item={profileId:'ordering-flow',source:'if (x) {\\n  y = 1;\\n}\\nelse if (z) {\\n  y = 2;\\n}',
@@ -2799,6 +2805,21 @@ function testCodeOrderingFlowTrailAdapter(){
         {line:5,statementId:'assignment-1',statementKind:'assignment',sourceText:'  y = 2;'}
       ]}};
     const adapted=coFlowTrailAdapter(item);
+    const parsedFrames=coPlaybackFrames({coreProgramResult:{ir:{statements:[
+      {id:'canonical-loop',kind:'loop',loopKind:'while'}
+    ],metadata:{executionFrames:[{
+      statementId:'canonical-loop',statementKind:'loop',sourceLine:4,sourceEndLine:4,
+      sourceText:'while (i < 2) {',memoryAfter:{},effects:[],
+      trace:[{action:'LOOP_CONDITION',value:false}]
+    }]}}}});
+    const loopItem={profileId:'ordering-flow',source:'while (i < 2) {\\n  i++;\\n}',orderLines:[],order:[],
+      _coFlowTransition:{originId:'co-flow-1-body',destinationId:'co-flow-2-loop-2'},
+      _coPlayback:{index:3,frames:[
+        {index:0,line:1,statementId:'loop-1',statementKind:'loop',loopKind:'while',runtime:{checked:true,assignedValue:true}},
+        {index:1,line:2,statementId:'body',statementKind:'unary-update',runtime:{checked:false,assignedValue:null}},
+        {index:2,line:1,statementId:'loop-2',statementKind:'loop',loopKind:'while',runtime:{checked:true,assignedValue:false}}
+      ]}};
+    const loopAdapted=coFlowTrailAdapter(loopItem);
     const candidateSource=['int main(void) {','  int x = 1;','  if (x) {','    x = 2;',
       '  } else {','    x = 3;','  }','  return 0;','}'].join('\\n');
     const span=line=>({start:{line},end:{line}});
@@ -2813,23 +2834,40 @@ function testCodeOrderingFlowTrailAdapter(){
     const beforeMigration=coSource(legacyItem);coEnsureWhitespaceCandidates(legacyItem);
     return JSON.stringify({selectionKinds:adapted.program.statements.map(statement=>statement.selectionKind),
       history:adapted.program.executionHistory,cursor:adapted.program.cursor,
+      parsedLoopFrame:{loopKind:parsedFrames[0].loopKind,runtime:parsedFrames[0].runtime},
+      loopKinds:loopAdapted.program.statements.map(statement=>statement.loopKind),
+      loopValues:loopAdapted.program.statements.map(statement=>statement.runtime.assignedValue),
+      loopStatuses:loopAdapted.program.statements.map(statement=>statement.status),
+      loopTransition:loopAdapted.trailItem._sourceFlowTransition,
       candidateLines:candidates.map(candidate=>candidate.slotLine),
       structuralLines:candidates.filter(candidate=>candidate.structural).map(candidate=>candidate.slotLine),
       migratedLines:legacyItem.orderLines.map(candidate=>candidate.slotLine),
       migrationPreservedSource:coSource(legacyItem)===beforeMigration});
   })()`));
   assert.deepStrictEqual(result.selectionKinds,['if','else-if',null]);
-  assert.strictEqual(result.history.length,2);
+  assert.strictEqual(result.history.length,3);
   assert.strictEqual(result.cursor,2);
+  assert.deepStrictEqual(result.parsedLoopFrame,{loopKind:'while',runtime:{checked:true,assignedValue:false}});
+  assert.deepStrictEqual(result.loopKinds,['while',null,'while']);
+  assert.deepStrictEqual(result.loopValues,[true,null,false]);
+  assert.deepStrictEqual(result.loopStatuses,['complete','complete','complete']);
+  assert.deepStrictEqual(result.loopTransition,{phase:'moving',originId:'co-flow-1-body',destinationId:'co-flow-2-loop-2'});
   assert.deepStrictEqual(result.candidateLines,[2,3,4,5,6,7]);
   assert.deepStrictEqual(result.structuralLines,[5,7]);
   assert.deepStrictEqual(result.migratedLines,[2,3,4,5,6,7]);
   assert.strictEqual(result.migrationPreservedSource,true);
   const orderingStyles=fs.readFileSync(path.join(ROOT,'plugins','code-ordering','styles.css'),'utf8');
   const sharedStyles=fs.readFileSync(path.join(ROOT,'css','styles.css'),'utf8');
+  const flowTrailSource=fs.readFileSync(path.join(ROOT,'js','program-flow-trail.js'),'utf8');
   assert(orderingStyles.includes('.co-order-list.has-program-flow-trail .co-order-line{position:relative;z-index:auto}'));
   assert(/\.co-order-list\.has-program-flow-trail \.co-order-number,\s*\.co-order-list\.has-program-flow-trail \.co-order-code,\s*\.co-order-list\.has-program-flow-trail \.co-line-actions\{position:relative;z-index:3\}/.test(orderingStyles));
   assert(orderingStyles.includes('.co-program-flow-highlight{position:absolute;z-index:1;'));
+  assert(orderingStyles.includes('.co-order-line.has-program-condition-result:not(.program-flow-trail-for-header)'));
+  assert(orderingStyles.includes('.co-order-line.has-program-condition-result .co-order-code{overflow:visible}'));
+  assert(orderingStyles.includes('var(--program-source-code-pad) + var(--program-flow-statement-end,0) * 1ch + 9px'));
+  assert(orderingStyles.includes('.co-order-list .program-flow-trail-port.is-return-origin{'));
+  assert(flowTrailSource.includes("edge.route==='right'?'return-origin':edge.fromAnchor"));
+  assert(flowTrailSource.includes("returnOriginPort.className='program-flow-trail-port is-return-origin'"));
   assert(sharedStyles.includes('.has-program-flow-trail .program-source-file-line{position:relative;z-index:auto;}'));
   assert(/\.has-program-flow-trail \.program-source-file-number,\s*\.has-program-flow-trail \.program-source-file-text,\s*\.has-program-flow-trail \.program-source-file-state\{position:relative;z-index:3;\}/.test(sharedStyles));
   assert(sharedStyles.includes('.has-program-flow-trail .program-source-file-state{background:transparent!important;}'));
@@ -3731,6 +3769,7 @@ function testProgramOutputStatementPlugin(){
     const combinedTimelineRows=countNodesWithClass(combinedTimeline,'tl-row');
     const combinedTimelineCards=countNodesWithClass(combinedTimeline,'tok-card');
     const combinedSubstitutionRows=countNodesWithClass(combinedTimeline,'output-substitution-row');
+    const combinedMutedConsumedCards=countNodesWithClass(combinedTimeline,'program-output-consumed-source-muted');
     const combinedTimelineText=combinedTimeline.textContent;
     const visualStepIds=dynamic.runtime.trace.map(step=>step.resultNodeId);
     const combineSourceId=dynamic.runtime.trace[1].sourceNodeId;
@@ -3918,6 +3957,7 @@ function testProgramOutputStatementPlugin(){
       sumInitializer:item.program.statements[2].runtime.originalTree.op,
       literal:literal.applied,read:read.applied,combine:combine.applied,printed:printed.applied,
       readTimelineRows,readTimelineCards,combinedTimelineRows,combinedTimelineCards,combinedSubstitutionRows,
+      combinedMutedConsumedCards,
       combinedTimelineText,visualStepIds,combineSourceId,
       sourceBinding,bindingColor,formatColor,
       cSource,javaSource,javaLineSource,cText,panelText,terminalPanelText,carriageSource,
@@ -4003,6 +4043,7 @@ function testProgramOutputStatementPlugin(){
   assert.strictEqual(result.combinedTimelineRows,3);
   assert.strictEqual(result.combinedTimelineCards,2);
   assert.strictEqual(result.combinedSubstitutionRows,1);
+  assert.strictEqual(result.combinedMutedConsumedCards,1);
   assert(result.combinedTimelineText.includes('printf')&&!result.combinedTimelineText.includes('Evaluated text'));
   assert(result.combinedTimelineText.includes(' is ')&&result.combinedTimelineText.includes('\\n'));
   assert(!result.combinedTimelineText.includes('='));
@@ -4038,6 +4079,8 @@ function testProgramOutputStatementPlugin(){
   assert(outputStyles.includes('.program-output-resolved-value{color:var(--binding-color,var(--good));}'));
   assert(outputStyles.includes('.source-program-workspace .code-out{white-space:pre;}'));
   assert(outputStyles.includes('.program-output-timeline .output-substitution-row{padding-bottom:30px;}'));
+  assert(outputStyles.includes('.program-output-consumed-source-muted .tok-card{opacity:.42;'));
+  assert(!outputStyles.includes('.program-output-consumed-source-muted .tok-card{opacity:.42;filter:'));
   assert(outputStyles.includes('.program-source-context{opacity:.78;}'));
   assert(outputStyles.includes('.program-source-context-code{min-width:max-content;color:var(--text-dim);font:inherit;'));
   assert(!outputStyles.includes('.program-source-context-code{font-size:11px;}'));
@@ -4047,6 +4090,17 @@ function testProgramOutputStatementPlugin(){
   assert(terminalStyles.includes('.program-output-cursor.is-hidden{display:none;}'));
   assert(terminalSource.includes('programTerminalPositionCursor(cursor,terminalState,pre)'));
   assert(terminalSource.includes('parent.insertBefore(cursor,node.splitText(remaining))'));
+  assert(terminalSource.includes('requestAnimationFrame(launch)'));
+  assert(terminalSource.includes('requestAnimationFrame(()=>launch(attempt+1))'));
+  assert(terminalSource.includes('sourceRect:activationRect||programTerminalRectSnapshot(source)'));
+  assert(terminalSource.includes('if(sourceRect&&layoutReady&&typeof runVarFinalComet'));
+  assert(!terminalSource.includes('if(source&&layoutReady&&typeof runVarFinalComet'));
+  const renderSessionSource=fs.readFileSync(path.join(ROOT,'js','render-session.js'),'utf8');
+  assert(renderSessionSource.includes("plan.action.type==='emit-output'&&activationSourceRect"));
+  assert(renderSessionSource.includes('item._pendingTerminalSourceRect=activationSourceRect'));
+  assert(terminalSource.includes('const sourceRect=liveSourceRect||pending.sourceRect;'));
+  assert(terminalSource.indexOf("setProgramContextTab('output')")
+    <terminalSource.indexOf('const liveSourceRect=programTerminalRectSnapshot(source);'));
   assert(!terminalStyles.includes('.program-output-escape-cue{position:absolute'));
   assert.strictEqual(result.canonicalPrints,4);
   assert(result.serializable&&result.outputSettings>0);
@@ -4165,6 +4219,16 @@ int main() {
     printf("Total: %d\\n", total);
     return 0;
 }`;
+  ctx.csRepeatedDirectOutputFixture=`#include <stdio.h>
+int main(void) {
+    int count = 0;
+    int limit = 3;
+    while (count < limit) {
+        printf("tick\\n");
+        count++;
+    }
+    return 0;
+}`;
   ctx.csStrictPrecedenceFixture=`#include <stdio.h>
 int main() {
     int a = 2;
@@ -4248,6 +4312,19 @@ int main() {
   const result=JSON.parse(evaluate(ctx,`(()=>{
     const profile=PROFILES.find(candidate=>candidate.id==='selection-statements-source');
     const sourceOutputProfile=PROFILES.find(candidate=>candidate.id==='program-output-source-flow');
+    const repeatedDirectOutputItem=csBuildItem(sourceOutputProfile,{id:'RepeatedDirectOutput',
+      filename:'RepeatedDirectOutput.c',raw:csRepeatedDirectOutputFixture},'c',111);
+    const repeatedDirectOutputs=repeatedDirectOutputItem.program.statements.filter(candidate=>candidate.kind==='output');
+    const repeatedDirectEmitterCounts=repeatedDirectOutputs.map(output=>{
+      const index=repeatedDirectOutputItem.program.statements.indexOf(output);
+      repeatedDirectOutputItem.program.statements.forEach((candidate,candidateIndex)=>{
+        candidate.status=candidateIndex<index?'complete':(candidateIndex===index?'active':'locked');
+      });
+      repeatedDirectOutputItem.program.cursor=index;repeatedDirectOutputItem.program.status='running';
+      const host=h('div',{});host.appendChild(renderProgramSourceFilePanel(repeatedDirectOutputItem,
+        repeatedDirectOutputItem.program));
+      return countNodesWithAttributeValue(host,'data-terminal-emitter',output.id);
+    });
     state.language='c';initializeSeededRandom(404);
     const basicOutputItems=generateItemsForProfile('test-basic-output');resetRandomGenerator();
     const taskGolph=basicOutputItems.find(candidate=>candidate.filename==='TaskGolph.c');
@@ -4536,6 +4613,7 @@ int main() {
     const firstStatement=first.program.statements[0],firstPlan=statementInteractionPlan(first,firstStatement);
     const selectionPlan=statementInteractionPlan(first,first.program.statements[selectionIndex]);
     const literalOutput=first.program.statements.find(candidate=>candidate.kind==='output'&&programOutputDynamicParts(candidate).length===0);
+    const literalOutputEmitterCount=countNodesWithAttributeValue(sourceHost,'data-terminal-emitter',literalOutput.id);
     const outputPlan=statementInteractionPlan(first,literalOutput);
     const directExecution=dispatchProgramAction(first,firstPlan.action,{applyExpressionAction});
     const attemptedSourceHost=h('div',{});renderProgramItem(attemptedSourceHost,first,{});
@@ -4674,6 +4752,8 @@ int main() {
       contextDocks,contextTabs,memoryDockHosts,
       inlineDefault,migratedSourceOutputTimeline,
       firstPlanMode:firstPlan.mode,firstPlanAction:firstPlan.action.type,directExecution:directExecution.applied,
+      literalOutputEmitterCount,
+      repeatedDirectOutputIds:repeatedDirectOutputs.map(output=>output.id),repeatedDirectEmitterCounts,
       sourceItemResetControls,sourceResetInsideWorkspace,sourceRetryBars,checkedSourceResetControls,
       selectionPlanMode:selectionPlan.mode,selectionPlanFocus:selectionPlan.focus,
       outputPlanMode:outputPlan.mode,outputPlanAction:outputPlan.action.type,
@@ -4847,6 +4927,10 @@ int main() {
   assert.strictEqual(result.selectionPlanFocus,'condition-expression');
   assert.strictEqual(result.outputPlanMode,'direct');
   assert.strictEqual(result.outputPlanAction,'emit-output');
+  assert.strictEqual(result.literalOutputEmitterCount,1);
+  assert(result.repeatedDirectOutputIds.length>1);
+  assert(result.repeatedDirectOutputIds.every((id,index,array)=>array.indexOf(id)===index));
+  assert(result.repeatedDirectEmitterCounts.every(count=>count===1));
   assert.strictEqual(result.expressionOnlyKeywords,0);
   assert.strictEqual(result.expressionOnlyParens,0);
   assert.strictEqual(result.completedModalPanels,1);

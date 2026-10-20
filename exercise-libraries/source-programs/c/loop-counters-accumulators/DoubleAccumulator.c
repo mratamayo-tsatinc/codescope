@@ -12,9 +12,12 @@ int main(void) {
 
     for (i = 0; i < limit; i++) {
         total += 2;
+        printf("%d-", total);
     }
 
-    printf("total %d\n", total);
+    printf("\n\n-------------------\n");
+    printf("\n\nTOTAL %d\n", total);
+    printf("\n\n-------------------\n");
 
     return 0;
 }

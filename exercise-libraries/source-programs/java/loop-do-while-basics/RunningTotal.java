@@ -9,12 +9,15 @@ public class RunningTotal {
         int limit = 4;
         int total = 0;
 
+        System.out.println("RUNNING TOTALS\n");
+
         do {
             total += i;
+            System.out.println(total);
             i++;
         } while (i <= limit);
 
-        System.out.println("total " + total);
+        System.out.println("\nFINAL TOTAL: " + total);
     }
 }
 

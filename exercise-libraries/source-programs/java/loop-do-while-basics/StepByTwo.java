@@ -8,12 +8,15 @@ public class StepByTwo {
         int number = 0;
         int limit = 6;
 
+        System.out.println("ADVANCE BY TWO\n");
+
         do {
             System.out.println(number);
+            System.out.println("-");
             number += 2;
         } while (number < limit);
 
-        System.out.println("final " + number);
+        System.out.println("FINAL VALUE: " + number);
     }
 }
 

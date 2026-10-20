@@ -1,6 +1,7 @@
 {
   "title": "Java - For Basics",
   "exercises": [
+    "RepeatCharacter.java",
     "CountUp.java",
     "CountDown.java",
     "InclusiveRange.java",

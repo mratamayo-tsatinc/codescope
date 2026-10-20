@@ -9,10 +9,11 @@ public class FinalCounter {
         int limit = 3;
 
         for (i = 0; i < limit; i++) {
+            System.out.println("LOOP");
             System.out.println("loop " + i);
         }
 
-        System.out.println("after " + i);
+        System.out.println("AFTER LOOP: " + i);
     }
 }
 

@@ -12,6 +12,7 @@ int main(void) {
 
     while (value < limit) {
         printf("%d\n", value);
+        printf("#####\n");
         value++;
     }
 

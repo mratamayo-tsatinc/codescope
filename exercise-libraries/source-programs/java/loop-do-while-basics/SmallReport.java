@@ -9,13 +9,15 @@ public class SmallReport {
         int limit = 3;
         int points = 0;
 
+        System.out.println("DAILY POINTS\n");
+
         do {
             points += 2;
             System.out.println("day " + day + " points " + points);
             day++;
         } while (day <= limit);
 
-        System.out.println("total " + points);
+        System.out.println("\nTOTAL POINTS: " + points);
     }
 }
 

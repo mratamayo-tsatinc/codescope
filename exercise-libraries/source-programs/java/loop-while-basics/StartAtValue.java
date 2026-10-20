@@ -10,8 +10,10 @@ public class StartAtValue {
         int limit = 5;
 
         while (value < limit) {
+            System.out.println("show seeded value");
             System.out.println(value);
             value++;
+            System.out.println("advance seeded value");
         }
 
         System.out.println("final " + value);

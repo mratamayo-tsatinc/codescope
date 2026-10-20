@@ -8,11 +8,13 @@ public class CountDown {
         int i;
         int start = 4;
 
+        System.out.println("FOR LOOP COUNTDOWN\n");
+
         for (i = start; i > 0; i--) {
             System.out.println(i);
         }
 
-        System.out.println("done");
+        System.out.println("\nLIFT OFF!");
     }
 }
 

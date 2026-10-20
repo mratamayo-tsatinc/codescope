@@ -9,8 +9,10 @@ public class StepByTwo {
         int limit = 6;
 
         while (number < limit) {
+            System.out.println("show even step");
             System.out.println(number);
             number += 2;
+            System.out.println("advance two places");
         }
 
         System.out.println("final " + number);

@@ -11,8 +11,10 @@ public class DecreasingBalance {
         int balance = 15;
 
         do {
+            System.out.println("subtract current step");
             balance -= step;
             step++;
+            System.out.println("prepare larger step");
         } while (step <= limit);
 
         System.out.println("balance " + balance);

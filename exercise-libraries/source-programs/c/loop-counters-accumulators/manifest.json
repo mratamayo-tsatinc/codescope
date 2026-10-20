@@ -1,6 +1,7 @@
 {
   "title": "C - Counters Accumulators",
   "exercises": [
+    "AccumulatorWalkthrough.c",
     "SumFirstNumbers.c",
     "ProductSequence.c",
     "CountdownTotal.c",

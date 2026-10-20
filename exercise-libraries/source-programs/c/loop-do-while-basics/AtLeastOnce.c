@@ -10,12 +10,14 @@ int main(void) {
     int value = 5;
     int limit = 3;
 
+    printf("BODY RUNS BEFORE THE TEST\n\n");
+
     do {
         printf("%d\n", value);
         value++;
     } while (value < limit);
 
-    printf("final %d\n", value);
+    printf("\nFINAL VALUE: %d\n", value);
 
     return 0;
 }

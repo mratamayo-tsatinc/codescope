@@ -13,7 +13,7 @@ int main(void) {
         printf("%d\n", i);
     }
 
-    printf("final %d\n", i);
+    printf("FINAL VALUE: %d\n", i);
 
     return 0;
 }

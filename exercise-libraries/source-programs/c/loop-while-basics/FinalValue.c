@@ -12,6 +12,7 @@ int main(void) {
     int limit = 6;
 
     while (value < limit) {
+        printf("=============\n");
         value += step;
     }
 

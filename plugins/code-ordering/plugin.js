@@ -113,6 +113,7 @@ function coPlaybackVariables(memory){
 }
 function coPlaybackFrames(parsed){
   const core=parsed.coreProgramResult||{},rawFrames=core.ir&&core.ir.metadata&&core.ir.metadata.executionFrames||[];
+  const coreStatements=new Map(((core.ir&&core.ir.statements)||[]).map(statement=>[statement.id,statement]));
   const frames=[];
   rawFrames.forEach(frame=>{
     const previous=frames[frames.length-1];
@@ -125,6 +126,8 @@ function coPlaybackFrames(parsed){
   });
   let output='';
   return frames.map((frame,index)=>{
+    const coreStatement=coreStatements.get(frame.statementId)||{};
+    const conditionStep=(frame.trace||[]).find(step=>step.action==='LOOP_CONDITION');
     const outputBefore=output;
     let printedText='';
     (frame.effects||[]).forEach(effect=>{
@@ -132,7 +135,9 @@ function coPlaybackFrames(parsed){
       else if(effect.kind==='input')output+=String(effect.rawText==null?'':effect.rawText)+'\n';
     });
     return {index,line:frame.sourceLine,endLine:frame.sourceEndLine,statementId:frame.statementId,
-      statementKind:frame.statementKind,forPhase:frame.forPhase||frame.phase||null,
+      statementKind:frame.statementKind,loopKind:coreStatement.loopKind||null,
+      forPhase:frame.forPhase||frame.phase||null,
+      runtime:{checked:!!conditionStep,assignedValue:conditionStep?Boolean(conditionStep.value):null},
       sourceText:frame.sourceText,error:frame.error||null,
       reads:[...new Set((frame.effects||[]).filter(effect=>effect.kind==='read').map(effect=>effect.target))],
       writes:[...new Set((frame.effects||[]).filter(effect=>effect.kind==='write'||effect.kind==='declare').map(effect=>effect.target))],
@@ -549,18 +554,30 @@ function coDo(item,action){
   const result=applyActivityAction(item,action);
   if(result.applied){
     const currentFrame=coCurrentPlaybackFrame(item);
-    if(previousFrame&&currentFrame&&previousFrame.line!==currentFrame.line
+    const changedExecutionPoint=previousFrame&&currentFrame&&(previousFrame.line!==currentFrame.line
+      ||previousFrame.statementId!==currentFrame.statementId||previousFrame.forPhase!==currentFrame.forPhase);
+    if(changedExecutionPoint
       &&['PLAYBACK_PLAY','PLAYBACK_NEXT','PLAYBACK_TICK'].includes(action.type)){
       const profile=typeof PROFILES!=='undefined'&&PROFILES.find(candidate=>candidate.id===item.profileId);
       if(typeof profileFlowTrailEnabled==='function'&&profileFlowTrailEnabled(profile)){
         const duration=Math.max(120,Math.round((item._coPlayback&&item._coPlayback.speed||.6)*1000));
         item._coFlowTransition={fromLine:previousFrame.line,toLine:currentFrame.line,
+          originId:coFlowStatementId(previousFrame,previousFrame.index),
+          destinationId:coFlowStatementId(currentFrame,currentFrame.index),
           duration,token:(item._coFlowTransitionToken||0)+1};
         item._coFlowTransitionToken=item._coFlowTransition.token;
         if(coFlowTransitionTimer!==null)clearTimeout(coFlowTransitionTimer);
         const transition=item._coFlowTransition;
         coFlowTransitionTimer=setTimeout(()=>{
-          if(item._coFlowTransition===transition)delete item._coFlowTransition;
+          if(item._coFlowTransition===transition){
+            delete item._coFlowTransition;
+            const stillCurrent=typeof currentItem!=='function'||currentItem()===item;
+            if(stillCurrent){
+              const settledViewport=coCaptureSourceViewport();
+              coPendingSourceViewport={item,viewport:settledViewport,revealCurrent:false};
+              render();
+            }
+          }
           coFlowTransitionTimer=null;
         },duration+50);
       }
@@ -658,35 +675,84 @@ function coFlowSelectionKind(text){
   if(/^\s*switch\b/.test(text))return 'switch';
   return null;
 }
+function coFlowStatementId(frame,frameIndex){
+  return `co-flow-${frameIndex}-${frame&&frame.statementId||frame&&frame.line||'statement'}`;
+}
 function coFlowTrailAdapter(item){
   const playback=item&&item._coPlayback,index=playback?Math.min(playback.index,playback.frames.length):0;
   if(!playback||index<=0)return null;
   const source=coSource(item).split('\n');
   const statements=playback.frames.map((frame,frameIndex)=>{
     const text=source[frame.line-1]||frame.sourceText||'',selectionKind=coFlowSelectionKind(text);
-    return {id:`co-flow-${frameIndex}-${frame.statementId||frame.line}`,sourceLine:frame.line,
-      sourceText:text,kind:selectionKind?'selection':frame.statementKind,selectionKind,forPhase:frame.forPhase||null};
+    return {id:coFlowStatementId(frame,frameIndex),sourceLine:frame.line,
+      sourceText:text,kind:selectionKind?'selection':frame.statementKind,selectionKind,
+      loopKind:frame.loopKind||null,forPhase:frame.forPhase||null,
+      status:frameIndex<index?'complete':'waiting',runtime:Object.assign({},frame.runtime||{})};
   });
   const visible=statements.slice(0,index),statementIdsByLine=new Map();
   statements.forEach(statement=>{
     if(!statementIdsByLine.has(statement.sourceLine))statementIdsByLine.set(statement.sourceLine,[]);
     statementIdsByLine.get(statement.sourceLine).push(statement.id);
   });
+  const complete=index>=playback.frames.length;
+  const transition=item._coFlowTransition?{phase:'moving',originId:item._coFlowTransition.originId,
+    destinationId:item._coFlowTransition.destinationId}:null;
   return {
     trailItem:{profileId:item.profileId,sourceDisplay:{lines:source.map((text,lineIndex)=>({
       number:lineIndex+1,text,statementIds:statementIdsByLine.get(lineIndex+1)||[]}))},
-      _sourceFlowTransition:item._coFlowTransition?{phase:'moving'}:null,
+      _sourceFlowTransition:transition,
       _programFlowTrailEdgeKeys:item._programFlowTrailEdgeKeys},
-    program:{statements,status:'running',cursor:index-1,executionHistory:visible.slice(0,-1).map(statement=>statement.id)}
+    program:{statements,status:complete?'complete':'running',cursor:index-1,
+      executionHistory:(complete?visible:visible.slice(0,-1)).map(statement=>statement.id)}
   };
+}
+function coAppendSourceFragments(target,text,item){
+  soSourceFragments(text,item.language).forEach(fragment=>
+    target.appendChild(typeof fragment==='string'?document.createTextNode(fragment):fragment));
+}
+function coRenderLoopConditionSource(code,text,item,conditionPart,result){
+  if(!code||!conditionPart)return;
+  while(code.firstChild)code.removeChild(code.firstChild);
+  coAppendSourceFragments(code,text.slice(0,conditionPart.start),item);
+  const condition=h('span',{class:'program-source-condition'});
+  coAppendSourceFragments(condition,text.slice(conditionPart.start,conditionPart.end),item);
+  const pill=typeof renderProgramConditionResult==='function'?renderProgramConditionResult(result):null;
+  if(pill)condition.appendChild(pill);
+  code.appendChild(condition);
+  coAppendSourceFragments(code,text.slice(conditionPart.end),item);
+}
+function coLoopConditionResult(adapted,lineNumber){
+  const program=adapted.program,transition=adapted.trailItem._sourceFlowTransition||null;
+  const incoming=transition&&program.statements.find(statement=>statement.id===transition.destinationId);
+  if(incoming&&incoming.kind==='loop'&&incoming.loopKind!=='do'
+    &&(!incoming.forPhase||incoming.forPhase==='condition'))return null;
+  const active=program.status==='running'?program.statements[program.cursor]||null:null;
+  return typeof programLoopConditionResult==='function'
+    ?programLoopConditionResult(program,lineNumber,active,transition):null;
 }
 function coMountFlowTrail(item,list){
   if(typeof mountProgramFlowTrail!=='function')return;
   const adapted=coFlowTrailAdapter(item);if(!adapted)return;
+  const source=adapted.trailItem.sourceDisplay.lines;
+  const loopConditionLines=new Set(adapted.program.statements
+    .filter(statement=>statement.kind==='loop'&&statement.loopKind!=='do'
+      &&(!statement.forPhase||statement.forPhase==='condition'))
+    .map(statement=>Number(statement.sourceLine)));
   const lineElements=new Map();
   list.querySelectorAll('.co-order-line[data-source-line]').forEach(row=>{
     const code=row.querySelector('.co-order-code'),line=Number(row.dataset.sourceLine);
-    if(code&&line)lineElements.set(line,{row,code,line:{number:line,text:code.textContent||''}});
+    const sourceLine=source[line-1],text=sourceLine&&sourceLine.text||'';
+    if(code&&line&&loopConditionLines.has(line)&&typeof programLoopConditionPart==='function'){
+      const forParts=typeof programFlowTrailForClauseParts==='function'
+        ?programFlowTrailForClauseParts(text):null;
+      const conditionPart=programLoopConditionPart(text,forParts);
+      if(conditionPart){
+        const result=coLoopConditionResult(adapted,line);
+        coRenderLoopConditionSource(code,text,item,conditionPart,result);
+        row.classList.toggle('has-program-condition-result',!!result);
+      }
+    }
+    if(code&&line)lineElements.set(line,{row,code,line:{number:line,text}});
   });
   const mounted=mountProgramFlowTrail(list,adapted.trailItem,adapted.program,lineElements);
   item._programFlowTrailEdgeKeys=adapted.trailItem._programFlowTrailEdgeKeys;
@@ -694,7 +760,7 @@ function coMountFlowTrail(item,list){
 }
 function coMountFlowHighlight(item,list){
   const transition=item&&item._coFlowTransition;
-  if(!transition||typeof requestAnimationFrame!=='function')return;
+  if(!transition||transition.fromLine===transition.toLine||typeof requestAnimationFrame!=='function')return;
   const highlight=h('span',{class:'co-program-flow-highlight','aria-hidden':'true'});list.appendChild(highlight);
   requestAnimationFrame(()=>{
     if(!list.isConnected||item._coFlowTransition!==transition)return;

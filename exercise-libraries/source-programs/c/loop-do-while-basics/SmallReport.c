@@ -10,13 +10,15 @@ int main(void) {
     int limit = 3;
     int points = 0;
 
+    printf("DAILY POINTS\n\n");
+
     do {
         points += 2;
         printf("day %d points %d\n", day, points);
         day++;
     } while (day <= limit);
 
-    printf("total %d\n", points);
+    printf("\nTOTAL POINTS: %d\n", points);
 
     return 0;
 }

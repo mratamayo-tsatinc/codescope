@@ -118,7 +118,7 @@ function renderProgramOutputConsumedIdentifier(statement,entry,partState,showDer
     style:bindingIdentityStyle(name,'variable'),
     'data-token-id':programOutputResultTokenId(statement,entry.index)},
     `→ ${formatValue(partState.resolvedValue,dataType)}`));
-  return h('span',{class:'program-output-consumed-source'},...nodes);
+  return h('span',{class:'program-output-consumed-source program-output-consumed-source-muted'},...nodes);
 }
 
 function renderProgramOutputResolvedJavaString(statement,partStates){

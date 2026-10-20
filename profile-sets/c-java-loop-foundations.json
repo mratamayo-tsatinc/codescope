@@ -3,7 +3,7 @@
   "id": "c-java-loop-foundations",
   "name": "C and Java: Loop Foundations",
   "version": "1",
-  "description": "A student-friendly foundation sequence for while, do while, for, counters, and accumulators. The same 10 sourced exercises per topic are shared by guided trace, simulation, and ordering, with parallel C and Java banks.",
+  "description": "A student-friendly foundation sequence for while, do while, for, counters, and accumulators. The same 11 sourced exercises per topic are shared by guided trace, simulation, and ordering, with parallel C and Java banks.",
   "session": {
     "language": "c",
     "availableLanguages": [

@@ -7,6 +7,15 @@ const ROOT=path.resolve(__dirname,'..');
 const context=vm.createContext({console,structuredClone:global.structuredClone,setTimeout(){return 1;},clearTimeout(){}});
 function load(relative){const filename=path.join(ROOT,relative);vm.runInContext(fs.readFileSync(filename,'utf8'),context,{filename});}
 function evaluate(source){return vm.runInContext(source,context);}
+function loopBodyLines(raw){
+  const lines=String(raw).split(/\r?\n/);
+  const open=lines.findIndex(line=>/^\s*(?:while\s*\(|for\s*\(|do\s*\{)/.test(line));
+  assert(open>=0,'loop opening must be present');
+  const indent=(lines[open].match(/^\s*/)||[''])[0];
+  const close=lines.findIndex((line,index)=>index>open&&new RegExp('^'+indent.replace(/ /g,'\\s')+'\\}').test(line));
+  assert(close>open,'loop closing must be present');
+  return lines.slice(open+1,close).map(line=>line.trim());
+}
 [
   'js/engine.js','js/flat-model.js','js/template-engine.js','js/profile-vocabulary.js','js/generator.js',
   'js/program-ir.js','js/language-core.js','js/expression-parser.js','js/expression-semantics.js',
@@ -48,10 +57,18 @@ for(const language of ['c','java']){
   for(const topic of topics){
     const directory=path.join(ROOT,'exercise-libraries','source-programs',language,topic);
     const manifest=JSON.parse(fs.readFileSync(path.join(directory,'manifest.json'),'utf8'));
-    assert.strictEqual(manifest.exercises.length,10,language+'/'+topic+' item count');
-    assert.strictEqual(new Set(manifest.exercises).size,10,language+'/'+topic+' duplicates');
+    assert.strictEqual(manifest.exercises.length,11,language+'/'+topic+' item count');
+    assert.strictEqual(new Set(manifest.exercises).size,11,language+'/'+topic+' duplicates');
+    const extension=language==='c'?'.c':'.java';
+    if(topic==='loop-while-basics')assert.strictEqual(manifest.exercises[0],'RepeatMessage'+extension);
+    if(topic==='loop-do-while-basics')assert(manifest.exercises.slice(0,2).includes('RepeatMessage'+extension));
+    if(topic==='loop-for-basics')assert.strictEqual(manifest.exercises[0],'RepeatCharacter'+extension);
     for(const filename of manifest.exercises){
       const raw=fs.readFileSync(path.join(directory,filename),'utf8');
+      assert(loopBodyLines(raw).length>=1,
+        language+'/'+topic+'/'+filename+' needs an executable statement in its loop body');
+      assert(!/body (?:begins|ends)/.test(raw),
+        language+'/'+topic+'/'+filename+' must use contextual rather than generic output');
       context.loopRaw=raw;context.loopFilename=filename;context.loopLanguage=language;
       const result=JSON.parse(evaluate(`(()=>{const details=sourceProgramMetadataAndSource(loopRaw,loopFilename);
         const choose=(min,max)=>Math.floor((min+max)/2);
@@ -66,6 +83,10 @@ for(const language of ['c','java']){
       assert.deepStrictEqual(result.diagnostics,[],language+'/'+topic+'/'+filename+' diagnostics');
       assert(result.loopKinds.length>0,language+'/'+topic+'/'+filename+' has loop');
       assert(result.output.length>0,language+'/'+topic+'/'+filename+' has output');
+      if(/^RepeatMessage\./.test(filename))assert((result.output.match(/Hello, loop!/g)||[]).length>=2,
+        language+'/'+topic+'/'+filename+' repeats the same message');
+      if(/^RepeatCharacter\./.test(filename))assert((result.output.match(/^\*$/gm)||[]).length>=2,
+        language+'/'+topic+'/'+filename+' repeats the same character');
       assert(result.variables>0,language+'/'+topic+'/'+filename+' has variables');
       if(result.frames>result.uniqueStatements)repeatingPrograms++;
       files++;frames+=result.frames;
@@ -104,7 +125,7 @@ for(const language of ['c','java']){
     const installed=evaluate(`(()=>{const url='test/'+bankLanguage+'/'+bankTopic+'/manifest.json';
       csInstallExerciseBank(url,bankLanguage,bankTopic,bankManifest,bankRows);
       return codeSimulatorExerciseBanks.get(url).exercises.length;})()`);
-    assert.strictEqual(installed,10,language+'/'+topic+' content-provider bank');
+    assert.strictEqual(installed,11,language+'/'+topic+' content-provider bank');
   }
 }
 for(const language of ['c','java']){
@@ -210,6 +231,51 @@ assert.strictEqual(conditionIndicators.doIncoming,null);
 assert.strictEqual(conditionIndicators.forIncoming,null);
 assert.strictEqual(conditionIndicators.forResult,'true');
 assert.deepStrictEqual(conditionIndicators.parts,['i <= limit','i <= limit','i <= limit']);
+const loopBranchStyles=JSON.parse(evaluate(`(()=>{
+  const condition=(id,line,loopKind,value,forPhase)=>({id,sourceLine:line,kind:'loop',loopKind,forPhase,
+    status:'complete',runtime:{checked:true,assignedValue:value}});
+  const statement=(id,line,kind='assignment',forPhase=null)=>({id,sourceLine:line,kind,forPhase,status:'complete'});
+  const model=(lines,statements,history,cursor)=>buildProgramFlowTrailModel({sourceDisplay:{lines:lines.map((text,index)=>({
+    number:index+1,text,statementIds:statements.filter(candidate=>candidate.sourceLine===index+1).map(candidate=>candidate.id)}))}},
+    {statements,status:'running',cursor,executionHistory:history});
+  const branches=result=>result.edges.filter(edge=>edge.loopBranch).map(edge=>({branch:edge.loopBranch,
+    prior:!!edge.priorLoopTrue,from:edge.fromLine,to:edge.toLine}));
+  const trails=result=>result.edges.map(edge=>({from:edge.fromLine,to:edge.toLine,route:edge.route,
+    prior:!!edge.priorLoopTrue}));
+  const whileStatements=[condition('while-true',1,'while',true),statement('while-body',2),
+    condition('while-false',1,'while',false),statement('while-after',4,'output')];
+  const whileLines=['while (i < 2) {','  i++;','}','print(i);'];
+  const whileBeforeExit=model(whileLines,whileStatements.slice(0,3),['while-true','while-body'],2);
+  const whileAfterExit=model(whileLines,whileStatements,['while-true','while-body','while-false'],3);
+  const doStatements=[statement('do-entry',1,'loop'),statement('do-body-1',2),
+    condition('do-true',3,'do-while',true),statement('do-body-2',2),
+    condition('do-false',3,'do-while',false),statement('do-after',4,'output')];
+  doStatements[0].loopKind='do';
+  const doAfterExit=model(['do {','  i++;','} while (i < 2);','print(i);'],doStatements,
+    ['do-entry','do-body-1','do-true','do-body-2','do-false'],5);
+  const forStatements=[statement('for-init',1,'assignment','initialize'),
+    condition('for-true',1,'for',true,'condition'),statement('for-body',2),
+    statement('for-update',1,'unary-update','update'),condition('for-false',1,'for',false,'condition'),
+    statement('for-after',4,'output')];
+  const forAfterExit=model(['for (i = 0; i < 2; i++) {','  print(i);','}','print(i);'],forStatements,
+    ['for-init','for-true','for-body','for-update','for-false'],5);
+  return JSON.stringify({whileBefore:branches(whileBeforeExit),whileAfter:branches(whileAfterExit),
+    whileTrails:trails(whileAfterExit),doAfter:branches(doAfterExit),doTrails:trails(doAfterExit),
+    forAfter:branches(forAfterExit),forTrails:trails(forAfterExit)});
+})()`));
+assert.deepStrictEqual(loopBranchStyles.whileBefore,[{branch:'true',prior:false,from:1,to:2}]);
+for(const branches of [loopBranchStyles.whileAfter,loopBranchStyles.doAfter,loopBranchStyles.forAfter]){
+  assert(branches.some(edge=>edge.branch==='true'&&edge.prior),'earlier true branch becomes historical after exit');
+  assert(branches.some(edge=>edge.branch==='false'&&!edge.prior),'false exit branch remains solid');
+}
+assert(loopBranchStyles.whileTrails.some(edge=>edge.from===2&&edge.to===1&&edge.prior),
+  'while loop return route becomes historical after the false exit');
+assert(loopBranchStyles.forTrails.some(edge=>edge.from===2&&edge.to===1&&edge.prior),
+  'for loop body-to-update route becomes historical after the false exit');
+assert(loopBranchStyles.forTrails.some(edge=>edge.from===1&&edge.to===1&&edge.route==='for-header'&&edge.prior),
+  'for loop update-to-condition route becomes historical after the false exit');
+assert(loopBranchStyles.doTrails.some(edge=>edge.from===2&&edge.to===3&&!edge.prior),
+  'do-while body route keeps its existing styling');
 const selectionIndicators=JSON.parse(evaluate(`(()=>{
   const complete=(id,line,selectionKind,value)=>({id,sourceLine:line,kind:'selection',selectionKind,
     status:'complete',runtime:{checked:true,assignedValue:value}});
@@ -240,6 +306,11 @@ assert.deepStrictEqual(repeatedTransition.sameLine,{origin:true,destination:true
 const modalViewport={scrollTop:148,scrollLeft:23};
 assert.strictEqual(evaluate('resetStatementTraceViewport')(modalViewport),true);
 assert.deepStrictEqual(modalViewport,{scrollTop:0,scrollLeft:0});
+const orderingTextRight=evaluate(`(()=>{const previous=document.createRange;
+  document.createRange=()=>({selectNodeContents(){},getBoundingClientRect:()=>({right:286,width:142})});
+  const result=programFlowTrailRenderedRight({classList:{contains:name=>name==='co-order-code'},
+    getBoundingClientRect:()=>({right:570,width:426})});document.createRange=previous;return result;})()`);
+assert.strictEqual(orderingTextRight,286,'ordering trails must use the rendered text edge, not the reorder column edge');
 const rightExtent=evaluate(`programFlowTrailRightExtent({offsetWidth:500,offsetHeight:300,clientLeft:0,clientTop:0,
   scrollLeft:0,scrollTop:0,getBoundingClientRect:()=>({left:100,top:50,width:500,height:300}),
   querySelectorAll:()=>[

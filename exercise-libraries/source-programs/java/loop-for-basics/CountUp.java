@@ -8,11 +8,13 @@ public class CountUp {
         int i;
         int limit = 4;
 
+        System.out.println("FOR LOOP COUNT UP\n");
+
         for (i = 1; i <= limit; i++) {
             System.out.println(i);
         }
 
-        System.out.println("done " + i);
+        System.out.println("\nCOUNTING COMPLETE: " + i);
     }
 }
 

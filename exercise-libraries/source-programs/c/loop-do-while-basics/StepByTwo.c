@@ -9,12 +9,15 @@ int main(void) {
     int number = 0;
     int limit = 6;
 
+    printf("ADVANCE BY TWO\n\n");
+
     do {
         printf("%d\n", number);
+        printf("-\n");
         number += 2;
     } while (number < limit);
 
-    printf("final %d\n", number);
+    printf("FINAL VALUE: %d\n", number);
 
     return 0;
 }

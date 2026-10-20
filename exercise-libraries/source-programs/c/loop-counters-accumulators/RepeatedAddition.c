@@ -15,9 +15,10 @@ int main(void) {
     while (i < times) {
         total += amount;
         i++;
+        printf("CURRENT TOTAL: %d\n\n", total);
     }
 
-    printf("total %d\n", total);
+    printf("FINAL TOTAL: %d\n", total);
 
     return 0;
 }

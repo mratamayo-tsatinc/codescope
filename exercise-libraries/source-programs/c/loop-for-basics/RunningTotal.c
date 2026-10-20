@@ -12,9 +12,10 @@ int main(void) {
 
     for (i = 1; i <= limit; i++) {
         total += i;
+        printf("%d\n", total);
     }
 
-    printf("total %d\n", total);
+    printf("FINAL TOTAL: %d\n", total);
 
     return 0;
 }

@@ -10,9 +10,11 @@ public class CounterAndTotal {
         int total = 0;
 
         while (count < limit) {
+            System.out.println("advance the counter");
             count++;
             total += count;
             System.out.println(count + " " + total);
+            System.out.println("counter added to total");
         }
 
         System.out.println("final " + total);

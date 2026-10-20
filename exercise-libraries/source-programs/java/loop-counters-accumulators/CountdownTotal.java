@@ -9,8 +9,10 @@ public class CountdownTotal {
         int total = 0;
 
         while (count > 0) {
+            System.out.println("add countdown value");
             total += count;
             count--;
+            System.out.println("move countdown lower");
         }
 
         System.out.println("total " + total);

@@ -25,6 +25,22 @@ function programFlowTrailForAnchor(statement,direction){
   return phase?`for-${phase}`:'entry';
 }
 
+function programFlowTrailLoopBranch(statement){
+  if(!statement||statement.kind!=='loop'||statement.loopKind==='do'
+    ||statement.forPhase&&statement.forPhase!=='condition')return null;
+  const runtime=statement.runtime;
+  if(!runtime||!runtime.checked)return null;
+  return Boolean(runtime.assignedValue)?'true':'false';
+}
+
+function programFlowTrailSuccessfulCycle(statement){
+  if(!statement||statement.kind!=='loop')return false;
+  if(statement.loopKind!=='while'&&statement.loopKind!=='for')return false;
+  if(statement.forPhase&&statement.forPhase!=='condition')return false;
+  const runtime=statement.runtime;
+  return !!(runtime&&runtime.checked&&runtime.assignedValue);
+}
+
 function programFlowTrailForClauseParts(text){
   text=String(text||'');
   const forIndex=text.search(/\bfor\s*\(/);if(forIndex<0)return null;
@@ -83,10 +99,12 @@ function buildProgramFlowTrailModel(item,program){
   };
   route.forEach(entry=>addNode(entry.line,'statement',entry.statement));
   const rawEdges=[];
-  const addEdge=(from,to,routeKind,toAnchor,fromAnchor)=>{
+  let transitionSuccessfulLoopLines=[];
+  const addEdge=(from,to,routeKind,toAnchor,fromAnchor,loopBranch)=>{
     fromAnchor=fromAnchor||'entry';toAnchor=toAnchor||'entry';
     if(!from||!to||(from.line===to.line&&fromAnchor===toAnchor))return;
-    rawEdges.push({fromLine:from.line,toLine:to.line,route:routeKind,fromAnchor,toAnchor});
+    rawEdges.push({fromLine:from.line,toLine:to.line,route:routeKind,fromAnchor,toAnchor,
+      loopBranch:loopBranch||null,successfulLoopLines:transitionSuccessfulLoopLines.slice()});
   };
   const labelBetween=(fromLine,toLine)=>{
     if(toLine<=fromLine)return null;
@@ -97,18 +115,31 @@ function buildProgramFlowTrailModel(item,program){
     }
     return result;
   };
+  const activeSuccessfulLoopLines=new Set();
+  const successfulLoopLinesByTransition=[];
   for(let index=0;index<route.length-1;index++){
     const from=route[index],to=route[index+1];
+    if(programFlowTrailSuccessfulCycle(from.statement))activeSuccessfulLoopLines.add(from.line);
+    successfulLoopLinesByTransition.push([...activeSuccessfulLoopLines]);
+    if(activeSuccessfulLoopLines.has(to.line)
+      &&to.statement&&to.statement.kind==='loop'
+      &&(to.statement.loopKind==='while'||to.statement.loopKind==='for')
+      &&(!to.statement.forPhase||to.statement.forPhase==='condition'))activeSuccessfulLoopLines.delete(to.line);
+  }
+  for(let index=0;index<route.length-1;index++){
+    const from=route[index],to=route[index+1];
+    transitionSuccessfulLoopLines=successfulLoopLinesByTransition[index]||[];
     const fromNode=nodes.get(from.line),toNode=nodes.get(to.line);
     const fromAnchor=programFlowTrailForAnchor(from.statement,'from'),toAnchor=programFlowTrailForAnchor(to.statement,'to');
+    const loopBranch=programFlowTrailLoopBranch(from.statement);
     if(from.line===to.line&&fromAnchor!=='entry'&&toAnchor!=='entry'){
-      addEdge(fromNode,toNode,'for-header',toAnchor,fromAnchor);continue;
+      addEdge(fromNode,toNode,'for-header',toAnchor,fromAnchor,loopBranch);continue;
     }
     const selection=from.statement&&from.statement.kind==='selection';
     const via=selection?labelBetween(from.line,to.line):null;
     if(via){
       const viaNode=addNode(via.line,via.kind,null);
-      addEdge(fromNode,viaNode,'left','entry',fromAnchor);addEdge(viaNode,toNode,'inner',toAnchor);continue;
+      addEdge(fromNode,viaNode,'left','entry',fromAnchor,loopBranch);addEdge(viaNode,toNode,'inner',toAnchor);continue;
     }
     if(to.line<from.line&&from.statement&&from.statement.kind==='loop'&&from.statement.loopKind==='do-while'){
       let headerLine=null;
@@ -121,26 +152,31 @@ function buildProgramFlowTrailModel(item,program){
         const headerStatement=statements.find(statement=>statement.kind==='loop'&&statement.loopKind==='do'
           &&Number(statement.sourceLine)===headerLine)||null;
         const headerNode=addNode(headerLine,'statement',headerStatement);
-        addEdge(fromNode,headerNode,'right','statement-end',fromAnchor);continue;
+        addEdge(fromNode,headerNode,'right','statement-end',fromAnchor,loopBranch);continue;
       }
     }
     if(to.line<from.line){
       const target=toAnchor!=='entry'?toAnchor:(to.statement&&to.statement.kind==='loop'?'statement-end':'entry');
-      addEdge(fromNode,toNode,'right',target,fromAnchor);continue;
+      addEdge(fromNode,toNode,'right',target,fromAnchor,loopBranch);continue;
     }
     if(selection&&to.statement&&to.statement.selectionKind==='else-if'){
-      addEdge(fromNode,toNode,'left',toAnchor,fromAnchor);continue;
+      addEdge(fromNode,toNode,'left',toAnchor,fromAnchor,loopBranch);continue;
     }
     const exitsBlock=toNode.indent<fromNode.indent
       ||selection&&toNode.indent<=fromNode.indent
       ||from.statement&&from.statement.kind==='loop'&&toNode.indent<=fromNode.indent
       ||from.statement&&from.statement.kind==='program-break';
-    addEdge(fromNode,toNode,exitsBlock?'left':'inner',toAnchor,fromAnchor);
+    addEdge(fromNode,toNode,exitsBlock?'left':'inner',toAnchor,fromAnchor,loopBranch);
   }
   const edgeMap=new Map();
   rawEdges.forEach((edge,index)=>edgeMap.set(`${edge.fromLine}:${edge.fromAnchor}:${edge.toLine}:${edge.route}:${edge.toAnchor}`,
     Object.assign({},edge,{order:index})));
   const edges=[...edgeMap.values()].sort((left,right)=>left.order-right.order);
+  const exitedLoopLines=new Set(edges.filter(edge=>edge.loopBranch==='false').map(edge=>edge.fromLine));
+  edges.forEach(edge=>{
+    if((edge.loopBranch==='true'&&exitedLoopLines.has(edge.fromLine))
+      ||edge.successfulLoopLines.some(line=>exitedLoopLines.has(line)))edge.priorLoopTrue=true;
+  });
   if(edges.length)edges[edges.length-1].latest=true;
   const executedLines=new Set(route.map(entry=>entry.line));
   const skipped=new Set();
@@ -154,6 +190,19 @@ function buildProgramFlowTrailModel(item,program){
 }
 
 function programFlowTrailStatementEnd(text){return String(text||'').trimEnd().length;}
+
+function programFlowTrailRenderedRight(element){
+  if(!element||typeof element.getBoundingClientRect!=='function')return 0;
+  const box=element.getBoundingClientRect();
+  if(!(element.classList&&element.classList.contains('co-order-code'))
+    ||typeof document==='undefined'||typeof document.createRange!=='function')return box.right;
+  try{
+    const range=document.createRange();range.selectNodeContents(element);
+    const content=range.getBoundingClientRect();
+    if(content&&content.width>0&&Number.isFinite(content.right))return content.right;
+  }catch(error){/* Fall back to the code cell when DOM Range is unavailable. */}
+  return box.right;
+}
 
 function programFlowTrailRightExtent(source,fromY,toY){
   if(!source||typeof source.querySelectorAll!=='function'||typeof source.getBoundingClientRect!=='function')return 0;
@@ -171,7 +220,8 @@ function programFlowTrailRightExtent(source,fromY,toY){
     const codeTop=(rect.top-originY)/scaleY+scrollTop;
     const codeBottom=(rect.bottom-originY)/scaleY+scrollTop;
     if(codeBottom<top||codeTop>bottom)return;
-    extent=Math.max(extent,(rect.right-originX)/scaleX+scrollLeft);
+    const renderedRight=programFlowTrailRenderedRight(code)||rect.right;
+    extent=Math.max(extent,(renderedRight-originX)/scaleX+scrollLeft);
   });
   return extent;
 }
@@ -233,7 +283,10 @@ function mountProgramFlowTrail(source,item,program,lineElements){
   const enteringKey=latestKey&&((seenEdges&&!seenEdges.has(latestKey))
     ||(!seenEdges&&item._sourceFlowTransition&&item._sourceFlowTransition.phase==='moving'))?latestKey:null;
   const nextSeen=seenEdges||new Set();
+  const orderingSource=!!(source.classList&&source.classList.contains('co-order-list'));
   const statementEndTargets=new Set(model.edges.filter(edge=>edge.toAnchor==='statement-end').map(edge=>edge.toLine));
+  const returnOriginLines=new Set(orderingSource
+    ?model.edges.filter(edge=>edge.route==='right').map(edge=>edge.fromLine):[]);
   const activeForPhase=program&&program.status==='running'&&program.statements&&program.statements[program.cursor]
     ?programFlowTrailForPhase(program.statements[program.cursor]):null;
   const forAnchorsByLine=new Map();
@@ -271,12 +324,19 @@ function mountProgramFlowTrail(source,item,program,lineElements){
       statementEndPort.style.setProperty('--program-flow-statement-end',String(programFlowTrailStatementEnd(node.text)));
       entry.code.appendChild(statementEndPort);
     }
-    ports.set(node.line,{port,anchorPorts,statementEndPort,entry});
+    let returnOriginPort=null;
+    if(returnOriginLines.has(node.line)){
+      returnOriginPort=document.createElement('span');returnOriginPort.className='program-flow-trail-port is-return-origin';
+      returnOriginPort.setAttribute('aria-hidden','true');
+      returnOriginPort.style.setProperty('--program-flow-return-origin',String(programFlowTrailStatementEnd(node.text)));
+      entry.code.appendChild(returnOriginPort);
+    }
+    ports.set(node.line,{port,anchorPorts,statementEndPort,returnOriginPort,entry});
   });
   model.edges.forEach(edge=>{
     const path=document.createElementNS('http://www.w3.org/2000/svg','path');
     const key=edgeKey(edge);
-    path.setAttribute('class',`program-flow-trail-path is-${edge.route}${edge.latest?' is-latest':''}${key===enteringKey?' is-entering':''}`);
+    path.setAttribute('class',`program-flow-trail-path is-${edge.route}${edge.priorLoopTrue?' is-prior-loop-true':''}${edge.latest?' is-latest':''}${key===enteringKey?' is-entering':''}`);
     path.dataset.fromLine=String(edge.fromLine);path.dataset.toLine=String(edge.toLine);svg.appendChild(path);
     nextSeen.add(key);
   });
@@ -289,6 +349,7 @@ function mountProgramFlowTrail(source,item,program,lineElements){
     const pointFor=(line,anchor)=>{
       const record=ports.get(line);if(!record)return null;
       const {entry}=record,port=anchor==='statement-end'&&record.statementEndPort?record.statementEndPort
+        :anchor==='return-origin'&&record.returnOriginPort?record.returnOriginPort
         :(record.anchorPorts.get(anchor)||record.port);
       if(!port)return null;
       const measured=programFlowTrailRenderedCenter(source,port);
@@ -298,15 +359,17 @@ function mountProgramFlowTrail(source,item,program,lineElements){
         const sourceOriginX=sourceRect.left+(source.clientLeft||0)*scaleX;
         const codeRect=entry.code&&typeof entry.code.getBoundingClientRect==='function'
           ?entry.code.getBoundingClientRect():port.getBoundingClientRect();
-        return {x:measured.x,y:measured.y,
-          right:(codeRect.right-sourceOriginX)/scaleX+(source.scrollLeft||0)};
+        const renderedRight=programFlowTrailRenderedRight(entry.code)||codeRect.right;
+        return {x:measured.x,y:measured.y,right:anchor==='return-origin'?measured.x
+          :(renderedRight-sourceOriginX)/scaleX+(source.scrollLeft||0)};
       }
       const y=entry.row.offsetTop+entry.code.offsetTop+port.offsetTop+port.offsetHeight/2;
-      return {x:entry.code.offsetLeft+port.offsetLeft+port.offsetWidth/2,y,
-        right:entry.code.offsetLeft+entry.code.scrollWidth};
+      const x=entry.code.offsetLeft+port.offsetLeft+port.offsetWidth/2;
+      return {x,y,right:anchor==='return-origin'?x:entry.code.offsetLeft+entry.code.scrollWidth};
     };
     Array.from(svg.querySelectorAll('path')).forEach((path,index)=>{
-      const edge=model.edges[index],from=pointFor(edge.fromLine,edge.fromAnchor),to=pointFor(edge.toLine,edge.toAnchor);
+      const edge=model.edges[index],fromAnchor=orderingSource&&edge.route==='right'?'return-origin':edge.fromAnchor;
+      const from=pointFor(edge.fromLine,fromAnchor),to=pointFor(edge.toLine,edge.toAnchor);
       if(from&&to){
         path.setAttribute('d',programFlowTrailRoundedPath(from,to,edge.route,source));
         if(path.classList.contains('is-entering')&&typeof path.getTotalLength==='function'){

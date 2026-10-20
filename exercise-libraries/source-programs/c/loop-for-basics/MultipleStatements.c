@@ -17,7 +17,7 @@ int main(void) {
         printf("%d\n", value);
     }
 
-    printf("total %d\n", total);
+    printf("TOTAL: %d\n", total);
 
     return 0;
 }

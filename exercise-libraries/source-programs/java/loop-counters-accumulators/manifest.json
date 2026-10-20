@@ -1,6 +1,7 @@
 {
   "title": "Java - Counters Accumulators",
   "exercises": [
+    "AccumulatorWalkthrough.java",
     "SumFirstNumbers.java",
     "ProductSequence.java",
     "CountdownTotal.java",

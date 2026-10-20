@@ -10,12 +10,15 @@ int main(void) {
     int limit = 4;
     int total = 0;
 
+    printf("RUNNING TOTALS\n\n");
+
     do {
         total += i;
+        printf("%d\n", total);
         i++;
     } while (i <= limit);
 
-    printf("total %d\n", total);
+    printf("\nFINAL TOTAL: %d\n", total);
 
     return 0;
 }

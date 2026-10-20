@@ -1,6 +1,7 @@
 {
   "title": "C - For Basics",
   "exercises": [
+    "RepeatCharacter.c",
     "CountUp.c",
     "CountDown.c",
     "InclusiveRange.c",

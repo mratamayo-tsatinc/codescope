@@ -10,12 +10,15 @@ int main(void) {
     int limit = 4;
     int product = 1;
 
+    printf("\nCOUNTER AND PRODUCT ACCUMULATOR\n");
+
     while (i <= limit) {
         product *= i;
         i++;
     }
 
-    printf("product %d\n", product);
+    printf("\n\nACCUMULATED PRODUCT & COUNTER: \n");
+    printf("%d\n", product);
 
     return 0;
 }

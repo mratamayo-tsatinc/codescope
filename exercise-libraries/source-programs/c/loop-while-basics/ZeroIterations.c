@@ -10,11 +10,15 @@ int main(void) {
     int value = 5;
     int limit = 3;
 
+    printf("DO NOT RUN!\n\n");
+
     while (value < limit) {
+        printf("value %d\n", value);
         value++;
     }
 
-    printf("value %d\n", value);
+    printf("===================\n");
+    printf("Final value %d\n", value);
 
     return 0;
 }

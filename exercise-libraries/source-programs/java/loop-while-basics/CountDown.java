@@ -8,8 +8,10 @@ public class CountDown {
         int count = 4;
 
         while (count > 0) {
+            System.out.println("countdown round");
             System.out.println(count);
             count--;
+            System.out.println("next count follows");
         }
 
         System.out.println("lift off");

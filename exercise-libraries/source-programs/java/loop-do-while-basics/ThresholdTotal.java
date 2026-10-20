@@ -10,12 +10,14 @@ public class ThresholdTotal {
         int total = 0;
         int limit = 6;
 
+        System.out.println("TOTALS TOWARD " + limit + "\n");
+
         do {
             total += amount;
             System.out.println(total);
         } while (total < limit);
 
-        System.out.println("final " + total);
+        System.out.println("\nTHRESHOLD REACHED: " + total);
     }
 }
 

@@ -9,12 +9,14 @@ public class OnePassFalse {
         int score = 8;
         int target = 5;
 
+        System.out.println("ONE PASS EVEN WHEN FALSE\n");
+
         do {
+            System.out.println("BODY EXECUTED");
             score++;
-            System.out.println(score);
         } while (score < target);
 
-        System.out.println("stopped " + score);
+        System.out.println("\nFINAL SCORE: " + score);
     }
 }
 

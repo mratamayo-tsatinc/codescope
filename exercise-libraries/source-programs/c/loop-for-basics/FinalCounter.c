@@ -10,10 +10,11 @@ int main(void) {
     int limit = 3;
 
     for (i = 0; i < limit; i++) {
+        printf("LOOP\n");
         printf("loop %d\n", i);
     }
 
-    printf("after %d\n", i);
+    printf("AFTER LOOP: %d\n", i);
 
     return 0;
 }

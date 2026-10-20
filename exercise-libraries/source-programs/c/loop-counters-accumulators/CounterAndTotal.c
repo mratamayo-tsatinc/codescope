@@ -14,6 +14,7 @@ int main(void) {
         count++;
         total += count;
         printf("%d %d\n", count, total);
+        printf("---\n");
     }
 
     printf("final %d\n", total);

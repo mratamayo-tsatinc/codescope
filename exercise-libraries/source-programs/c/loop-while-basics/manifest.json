@@ -1,8 +1,9 @@
 {
   "title": "C - While Basics",
   "exercises": [
-    "CountUp.c",
+    "RepeatMessage.c",
     "CountDown.c",
+    "CountUp.c",
     "StartAtValue.c",
     "StepByTwo.c",
     "RunningTotal.c",

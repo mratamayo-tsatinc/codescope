@@ -14,8 +14,9 @@ int main(void) {
     while (i <= limit) {
         doubled = i * 2;
         total += doubled;
-        printf("%d\n", doubled);
         i++;
+        printf("%d\n", doubled);
+        printf("***\n");
     }
 
     printf("total %d\n", total);

@@ -11,9 +11,10 @@ public class RunningTotal {
 
         for (i = 1; i <= limit; i++) {
             total += i;
+            System.out.println(total);
         }
 
-        System.out.println("total " + total);
+        System.out.println("FINAL TOTAL: " + total);
     }
 }
 

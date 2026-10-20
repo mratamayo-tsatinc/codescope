@@ -12,9 +12,11 @@ int main(void) {
     while (count > 0) {
         total += count;
         count--;
+        printf("= %d =\n", total);
     }
 
-    printf("total %d\n", total);
+    printf("\n\nFINAL TOTAL:\n");
+    printf("%d\n", total);
 
     return 0;
 }

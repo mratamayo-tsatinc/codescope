@@ -12,8 +12,10 @@ public class RepeatedAddition {
         int total = 0;
 
         while (i < times) {
+            System.out.println("add another amount");
             total += amount;
             i++;
+            System.out.println("repetition counted");
         }
 
         System.out.println("total " + total);

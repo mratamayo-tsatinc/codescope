@@ -9,11 +9,14 @@ int main(void) {
     int i;
     int limit = 8;
 
+    printf("ADVANCE BY TWO\n\n");
+
     for (i = 0; i < limit; i += 2) {
         printf("%d\n", i);
+        printf("-\n");
     }
 
-    printf("final %d\n", i);
+    printf("FINAL VALUE: %d\n", i);
 
     return 0;
 }

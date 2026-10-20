@@ -11,10 +11,12 @@ public class MultipleStatements {
         int total = 0;
 
         while (i <= limit) {
+            System.out.println("calculate doubled value");
             doubled = i * 2;
             total += doubled;
             System.out.println(doubled);
             i++;
+            System.out.println("iteration summary ready");
         }
 
         System.out.println("total " + total);

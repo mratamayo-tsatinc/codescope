@@ -2424,6 +2424,7 @@ button.program-source-for-clause:focus-visible{background:color-mix(in srgb,var(
   stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;
 }
 .program-flow-trail-path.is-latest{stroke:color-mix(in srgb,var(--op) 86%,var(--text));stroke-width:1.8;}
+.program-flow-trail-path.is-prior-loop-true:not(.is-latest){stroke-dasharray:5 4;}
 .program-flow-trail-path.is-entering{
   stroke-dasharray:var(--program-flow-trail-length);stroke-dashoffset:var(--program-flow-trail-length);
 }

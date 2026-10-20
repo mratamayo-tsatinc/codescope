@@ -18,7 +18,7 @@ int main(void) {
         i++;
     } while (i <= limit);
 
-    printf("total %d\n", total);
+    printf("TOTAL: %d\n", total);
 
     return 0;
 }

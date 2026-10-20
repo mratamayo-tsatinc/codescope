@@ -1,8 +1,9 @@
 {
   "title": "Java - While Basics",
   "exercises": [
-    "CountUp.java",
+    "RepeatMessage.java",
     "CountDown.java",
+    "CountUp.java",
     "StartAtValue.java",
     "StepByTwo.java",
     "RunningTotal.java",

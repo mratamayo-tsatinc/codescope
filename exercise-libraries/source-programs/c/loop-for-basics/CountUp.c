@@ -9,11 +9,13 @@ int main(void) {
     int i;
     int limit = 4;
 
+    printf("FOR LOOP COUNT UP\n\n");
+
     for (i = 1; i <= limit; i++) {
         printf("%d\n", i);
     }
 
-    printf("done %d\n", i);
+    printf("\nCOUNTING COMPLETE: %d\n", i);
 
     return 0;
 }

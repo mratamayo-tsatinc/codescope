@@ -10,11 +10,13 @@ public class StartOffset {
         int start = 3;
         int limit = 6;
 
+        System.out.println("START AT " + start + "\n");
+
         for (i = start; i < limit; i++) {
             System.out.println(i);
         }
 
-        System.out.println("final " + i);
+        System.out.println("FINAL VALUE: " + i);
     }
 }
 

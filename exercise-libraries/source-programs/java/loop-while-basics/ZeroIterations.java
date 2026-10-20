@@ -10,7 +10,9 @@ public class ZeroIterations {
         int limit = 3;
 
         while (value < limit) {
+            System.out.println("this line is skipped");
             value++;
+            System.out.println("value would advance");
         }
 
         System.out.println("value " + value);

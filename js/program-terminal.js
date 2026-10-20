@@ -13,9 +13,24 @@ let programTerminalAnimationTimer=null;
 
 function programTerminalInteractionLocked(){return programTerminalAnimationActive||!!pendingProgramTerminalAnimation;}
 
+function programTerminalRectSnapshot(element){
+  if(!element||typeof element.getBoundingClientRect!=='function')return null;
+  const rect=element.getBoundingClientRect();
+  if(!rect||!rect.width||!rect.height)return null;
+  return {left:rect.left,top:rect.top,width:rect.width,height:rect.height,
+    right:rect.right,bottom:rect.bottom};
+}
+
 function queueProgramTerminalAnimation(item,event,onComplete){
   if(!item||!event||event.type!=='OUTPUT') return;
-  pendingProgramTerminalAnimation={item,event,onComplete:typeof onComplete==='function'?onComplete:null};
+  const source=typeof document!=='undefined'&&document.querySelector
+    ?document.querySelector(`[data-terminal-emitter="${event.statementId}"]`)
+      ||document.querySelector(`.program-source-file-line[data-statement-id="${event.statementId}"]`)
+    :null;
+  const activationRect=item._pendingTerminalSourceRect||null;
+  delete item._pendingTerminalSourceRect;
+  pendingProgramTerminalAnimation={item,event,sourceRect:activationRect||programTerminalRectSnapshot(source),
+    onComplete:typeof onComplete==='function'?onComplete:null};
 }
 
 function programTerminalAnimationSurface(item,pending){
@@ -148,8 +163,6 @@ function startProgramTerminalAnimation(panel,pre,escape,cursor,pending){
     if(pending.onComplete)pending.onComplete();};
   if(reduced||!PROGRAM_TERMINAL_SETTINGS.characterAnimation){terminalStream+=text;paint();finish();return;}
   programTerminalAnimationActive=true;panel.classList.add('is-printing');
-  const source=document.querySelector(`[data-terminal-emitter="${pending.event.statementId}"]`)
-    ||document.querySelector(`.program-source-file-line[data-statement-id="${pending.event.statementId}"]`);
   const begin=()=>{
     let index=0;
     const step=()=>{
@@ -173,8 +186,28 @@ function startProgramTerminalAnimation(panel,pre,escape,cursor,pending){
     };
     step();
   };
-  if(source&&typeof runVarFinalComet==='function')
-    runVarFinalComet(source.getBoundingClientRect(),panel.getBoundingClientRect(),'#67e8c1',begin,
-      Number.isFinite(Number(pending.event.trailDurationMs))?Number(pending.event.trailDurationMs):undefined);
-  else begin();
+  // A condition trace can leave the compact context dock on its Memory tab.
+  // Switching it to Output changes the terminal from display:none to visible.
+  // Wait one paint before measuring both endpoints; otherwise a repeated
+  // direct output inside a loop can receive a zero-sized destination and its
+  // text appears without the source-to-screen trail.
+  const launch=(attempt=0)=>{
+    if(!panel.isConnected){finish();return;}
+    const source=document.querySelector(`[data-terminal-emitter="${pending.event.statementId}"]`)
+      ||document.querySelector(`.program-source-file-line[data-statement-id="${pending.event.statementId}"]`);
+    const liveSourceRect=programTerminalRectSnapshot(source);
+    const sourceRect=liveSourceRect||pending.sourceRect;
+    const panelRect=panel.getBoundingClientRect();
+    const layoutReady=!!(panelRect.width&&panelRect.height
+      &&(!sourceRect||(sourceRect.width&&sourceRect.height)));
+    if(!layoutReady&&attempt<2&&typeof requestAnimationFrame==='function'){
+      requestAnimationFrame(()=>launch(attempt+1));return;
+    }
+    if(sourceRect&&layoutReady&&typeof runVarFinalComet==='function')
+      runVarFinalComet(sourceRect,panelRect,'#67e8c1',begin,
+        Number.isFinite(Number(pending.event.trailDurationMs))?Number(pending.event.trailDurationMs):undefined);
+    else begin();
+  };
+  if(typeof requestAnimationFrame==='function')requestAnimationFrame(launch);
+  else launch();
 }

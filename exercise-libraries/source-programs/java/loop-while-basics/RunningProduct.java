@@ -10,8 +10,10 @@ public class RunningProduct {
         int product = 1;
 
         while (factor <= limit) {
+            System.out.println("multiply next factor");
             product *= factor;
             factor++;
+            System.out.println("factor advanced");
         }
 
         System.out.println("product " + product);

@@ -11,12 +11,14 @@ int main(void) {
     int limit = 3;
     int balance = 15;
 
+    printf("\nINITIAL BALANCE: %d\n\n", balance);
+
     do {
         balance -= step;
         step++;
     } while (step <= limit);
 
-    printf("balance %d\n", balance);
+    printf("\nFINAL BALANCE: %d\n", balance);
 
     return 0;
 }

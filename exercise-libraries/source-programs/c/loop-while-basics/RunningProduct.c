@@ -10,6 +10,8 @@ int main(void) {
     int limit = 4;
     int product = 1;
 
+    printf("Multiply values in a loop\n\n");
+
     while (factor <= limit) {
         product *= factor;
         factor++;

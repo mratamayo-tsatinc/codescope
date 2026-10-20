@@ -11,9 +11,10 @@ public class RunningProduct {
 
         for (i = 1; i <= limit; i++) {
             product *= i;
+            System.out.println(product);
         }
 
-        System.out.println("product " + product);
+        System.out.println("FINAL PRODUCT: " + product);
     }
 }
 
