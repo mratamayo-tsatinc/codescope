@@ -1,0 +1,11 @@
+{
+  "title": "C - Loop Completion Basics",
+  "exercises": [
+    "WhileCountUp.c",
+    "WhileCountDown.c",
+    "DoWhileCountUp.c",
+    "DoWhileStepByTwo.c",
+    "ForCountUp.c",
+    "ForStepByTwo.c"
+  ]
+}

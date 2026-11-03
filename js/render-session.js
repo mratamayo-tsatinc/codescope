@@ -403,7 +403,8 @@ function programSourceTransitionRoles(statementIds,transition){
     destination:!!(transition&&transition.destinationId&&ids.includes(transition.destinationId))};
 }
 
-function renderProgramSourceFilePanel(item,program){
+function renderProgramSourceFilePanel(item,program,services){
+  services=services||{};
   const display=item.sourceDisplay,statements=new Map(program.statements.map((statement,index)=>[statement.id,{statement,index}]));
   const active=program.statements[program.cursor],transition=item._sourceFlowTransition||null;
   const activeProfile=typeof PROFILES!=='undefined'&&PROFILES.find(candidate=>candidate.id===item.profileId);
@@ -474,9 +475,16 @@ function renderProgramSourceFilePanel(item,program){
     const conditionPart=forHeaderParts?programLoopConditionPart(line.text,forHeaderParts)
       :(loopConditionResult?programLoopConditionPart(line.text,null)
         :(selectionConditionResult?programSelectionConditionPart(line.text):null));
-    const sourceCode=forHeaderParts
+    const defaultSourceCode=()=>forHeaderParts
       ?renderProgramForHeaderSource(line,item,program,lineStatementIds,active,transition,conditionResult)
       :renderProgramConditionSource(line,item,conditionPart,conditionResult);
+    // Source-backed presentations may add an editor to the canonical source
+    // row, but row layout, transitions, trails, scrolling, and timing remain
+    // owned by this renderer.
+    const sourceCode=typeof services.renderSourceLineCode==='function'
+      ?services.renderSourceLineCode({line,item,program,statement,active,transition,
+        conditionResult,conditionPart,forHeaderParts,defaultSourceCode})
+      :defaultSourceCode();
     // Literal-only output runs directly from the source row. Keep a precise
     // emitter on the rendered command after completion re-renders the row so
     // the source-to-terminal trail can still start from the statement text,
@@ -485,7 +493,7 @@ function renderProgramSourceFilePanel(item,program){
       &&typeof programOutputDynamicParts==='function'
       &&programOutputDynamicParts(statement).length===0;
     if(directOutputEmitter&&sourceCode&&typeof sourceCode.setAttribute==='function')
-      sourceCode.setAttribute('data-terminal-emitter',statement.id);
+      sourceCode.setAttribute('data-terminal-emitter',statement.terminalEmitterId||statement.id);
     row.appendChild(sourceCode);flowLineElements.set(Number(line.number),{row,code:sourceCode,line});
     const state=h('span',{class:'program-source-file-state'});
     if(result!==null){
@@ -565,7 +573,7 @@ function renderProgramSourceContextLine(line){
 function renderProgramSourceFlow(container,item,program,services,renderStatement){
   if(!item||!item.sourceFlow||!item.sourceDisplay||!Array.isArray(item.sourceDisplay.lines)) return false;
   if(programUsesSourceFilePanel(item)){
-    container.appendChild(renderProgramSourceFilePanel(item,program));
+    container.appendChild(renderProgramSourceFilePanel(item,program,services));
     return true;
   }
   const statements=new Map(program.statements.map((statement,index)=>[statement.id,{statement,index}]));

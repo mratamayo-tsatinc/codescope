@@ -183,6 +183,7 @@ function main(){
   const content=assertExerciseContent();
   assertArchitectureCleanup();
   assertResponsiveContracts();
+  runNode('tests/validate-code-completion.js');
   runNode('tests/phase0-baseline.js',['--check']);
   runNode('tests/run-tests.js');
   console.log(`Phase 10 release gate passed: ${syntaxCount} scripts, ${assets.scripts} indexed scripts, ${assets.styles} stylesheets, ${content.manifests} manifests, ${content.exercises} exercises, and ${content.sourceProfiles} enabled source profiles validated.`);

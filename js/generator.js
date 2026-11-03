@@ -384,8 +384,8 @@ function finalizeProfile(raw){
     &&typeof raw.presentation.flowTrail!=='boolean')
     throw new Error(`Profile '${raw.meta&&raw.meta.id||'unknown'}': presentation.flowTrail must be a boolean`);
   if(raw.presentation&&raw.presentation.flowTrail===true&&raw.presentation.workspace!=='source-program'
-    &&!(raw.activity&&raw.activity.kind==='code-ordering'))
-    throw new Error(`Profile '${raw.meta&&raw.meta.id||'unknown'}': presentation.flowTrail requires the source-program workspace or code-ordering activity`);
+    &&!(raw.activity&&['code-ordering','code-completion'].includes(raw.activity.kind)))
+    throw new Error(`Profile '${raw.meta&&raw.meta.id||'unknown'}': presentation.flowTrail requires the source-program workspace, code-ordering, or code-completion activity`);
   // Activity profiles share the shell's global profile catalog and scoring
   // aliases, but their remaining configuration is owned by the activity
   // plugin rather than the legacy expression generator.

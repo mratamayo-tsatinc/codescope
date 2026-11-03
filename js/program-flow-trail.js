@@ -352,6 +352,19 @@ function mountProgramFlowTrail(source,item,program,lineElements){
         :anchor==='return-origin'&&record.returnOriginPort?record.returnOriginPort
         :(record.anchorPorts.get(anchor)||record.port);
       if(!port)return null;
+      // A source presentation may replace authored text with a real control
+      // (for example a code-completion input). Anchor for-loop ports to the
+      // rendered clause instead of assuming every source character is 1ch.
+      if(String(anchor||'').startsWith('for-')&&entry.code&&entry.code.querySelector
+        &&typeof entry.code.getBoundingClientRect==='function'){
+        const phase=anchor.startsWith('for-condition')?'condition':anchor.slice(4);
+        const clause=entry.code.querySelector(`[data-for-phase="${phase}"]`);
+        if(clause&&typeof clause.getBoundingClientRect==='function'){
+          const codeRect=entry.code.getBoundingClientRect(),clauseRect=clause.getBoundingClientRect();
+          const scaleX=entry.code.offsetWidth?codeRect.width/entry.code.offsetWidth:1;
+          port.style.left=`${(clauseRect.left+clauseRect.width/2-codeRect.left)/scaleX}px`;
+        }
+      }
       const measured=programFlowTrailRenderedCenter(source,port);
       if(measured){
         const sourceRect=source.getBoundingClientRect();

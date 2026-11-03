@@ -29,6 +29,13 @@
       "description": "A student-friendly sequence of shared guided trace, simulation, and ordering exercises for foundational loops.",
       "file": "c-java-loop-foundations.json",
       "enabled": true
+    },
+    {
+      "id": "c-java-loop-completion",
+      "name": "C and Java: Loop Completion",
+      "description": "An isolated Code Completion set using existing seeded C and Java loop exercises.",
+      "file": "c-java-loop-completion.json",
+      "enabled": true
     }
   ]
 }

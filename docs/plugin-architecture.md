@@ -65,11 +65,17 @@ contract; it does not maintain a second answer list.
 ## Reference implementation
 
 `plugins/falling-token-sort/`, `plugins/token-classification/`,
-`plugins/simulate-output/`, `plugins/program-output/`, and
+`plugins/simulate-output/`, `plugins/code-ordering/`, `plugins/code-completion/`, `plugins/program-output/`, and
 `plugins/program-input/` are reference
 directory boundaries for activity plugins. Their profiles are declared
 globally in `js/profiles.js`; their plugin directories contain only the
 behavior and presentation needed to execute those configurations.
+
+Code Completion declares a public presentation dependency on Code Ordering's
+frozen program-playback capability. It supplies completed source fragments to
+that capability but continues to parse and execute through Program Core. This
+keeps statement animation, memory/output trails, and flow playback consistent
+without importing Code Ordering's private implementation.
 
 Program Output is a statement interaction and presentation capability. It
 consumes canonical Output IR and shell-produced effects, then renders the

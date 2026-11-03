@@ -167,6 +167,8 @@ function coRun(item){
   try{
     const parsed=sourceProgramParseExercise({details:sourceProgramMetadataAndSource(source,item.filename),
       filename:item.filename,language:item.language,sourceValueMode:'authored',
+      maxLoopIterations:item.executionGuard&&item.executionGuard.maxLoopIterations,
+      detectLoopCycles:!!(item.executionGuard&&item.executionGuard.detectCycles),
       inputValues:Object.fromEntries((item.inputs||[]).map(v=>[v.target,{value:v.value,raw:String(v.value)}]))});
     const frames=coPlaybackFrames(parsed),diagnostics=parsed.coreProgramResult.diagnostics||[];
     const diagnostic=diagnostics.slice().sort((left,right)=>{
@@ -328,8 +330,9 @@ function coRetry({item}){if(!item||!item.checked)return {applied:false};item.ord
   item.runResult=item.result=null;item._coPlayback=null;item.checked=false;item.itemScore=item.points=null;item.correctSteps=item.totalOpSteps=0;
   item.wasCorrectFinal=null;item.lockedAt=null;item._coMobileTab='order';item._feedbackAnimated=false;return {applied:true,resetAttempt:true};}
 function coScreen(value){return sourceProgramScreenStateText(String(value||''));}
+function coWorkspaceDisplayAnswer(item){return item.displayAnswerKey||item.answerKey;}
 function coWorkspaceMemoryPanel(item,system){
-  const expected=item.answerKey,actual=system?{variables:[]}:coVisibleRunAnswer(item),frame=system?null:coCurrentPlaybackFrame(item);
+  const expected=coWorkspaceDisplayAnswer(item),actual=system?{variables:[]}:coVisibleRunAnswer(item),frame=system?null:coCurrentPlaybackFrame(item);
   const actualMap=new Map(actual.variables.map(variable=>[variable.name,variable]));
   const panel=h('div',{class:'var-final-panel'}),list=h('div',{class:'var-final-list'});
   expected.variables.forEach(variable=>{
@@ -353,7 +356,7 @@ function coWorkspaceMemoryPanel(item,system){
 }
 function coWorkspaceOutputPanel(item,system){
   const actual=coVisibleRunAnswer(item),frame=system?null:coCurrentPlaybackFrame(item);
-  const output=system?item.answerKey.output:actual.output;
+  const displayAnswer=coWorkspaceDisplayAnswer(item),output=system?displayAnswer.output:actual.output;
   if(typeof renderProgramTerminalPanel==='function'){
     let events=output?[{type:'OUTPUT',text:output}]:[];
     if(!system&&frame&&item._coTerminalEvent){
@@ -365,7 +368,7 @@ function coWorkspaceOutputPanel(item,system){
     if(!system&&item.runResult&&!item._coTerminalEvent){
       const pre=panel.querySelector('.program-output-screen-text');
       if(pre){
-        const student=coScreen(output),answer=coScreen(item.answerKey.output);
+        const student=coScreen(output),answer=coScreen(displayAnswer.output);
         pre.classList.add('co-output-comparison');
         pre.replaceChildren(...(student===answer?[student]:traceFeedbackScreenDiffNodes(student,answer,false)));
       }
@@ -395,10 +398,11 @@ function coWorkspaceStateColumn(item,system){
     title:failed?'Show the source line that stopped execution':null,
     onclick:failed?()=>coFocusExecutionError(item):null},
     h('i',{class:'fa-solid '+(matches?'fa-check':'fa-magnifying-glass'),'aria-hidden':'true'}),statusLabel):null;
+  const targetState=system&&item.activityKind==='code-completion';
   return h('section',{class:'co-workspace-state '+(system?'system-state':'student-state')},
     h('h4',{class:'co-workspace-state-title'},
-      h('i',{class:'fa-solid '+(system?'fa-calculator':'fa-user'),'aria-hidden':'true'}),
-      h('span',{class:'co-workspace-state-label'},system?'System answer key':'Your run'),status),
+      h('i',{class:'fa-solid '+(system?(targetState?'fa-bullseye':'fa-calculator'):'fa-user'),'aria-hidden':'true'}),
+      h('span',{class:'co-workspace-state-label'},system?(targetState?'Target state':'System answer key'):'Your run'),status),
     h('div',{class:'co-workspace-context'},coWorkspaceMemoryPanel(item,system),coWorkspaceOutputPanel(item,system)));
 }
 function coExecutionErrorStrip(item){
@@ -439,9 +443,10 @@ function coFeedbackColumn(item,system){
     :failed?(system?[screen||'No output']:coStoppedScreenDiffNodes(student,answer))
       :(screen||screenMismatch?traceFeedbackScreenDiffNodes(student,answer,system):['No output']);
   const showDifferenceBorder=screenMismatch&&!(failed&&system);
+  const targetState=system&&item.activityKind==='code-completion';
   return h('section',{class:'trace-feedback-state '+(system?'system-state':'student-state')},
-    h('h4',{class:'trace-feedback-state-title'},h('i',{class:'fa-solid '+(system?'fa-calculator':'fa-user'),'aria-hidden':'true'}),
-      system?'System answer key':'Your run'),
+    h('h4',{class:'trace-feedback-state-title'},h('i',{class:'fa-solid '+(system?(targetState?'fa-bullseye':'fa-calculator'):'fa-user'),'aria-hidden':'true'}),
+      system?(targetState?'Target state':'System answer key'):'Your run'),
     h('div',{class:'trace-feedback-state-section'},h('div',{class:'trace-feedback-section-label'},'Variable state'),memory),
     h('div',{class:'trace-feedback-state-section'},h('div',{class:'trace-feedback-section-label'},'Screen state'),
       h('pre',{class:'trace-feedback-screen'+(!screen&&!screenMismatch?' is-empty':'')+(showDifferenceBorder?' has-differences':'')},...screenNodes)));
@@ -451,7 +456,8 @@ function coFeedback(item){
   root.appendChild(h('div',{class:'feedback '+(item.wasCorrectFinal?'correct':'incorrect')},
     h('div',{class:'feedback-head'},h('i',{class:'fa-solid '+(item.wasCorrectFinal?'fa-circle-check':'fa-circle-xmark'),'aria-hidden':'true'}),
       item.wasCorrectFinal?' Correct':' Review needed'),
-    h('div',{class:'feedback-body'},item.wasCorrectFinal?'The ordered program produced the required final state.'
+    h('div',{class:'feedback-body'},item.wasCorrectFinal
+      ?(item.activityKind==='code-completion'?'Your completed program reproduced the target state.':'The ordered program produced the required final state.')
       :run&&run.ok?'Compare both program states below.'
         :'Execution stopped at the reported line. Matching variable and output records produced before the stop were still credited.'),
     h('div',{class:'feedback-stats'},h('div',{class:'stat'},h('div',{class:'sv'},r.correct+'/'+r.total),h('div',{class:'sl'},'state checks')),
@@ -742,7 +748,7 @@ function coMountFlowTrail(item,list){
   list.querySelectorAll('.co-order-line[data-source-line]').forEach(row=>{
     const code=row.querySelector('.co-order-code'),line=Number(row.dataset.sourceLine);
     const sourceLine=source[line-1],text=sourceLine&&sourceLine.text||'';
-    if(code&&line&&loopConditionLines.has(line)&&typeof programLoopConditionPart==='function'){
+    if(item.activityKind!=='code-completion'&&code&&line&&loopConditionLines.has(line)&&typeof programLoopConditionPart==='function'){
       const forParts=typeof programFlowTrailForClauseParts==='function'
         ?programFlowTrailForClauseParts(text):null;
       const conditionPart=programLoopConditionPart(text,forParts);
@@ -864,15 +870,24 @@ function coRunPlaybackTrail(origin,destination,color,duration){
   if(!coRectCanAnimate(originRect)||!coRectCanAnimate(destinationRect))return;
   runVarFinalComet(originRect,destinationRect,color,null,duration);
 }
+function coPlaybackMemoryTrailDuration(item,stepMs){
+  if(!item||item.activityKind!=='code-completion')return null;
+  const configured=DEFAULT_APP_SETTINGS&&DEFAULT_APP_SETTINGS.shell&&DEFAULT_APP_SETTINGS.shell.memoryPanel
+    &&DEFAULT_APP_SETTINGS.shell.memoryPanel.transferAnimation;
+  const standard=Number(configured&&configured.durationMs)||1000;
+  return Math.max(500,Math.min(standard,stepMs));
+}
 function coSchedulePlaybackTrail(item,flow){
   const pending=item&&item._coPlaybackTrail,playback=item&&item._coPlayback;
-  if(!pending||!playback||playback.speed<=0)return;
+  if(!pending||!playback||playback.speed<=0||!flow)return;
   delete item._coPlaybackTrail;
   const frame=playback.frames[pending.index-1];if(!frame)return;
   requestAnimationFrame(()=>{
     if(!flow.isConnected||pending.token!==item._coPlaybackTrailToken)return;
-    const source=flow.querySelector('.co-order-line[data-source-line="'+frame.line+'"]');if(!source)return;
-    const stepMs=Math.max(100,playback.speed*1000),readMs=Math.max(80,stepMs*.44);
+    const source=flow.querySelector('.program-source-file-line[data-source-line="'+frame.line+'"],.co-order-line[data-source-line="'+frame.line+'"]');
+    if(!source)return;
+    const stepMs=Math.max(100,playback.speed*1000),completionMemoryMs=coPlaybackMemoryTrailDuration(item,stepMs);
+    const readMs=completionMemoryMs||Math.max(80,stepMs*.44);
     frame.reads.forEach(name=>{
       const memory=coPlaybackMemoryCard(flow,name),color=typeof bindingIdentityColor==='function'
         ?bindingIdentityColor(name,'variable'):'#6fb7ff';
@@ -883,7 +898,7 @@ function coSchedulePlaybackTrail(item,flow){
       frame.writes.forEach(name=>{
         const memory=coPlaybackMemoryCard(flow,name),color=typeof bindingIdentityColor==='function'
           ?bindingIdentityColor(name,'variable'):'#ffa35c';
-        coRunPlaybackTrail(source,memory,color,Math.max(80,stepMs*.5));
+        coRunPlaybackTrail(source,memory,color,completionMemoryMs||Math.max(80,stepMs*.5));
       });
       if(frame.consoleActive&&!frame.printedText){
         const consolePanel=flow.querySelector('.student-state .program-output-screen');
@@ -941,6 +956,24 @@ async function coLoad(){
   const unique=new Map(profiles.map(p=>[soManifestUrl(p,state.language),p]));
   await Promise.all([...unique.values()].map(p=>soFetchExerciseBank(p,state.language)));
 }
+// Public presentation capability shared with activities that execute an
+// editable source program. Consumers depend on this frozen surface rather
+// than reaching into Code Ordering's private implementation details.
+const CODE_ORDERING_PLAYBACK_CAPABILITY=Object.freeze({
+  applyAction:coApplyAction,
+  currentFrame:coCurrentPlaybackFrame,
+  discard:coDiscardPlayback,
+  executionError:coExecutionErrorStrip,
+  mountFlowHighlight:coMountFlowHighlight,
+  mountFlowTrail:coMountFlowTrail,
+  playbackControls:coPlaybackControls,
+  run:coRun,
+  schedule:coSchedulePlayback,
+  scheduleTrail:coSchedulePlaybackTrail,
+  score:coScore,
+  stateColumn:coWorkspaceStateColumn,
+  syncFeedback:coSyncFeedback
+});
 registerActivityPlugin({id:'code-ordering',manifest:CODE_ORDERING_MANIFEST,loadContent:coLoad,
   itemCount({profile,language}){return soCatalog(profile,language).length;},maxPoints({item}){return coTotal(item.answerKey);},
   validateProfile:coValidate,generateItem:coGenerateItem,render:coRender,applyAction:coApplyAction,check:coCheck,

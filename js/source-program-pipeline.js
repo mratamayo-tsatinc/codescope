@@ -335,7 +335,8 @@ function sourceProgramParseExercise(spec){
   spec=spec||{};const filename=spec.filename||'source',language=String(spec.language||'c').toLowerCase();
   const authored=spec.details||sourceProgramMetadataAndSource(spec.raw,filename);
   const materialized=sourceProgramMaterializeSource(authored,language,filename,spec.sourceValueMode||'authored',spec.randomInteger);
-  const coreProgramResult=coreParseProgram({language,source:materialized.source,filename,inputValues:spec.inputValues||{}});
+  const coreProgramResult=coreParseProgram({language,source:materialized.source,filename,inputValues:spec.inputValues||{},
+    maxLoopIterations:spec.maxLoopIterations,detectLoopCycles:spec.detectLoopCycles===true});
   return Object.assign({},authored,{templateSource:authored.source,source:materialized.source,
     sourceValueMode:spec.sourceValueMode||'authored',seedValues:materialized.seedValues,
     seedDirectives:materialized.directives,lines:materialized.source.split('\n'),coreProgramResult,

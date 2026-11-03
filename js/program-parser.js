@@ -291,7 +291,12 @@ function coreExecuteParsedProgram(spec){
     binding&&typeof binding==='object'&&!Array.isArray(binding)
       ?Object.assign({},binding,{value:Array.isArray(binding.value)?binding.value.slice():binding.value})
       :binding]));
-  const loopVisits=new Map();
+  const loopVisits=new Map(),loopStateSignatures=new Map();
+  const maxLoopIterations=Number.isInteger(spec.maxLoopIterations)&&spec.maxLoopIterations>0
+    ?spec.maxLoopIterations:null;
+  const loopStateSignature=(statement)=>JSON.stringify([statement.id,...Object.keys(memory).sort().map(name=>{
+    const binding=memory[name];return [name,binding&&typeof binding==='object'?binding.value:binding];
+  })]);
   let current=statements[0]||null,steps=0;
   while(current&&current.id!=='$end'){
     if(++steps>10000){
@@ -299,6 +304,19 @@ function coreExecuteParsedProgram(spec){
       break;
     }
     const before=snapshotMemory();
+    if(spec.detectLoopCycles===true&&current.kind==='loop'&&current.loopKind!=='do'){
+      const signature=loopStateSignature(current),seen=loopStateSignatures.get(current.id)||new Set();
+      if(seen.has(signature)){
+        diagnostics.push(coreProgramDiagnostic('This loop returned to the same program state and will continue repeating',
+          rowFor(current),filename,'PROGRAM_LOOP_CYCLE'));
+        executionFrames.push({index:executionFrames.length,statementId:current.id,statementKind:current.kind,
+          sourceLine:current.sourceLine||1,sourceEndLine:current.sourceEndLine||current.sourceLine||1,
+          sourceText:current.sourceText||'',memoryBefore:before,memoryAfter:before,effects:[],trace:[],
+          nextStatementId:null,error:'Repeating loop state detected'});
+        break;
+      }
+      seen.add(signature);loopStateSignatures.set(current.id,seen);
+    }
     try{
       if(!memoryBeforeByStatementId[current.id])memoryBeforeByStatementId[current.id]=[];
       memoryBeforeByStatementId[current.id].push(before);
@@ -340,6 +358,15 @@ function coreExecuteParsedProgram(spec){
           sourceLine:current.sourceLine||1,sourceEndLine:current.sourceEndLine||current.sourceLine||1,
           sourceText:current.sourceText||'',memoryBefore:before,memoryAfter:snapshotMemory(),
           effects:statementEffects,trace:statementTrace,nextStatementId:nextId,error:null});
+      const conditionStep=statementTrace.find(step=>step.action==='LOOP_CONDITION');
+      if(maxLoopIterations&&current.kind==='loop'&&current.loopKind!=='do'&&conditionStep&&conditionStep.value===true){
+        const visits=(loopVisits.get('guard:'+current.id)||0)+1;loopVisits.set('guard:'+current.id,visits);
+        if(visits>=maxLoopIterations){
+          const diagnostic=coreProgramDiagnostic(`Loop did not terminate within ${maxLoopIterations} iterations`,
+            rowFor(current),filename,'PROGRAM_LOOP_LIMIT');
+          diagnostics.push(diagnostic);executionFrames[executionFrames.length-1].error=diagnostic.message;break;
+        }
+      }
       current=nextId==='$end'?null:(byId.get(nextId)||null);
     }catch(error){
       const diagnostic=coreProgramDiagnostic(error,rowFor(current),filename,'PROGRAM_STATE_UNAVAILABLE');
@@ -394,7 +421,8 @@ function parseCoreProgram(request){
   });
   if(!statements.length) return {ir:null,diagnostics,dependencies:[],effects,trace};
   const controlFlow=coreBuildProgramControlFlow({source,language,filename,statements,symbols:memory});
-  const executed=coreExecuteParsedProgram({source,language,filename,statements,symbols:request.symbols});
+  const executed=coreExecuteParsedProgram({source,language,filename,statements,symbols:request.symbols,
+    maxLoopIterations:request.maxLoopIterations,detectLoopCycles:request.detectLoopCycles===true});
   const dependencies=[...new Set(statements.flatMap(statement=>statement.dependencies||[]))];
   return {ir:languageCoreProgramIr({language,source,statements,metadata:{filename,
       statementRows:rows.map(row=>Object.assign({},row)),expectedMemory:executed.memory,

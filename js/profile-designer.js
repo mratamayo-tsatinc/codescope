@@ -8,6 +8,7 @@ const PROFILE_DESIGNER_KINDS=Object.freeze([
   {id:'trace-source',label:'Trace source program'},
   {id:'simulate-output',label:'Simulate source program'},
   {id:'code-ordering',label:'Code ordering'},
+  {id:'code-completion',label:'Code completion'},
   {id:'bug-catcher',label:'Bug catcher'},
   {id:'token-classification',label:'Token classification'},
   {id:'falling-token-sort',label:'Falling token sort'},
@@ -312,6 +313,14 @@ function deleteProfileDesignerCategory(category){
 function profileDesignerDefaultProfile(id){return {enabled:true,meta:{id,name:'New Profile',description:''},
   shape:{operandSources:{literal:2},operandRange:{min:1,max:20},allowNegativeOperands:false},operators:{allowed:['+','-']},
   template:'operand op operand',scoring:{itemCount:5,pointsPerItem:1},behavior:profileDesignerClone(DEFAULT_PROFILE_BEHAVIOR)};}
+function profileDesignerDefaultCompletionProfile(id){return {enabled:true,meta:{id,name:'New Code Completion Profile',description:''},
+  scoring:{itemCount:5,pointsPerItem:'generated-answer'},content:{values:{variables:'seeded',input:'seeded'}},
+  activity:{kind:'code-completion',instructions:'Complete the missing code, run the program, and reproduce the target state.',
+    generator:{library:'source-programs',exerciseSet:'loop-completion-basics',shuffle:true},
+    completion:{targets:[{role:'loop-update'}]},
+    assessment:{equivalence:{output:{required:true,showTarget:true},memory:{required:false}}},
+    execution:{loopGuard:{maxIterations:16,detectCycles:true}}},presentation:{flowTrail:true},
+  behavior:profileDesignerClone(DEFAULT_PROFILE_BEHAVIOR)};}
 function addProfileDesignerProfile(){
   const category=profileDesignerCategory();if(!category){profileDesignerSetStatus('Add a category before adding a profile.','error');return;}
   const used=new Set(profileDesignerDraft.profiles.map(row=>row.meta&&row.meta.id)),id=profileDesignerUniqueId('new-profile',used),profile=profileDesignerDefaultProfile(id);
@@ -336,8 +345,10 @@ function changeProfileDesignerKind(profile,kind){
   const identity={enabled:profile.enabled!==false,meta:profileDesignerClone(profile.meta),scoring:profileDesignerClone(profile.scoring||{}),
     behavior:profileDesignerClone(profile.behavior||DEFAULT_PROFILE_BEHAVIOR)};
   const template=PROFILES_RAW.find(candidate=>profileDesignerKind(candidate)===kind);
-  let replacement=template?profileDesignerClone(template):profileDesignerDefaultProfile(identity.meta.id);
+  let replacement=template?profileDesignerClone(template):(kind==='code-completion'
+    ?profileDesignerDefaultCompletionProfile(identity.meta.id):profileDesignerDefaultProfile(identity.meta.id));
   replacement.enabled=identity.enabled;replacement.meta=identity.meta;replacement.scoring=identity.scoring;replacement.behavior=identity.behavior;
+  if(kind==='code-completion')replacement.scoring.pointsPerItem='generated-answer';
   const index=profileDesignerDraft.profiles.indexOf(profile);profileDesignerDraft.profiles[index]=replacement;renderProfileDesigner();
 }
 

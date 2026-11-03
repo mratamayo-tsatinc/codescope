@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "id": "c-java-loop-completion",
+  "name": "C and Java: Loop Completion",
+  "version": "1",
+  "description": "An isolated Code Completion set for focused loop initialization, condition, and update practice using existing seeded C and Java exercises.",
+  "session": {
+    "language": "c",
+    "availableLanguages": ["c", "java"],
+    "timing": {"allowReset": true, "enabled": false, "minutes": 120},
+    "persistence": {"enabled": true},
+    "results": {"unified": false}
+  },
+  "categories": [
+    {
+      "id": "loop-completion",
+      "name": "Complete Loop Logic",
+      "enabled": true,
+      "profileIds": [
+        "completion-initial-value",
+        "completion-condition-operator",
+        "completion-condition-boundary",
+        "completion-update",
+        "completion-loop-control"
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "enabled": true,
+      "meta": {"id": "completion-initial-value", "name": "Complete the Initial Value", "description": "Supply the loop control variable's starting value and reproduce the visible target output."},
+      "scoring": {"itemCount": 6, "pointsPerItem": "generated-answer"},
+      "content": {"values": {"variables": "seeded", "input": "seeded"}},
+      "activity": {
+        "kind": "code-completion",
+        "instructions": "Complete the initial value, then run the program and reproduce the target screen state.",
+        "generator": {"library": "source-programs", "exerciseSet": "loop-completion-basics", "shuffle": true},
+        "completion": {"targets": [{"role": "loop-initializer-value"}]},
+        "assessment": {"equivalence": {"output": {"required": true, "showTarget": true}, "memory": {"required": false}}},
+        "execution": {"loopGuard": {"maxIterations": 16, "detectCycles": true}}
+      },
+      "presentation": {"flowTrail": true},
+      "behavior": {"interactionMode": "guided", "allowUndo": false, "allowRetry": true, "allowReviewFlags": true, "showNeutralGuidance": true, "showScores": true, "feedbackRelease": "immediate", "lockItemAfterCheck": false, "showCorrectSolution": true, "manualResponses": {"mode": "automatic", "namedValueRate": 0, "operatorRate": 0}}
+    },
+    {
+      "enabled": true,
+      "meta": {"id": "completion-condition-operator", "name": "Complete the Condition Operator", "description": "Choose the comparison operator that makes the loop reproduce the target output."},
+      "scoring": {"itemCount": 6, "pointsPerItem": "generated-answer"},
+      "content": {"values": {"variables": "seeded", "input": "seeded"}},
+      "activity": {
+        "kind": "code-completion",
+        "instructions": "Complete the comparison operator, then run the program and reproduce the target screen state.",
+        "generator": {"library": "source-programs", "exerciseSet": "loop-completion-basics", "shuffle": true},
+        "completion": {"targets": [{"role": "loop-condition-operator"}]},
+        "assessment": {"equivalence": {"output": {"required": true, "showTarget": true}, "memory": {"required": false}}},
+        "execution": {"loopGuard": {"maxIterations": 16, "detectCycles": true}}
+      },
+      "presentation": {"flowTrail": true},
+      "behavior": {"interactionMode": "guided", "allowUndo": false, "allowRetry": true, "allowReviewFlags": true, "showNeutralGuidance": true, "showScores": true, "feedbackRelease": "immediate", "lockItemAfterCheck": false, "showCorrectSolution": true, "manualResponses": {"mode": "automatic", "namedValueRate": 0, "operatorRate": 0}}
+    },
+    {
+      "enabled": true,
+      "meta": {"id": "completion-condition-boundary", "name": "Complete the Condition Boundary", "description": "Supply the comparison boundary and match both the screen and final loop-control state."},
+      "scoring": {"itemCount": 6, "pointsPerItem": "generated-answer"},
+      "content": {"values": {"variables": "seeded", "input": "seeded"}},
+      "activity": {
+        "kind": "code-completion",
+        "instructions": "Complete the condition boundary, then reproduce the target screen and loop-control value.",
+        "generator": {"library": "source-programs", "exerciseSet": "loop-completion-basics", "shuffle": true},
+        "completion": {"targets": [{"role": "loop-condition-boundary"}]},
+        "assessment": {"equivalence": {"output": {"required": true, "showTarget": true}, "memory": {"required": true, "showTarget": true, "variables": {"select": "loop-control"}}}},
+        "execution": {"loopGuard": {"maxIterations": 16, "detectCycles": true}}
+      },
+      "presentation": {"flowTrail": true},
+      "behavior": {"interactionMode": "guided", "allowUndo": false, "allowRetry": true, "allowReviewFlags": true, "showNeutralGuidance": true, "showScores": true, "feedbackRelease": "immediate", "lockItemAfterCheck": false, "showCorrectSolution": true, "manualResponses": {"mode": "automatic", "namedValueRate": 0, "operatorRate": 0}}
+    },
+    {
+      "enabled": true,
+      "meta": {"id": "completion-update", "name": "Complete the Update", "description": "Supply the increment, decrement, or step operation and reproduce the target program state."},
+      "scoring": {"itemCount": 6, "pointsPerItem": "generated-answer"},
+      "content": {"values": {"variables": "seeded", "input": "seeded"}},
+      "activity": {
+        "kind": "code-completion",
+        "instructions": "Complete the loop update, then reproduce the target screen and loop-control value.",
+        "generator": {"library": "source-programs", "exerciseSet": "loop-completion-basics", "shuffle": true},
+        "completion": {"targets": [{"role": "loop-update"}]},
+        "assessment": {"equivalence": {"output": {"required": true, "showTarget": true}, "memory": {"required": true, "showTarget": true, "variables": {"select": "loop-control"}}}},
+        "execution": {"loopGuard": {"maxIterations": 16, "detectCycles": true}}
+      },
+      "presentation": {"flowTrail": true},
+      "behavior": {"interactionMode": "guided", "allowUndo": false, "allowRetry": true, "allowReviewFlags": true, "showNeutralGuidance": true, "showScores": true, "feedbackRelease": "immediate", "lockItemAfterCheck": false, "showCorrectSolution": true, "manualResponses": {"mode": "automatic", "namedValueRate": 0, "operatorRate": 0}}
+    },
+    {
+      "enabled": true,
+      "meta": {"id": "completion-loop-control", "name": "Complete the Loop Control", "description": "Complete the initialization, full condition, and update while matching both target states."},
+      "scoring": {"itemCount": 5, "pointsPerItem": "generated-answer"},
+      "content": {"values": {"variables": "seeded", "input": "seeded"}},
+      "activity": {
+        "kind": "code-completion",
+        "instructions": "Complete all three loop-control parts, then reproduce the target screen and final loop-control value.",
+        "generator": {"library": "source-programs", "exerciseSet": "loop-completion-basics", "shuffle": true},
+        "completion": {"targets": [{"role": "loop-initializer-value"}, {"role": "loop-condition"}, {"role": "loop-update"}]},
+        "assessment": {"equivalence": {"output": {"required": true, "showTarget": true}, "memory": {"required": true, "showTarget": true, "variables": {"select": "loop-control"}}}},
+        "execution": {"loopGuard": {"maxIterations": 16, "detectCycles": true}}
+      },
+      "presentation": {"flowTrail": true},
+      "behavior": {"interactionMode": "guided", "allowUndo": false, "allowRetry": true, "allowReviewFlags": true, "showNeutralGuidance": true, "showScores": true, "feedbackRelease": "immediate", "lockItemAfterCheck": false, "showCorrectSolution": true, "manualResponses": {"mode": "automatic", "namedValueRate": 0, "operatorRate": 0}}
+    }
+  ]
+}

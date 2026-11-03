@@ -1,0 +1,11 @@
+{
+  "title": "Java - Loop Completion Basics",
+  "exercises": [
+    "WhileCountUp.java",
+    "WhileCountDown.java",
+    "DoWhileCountUp.java",
+    "DoWhileStepByTwo.java",
+    "ForCountUp.java",
+    "ForStepByTwo.java"
+  ]
+}
