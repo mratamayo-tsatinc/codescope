@@ -166,6 +166,61 @@ const strictSequence=JSON.parse(evaluate(`(()=>{const item=csBuildItem({id:'loop
   return JSON.stringify({canonical:item.canonicalStatementIds,actual:item.program.statements.map(statement=>statement.id)});})()`));
 assert.deepStrictEqual(strictSequence.canonical,strictSequence.actual,'strict trace must follow every unrolled loop frame');
 
+function parseControlFlowTrace(relative,filename){
+  context.controlFlowRaw=fs.readFileSync(path.join(ROOT,'exercise-libraries','source-programs','c',relative,filename),'utf8');
+  context.controlFlowFilename=filename;
+  return JSON.parse(evaluate(`(()=>{const parsed=csParseExercise({filename:controlFlowFilename,raw:controlFlowRaw},'c','authored');
+    const frames=parsed.coreProgram.metadata.executionFrames||[];
+    return JSON.stringify({frameCount:frames.filter(frame=>!frame.error).length,
+      frameKinds:frames.map(frame=>frame.statementKind),statements:parsed.statements.map(statement=>({
+      id:statement.id,kind:statement.kind,line:statement.sourceLine,forPhase:statement.forPhase||null,
+      nextStatementId:statement.nextStatementId,
+      branchTargets:(statement.branches||[]).map(branch=>branch.nextStatementId)}))});})()`));
+}
+function traceKindCount(trace,kind){return trace.statements.filter(statement=>statement.kind===kind).length;}
+function frameKindCount(trace,kind){return trace.frameKinds.filter(candidate=>candidate===kind).length;}
+function assertEveryCanonicalFrameIsTraceable(trace,label){
+  assert.strictEqual(trace.statements.length,trace.frameCount,label+' must materialize every canonical execution frame');
+}
+
+const continueTrace=parseControlFlowTrace('final-exam-trace','delta.c');
+assertEveryCanonicalFrameIsTraceable(continueTrace,'for-loop continue trace');
+assert.strictEqual(traceKindCount(continueTrace,'selection'),frameKindCount(continueTrace,'selection'),
+  'loop trace must retain every selection frame');
+assert.strictEqual(traceKindCount(continueTrace,'program-continue'),frameKindCount(continueTrace,'program-continue'),
+  'loop trace must retain every continue frame');
+const continueIndex=continueTrace.statements.findIndex(statement=>statement.kind==='program-continue');
+assert(continueIndex>=0&&continueTrace.statements[continueIndex+1].forPhase==='update',
+  'for-loop continue must advance to the for update');
+continueTrace.statements.filter(statement=>statement.kind==='selection').forEach(statement=>{
+  assert(statement.branchTargets.length>=1,'selection trace must retain its branches');
+  assert(statement.branchTargets.every(target=>target===statement.nextStatementId),
+    'unrolled selection branches must target the concrete next execution frame');
+});
+
+const selectionTrace=parseControlFlowTrace('final-exam-simulate','hotel.c');
+assertEveryCanonicalFrameIsTraceable(selectionTrace,'selection-in-loop trace');
+assert.strictEqual(traceKindCount(selectionTrace,'selection'),frameKindCount(selectionTrace,'selection'),
+  'selection-in-loop trace must retain every canonical branch decision');
+
+const nestedContinueTrace=parseControlFlowTrace('final-exam-simulate','juliett.c');
+assertEveryCanonicalFrameIsTraceable(nestedContinueTrace,'nested continue trace');
+assert.strictEqual(traceKindCount(nestedContinueTrace,'program-continue'),frameKindCount(nestedContinueTrace,'program-continue'),
+  'nested-loop trace must retain every continue frame');
+nestedContinueTrace.statements.forEach((statement,index)=>{
+  if(statement.kind==='program-continue')assert(nestedContinueTrace.statements[index+1].line===12
+    &&nestedContinueTrace.statements[index+1].forPhase==='update',
+    'nested continue must advance to the inner for-loop update');
+});
+
+const nestedBreakTrace=parseControlFlowTrace('final-exam-completion','oscar.c');
+assertEveryCanonicalFrameIsTraceable(nestedBreakTrace,'nested break trace');
+nestedBreakTrace.statements.forEach((statement,index)=>{
+  if(statement.kind==='program-break')assert(nestedBreakTrace.statements[index+1].line===8
+    &&nestedBreakTrace.statements[index+1].forPhase==='update',
+    'nested break must exit the inner loop and advance to the outer for-loop update');
+});
+
 class TestNode{
   constructor(tag,text=''){this.tagName=tag;this._text=text;this.children=[];this.attributes={};this.className='';}
   appendChild(child){this.children.push(child);return child;}

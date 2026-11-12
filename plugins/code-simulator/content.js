@@ -76,6 +76,26 @@ function csBuildLoopFrame(coreStatement,frame,frameIndex,lines,kinds,dataTypes,l
   return statement;
 }
 
+function csBuildSelectionFrame(coreStatement,frame,frameIndex,lines,kinds,dataTypes,language){
+  const statement=Object.assign({},coreStatement,{id:`selection-frame-${frameIndex+1}`,
+    branches:(coreStatement.branches||[]).map(branch=>Object.assign({},branch))});
+  return csBuildSelection(statement.id,statement.selectionKind,statement,frame.sourceLine-1,lines,
+    csRuntimeMemoryValues(frame.memoryBefore||{}),kinds,statement.branches,dataTypes,language);
+}
+
+function csBuildInputFrame(coreStatement,frame,frameIndex,inputDefinitions,filename){
+  const reads=coreStatement.reads.map(read=>{
+    const definition=inputDefinitions.find(candidate=>candidate.target===read.target);
+    if(!definition)throw new Error(`${filename}:${frame.sourceLine}: input target '${read.target}' has no matching @input metadata`);
+    return Object.assign({},read,{expectedRaw:String(definition.materializedRaw),
+      expectedValue:definition.materializedValue});
+  });
+  const rawInput=coreStatement.inputSyntax==='c'
+    ?coreInputRawText(coreStatement.format,reads,`${filename}:${frame.sourceLine}`):reads[0].expectedRaw;
+  return programInputStatement(Object.assign({},coreStatement,
+    {id:`input-frame-${frameIndex+1}`,reads,rawInput}));
+}
+
 function csBuildForControlFrame(coreStatement,frame,frameIndex,kinds,dataTypes,language){
   const phase=frame.forPhase||frame.phase,control=phase==='initialize'?coreStatement.initializer:coreStatement.update;
   if(!control)throw new Error(`for source:${frame.sourceLine}: missing ${phase} statement`);
@@ -102,7 +122,7 @@ function csBuildForControlFrame(coreStatement,frame,frameIndex,kinds,dataTypes,l
   return statement;
 }
 
-function csBuildExecutedLoopStatements(coreProgram,lines,kinds,dataTypes,language,supported){
+function csBuildExecutedLoopStatements(coreProgram,lines,kinds,dataTypes,language,supported,inputDefinitions,filename){
   const frames=coreProgram&&coreProgram.metadata&&coreProgram.metadata.executionFrames||[];
   const canonical=coreProgram&&coreProgram.statements||[];
   if(!canonical.some(statement=>statement.kind==='loop')||!frames.length)return null;
@@ -117,6 +137,10 @@ function csBuildExecutedLoopStatements(coreProgram,lines,kinds,dataTypes,languag
       &&(frame.forPhase==='initialize'||frame.forPhase==='update'))
       statement=csBuildForControlFrame(coreStatement,frame,frameIndex,kinds,dataTypes,language);
     else if(coreStatement.kind==='loop')statement=csBuildLoopFrame(coreStatement,frame,frameIndex,lines,kinds,dataTypes,language);
+    else if(coreStatement.kind==='selection')statement=csBuildSelectionFrame(coreStatement,frame,frameIndex,
+      lines,kinds,dataTypes,language);
+    else if(coreStatement.kind==='input')statement=csBuildInputFrame(coreStatement,frame,frameIndex,
+      inputDefinitions,filename);
     else if(coreStatement.kind==='declaration'){
       statement=Object.assign({},coreStatement,{id:`declaration-frame-${frameIndex+1}`});
       statement.binding=Object.assign({},coreStatement.binding,{kind:coreStatement.binding.mutable===false?'constant':'variable'});
@@ -137,7 +161,9 @@ function csBuildExecutedLoopStatements(coreProgram,lines,kinds,dataTypes,languag
       statement=buildOutputStatementRuntime(coreStatement,frameIndex,memory);statement.id=`output-frame-${frameIndex+1}`;
     }else if(coreStatement.kind==='program-return')statement=Object.assign({},coreStatement,{id:`return-frame-${frameIndex+1}`,runtime:{checked:false}});
     else if(coreStatement.kind==='program-break')statement=Object.assign({},coreStatement,{id:`break-frame-${frameIndex+1}`,runtime:{checked:false}});
-    if(!statement)return;
+    else if(coreStatement.kind==='program-continue')statement=Object.assign({},coreStatement,
+      {id:`continue-frame-${frameIndex+1}`,runtime:{checked:false}});
+    if(!statement)throw new Error(`${filename}:${line}: Trace does not support canonical statement kind '${coreStatement.kind}'`);
     statement.sourceSpan=coreStatement.sourceSpan;statement.sourceLine=line;
     statement.sourceEndLine=frame.sourceEndLine||line;statement.sourceText=lines[line-1]||frame.sourceText||'';
     statement.sourceIndent=(statement.sourceText.match(/^\s*/)||[''])[0];
@@ -147,7 +173,15 @@ function csBuildExecutedLoopStatements(coreProgram,lines,kinds,dataTypes,languag
     if(!support.statementIds.includes(statement.id))support.statementIds.push(statement.id);
     supported.set(line,support);
   });
-  statements.forEach((statement,index)=>statement.nextStatementId=statements[index+1]?statements[index+1].id:'$end');
+  statements.forEach((statement,index)=>{
+    const nextStatementId=statements[index+1]?statements[index+1].id:'$end';
+    statement.nextStatementId=nextStatementId;
+    // The unrolled trace contains the one branch taken by canonical execution.
+    // Point every evaluated selection outcome at that concrete next frame so a
+    // learner response can never reuse a static graph id from another iteration.
+    if(statement.kind==='selection')statement.branches=(statement.branches||[]).map(branch=>
+      Object.assign({},branch,{nextStatementId,targetStatementId:nextStatementId}));
+  });
   return statements;
 }
 
@@ -214,7 +248,9 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
       declarationsByLine.set(index+1,entries);return;
     }
     if(coreStatement&&coreStatement.kind==='input'){
-      coreStatement.reads.forEach(read=>{const definition=inputDefinitions.find(candidate=>candidate.target===read.target);
+      coreStatement.reads.forEach(read=>{const definition=hasLoops
+          ?programInputClaimDefinition(inputDefinitions,read.target,exercise.filename,index+1)
+          :inputDefinitions.find(candidate=>candidate.target===read.target);
         if(definition)memory[read.target]=definition.materializedValue;});
       return;
     }
@@ -226,7 +262,7 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
   });
   let selectionIndex=0;
   const executionMemoryBefore=coreProgramResult.ir.metadata&&coreProgramResult.ir.metadata.executionMemoryBefore||{};
-  coreProgramResult.ir.statements.filter(statement=>statement.kind==='selection').forEach(coreStatement=>{
+  coreProgramResult.ir.statements.filter(statement=>!hasLoops&&statement.kind==='selection').forEach(coreStatement=>{
     const index=coreStatement.sourceLine-1;
     const snapshots=executionMemoryBefore[coreStatement.id]||[];
     const conditionMemory=snapshots[0]||memory;
@@ -310,7 +346,8 @@ function csParseExercise(exercise,language,sourceValueMode='authored',inputValue
   const expectedMemory=coreProgramResult.ir.metadata&&coreProgramResult.ir.metadata.expectedMemory||{};
   Object.keys(memory).forEach(name=>delete memory[name]);Object.assign(memory,csRuntimeMemoryValues(expectedMemory));
   statements.sort((left,right)=>left.sourceLine-right.sourceLine);
-  const executedLoopStatements=csBuildExecutedLoopStatements(coreProgramResult.ir,lines,kinds,dataTypes,language,supported);
+  const executedLoopStatements=csBuildExecutedLoopStatements(coreProgramResult.ir,lines,kinds,dataTypes,language,
+    supported,inputDefinitions,exercise.filename);
   if(executedLoopStatements){
     statements.length=0;statements.push(...executedLoopStatements);
   }
