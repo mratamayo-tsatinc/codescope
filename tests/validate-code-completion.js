@@ -169,4 +169,82 @@ const guards=JSON.parse(evaluate(`(()=>{const parse=source=>sourceProgramParseEx
 assert(guards.cycle.includes('PROGRAM_LOOP_CYCLE'));
 assert(guards.limit.includes('PROGRAM_LOOP_LIMIT'));
 
+context.validSyntaxSource=`#include <stdio.h>
+int main(void) {
+  int i = 0;
+  while (i >= 0) {
+    i++;
+  }
+  return 0;
+}`;
+context.invalidCSyntaxSource=`#include <stdio.h>
+int main(void) {
+  int i = 0;
+  for (i = 0; i < < 3; i++) {
+    printf("%d\\n", i);
+  }
+  return 0;
+}`;
+context.invalidJavaSyntaxSource=`class Broken {
+  public static void main(String[] args) {
+    int i = 0;
+    i +;
+  }
+}`;
+const syntaxGate=JSON.parse(evaluate(`(()=>{
+  const check=(raw,filename,language)=>sourceProgramCanonicalSyntaxCheck({raw,filename,language,
+    sourceValueMode:'authored',inputValues:{}});
+  const valid=check(validSyntaxSource,'Valid.c','c');
+  const invalidC=check(invalidCSyntaxSource,'Broken.c','c');
+  const invalidJava=check(invalidJavaSyntaxSource,'Broken.java','java');
+  return JSON.stringify({valid:{ok:valid.ok,frames:valid.result&&valid.result.ir.metadata.executionFrames.length},
+    invalidC:{ok:invalidC.ok,line:invalidC.line,message:invalidC.message,
+      frames:invalidC.result&&invalidC.result.ir&&invalidC.result.ir.metadata.executionFrames.length},
+    invalidJava:{ok:invalidJava.ok,line:invalidJava.line,message:invalidJava.message,
+      frames:invalidJava.result&&invalidJava.result.ir&&invalidJava.result.ir.metadata.executionFrames.length}});
+})()`));
+assert.deepStrictEqual(syntaxGate.valid,{ok:true,frames:0},'syntax checking must not execute a valid program');
+assert.strictEqual(syntaxGate.invalidC.ok,false,'invalid C must be rejected before simulation');
+assert.strictEqual(syntaxGate.invalidJava.ok,false,'invalid Java must be rejected before simulation');
+assert(Number.isInteger(syntaxGate.invalidC.line)&&Number.isInteger(syntaxGate.invalidJava.line),
+  'syntax feedback must identify the source line');
+assert(syntaxGate.invalidC.message.length>20&&syntaxGate.invalidJava.message.length>20,
+  'syntax feedback must provide a student-readable explanation');
+assert.strictEqual(syntaxGate.invalidC.frames,0,'invalid C must produce no execution frames');
+assert.strictEqual(syntaxGate.invalidJava.frames,0,'invalid Java must produce no execution frames');
+let centralGateError='';
+try{evaluate(`sourceProgramParseExercise({raw:invalidCSyntaxSource,filename:'CentralGate.c',language:'c'})`);}
+catch(error){centralGateError=String(error.message||error);}
+assert(/canonical syntax check failed.*line/i.test(centralGateError),
+  'the shared source simulation pipeline must reject invalid syntax before execution');
+assert(orderingSource.includes('sourceProgramCanonicalSyntaxCheck(request)')
+  &&orderingSource.includes("failureKind:'syntax'")
+  &&orderingSource.includes("label=syntax?'Syntax check':'Run stopped'"),
+  'student-triggered playback must use the canonical syntax gate and labeled visual feedback');
+assert(pluginSource.includes("row.classList.add('has-execution-error')")
+  &&pluginSource.includes('Syntax or execution error on line'),
+  'code completion must visually identify the rejected source line');
+
+const gateContext=vm.createContext({console,structuredClone:global.structuredClone,setTimeout(){return 1;},clearTimeout(){}});
+const gateLoad=relative=>vm.runInContext(fs.readFileSync(path.join(ROOT,relative),'utf8'),gateContext,
+  {filename:path.join(ROOT,relative)});
+[
+  'js/engine.js','js/flat-model.js','js/template-engine.js','js/profile-vocabulary.js','js/generator.js',
+  'js/program-ir.js','js/language-core.js','js/expression-parser.js','js/expression-semantics.js',
+  'js/output-statement-core.js','js/input-statement-core.js','js/selection-statement-core.js','js/loop-statement-core.js',
+  'js/statement-parser.js','js/statement-semantics.js','js/program-parser.js','js/source-program-pipeline.js',
+  'plugins/simulate-output/generator.js'
+].forEach(gateLoad);
+Object.assign(gateContext,{registerActivityPlugin:plugin=>plugin,profileVariableValueMode:()=> 'seeded',
+  profileInputValueMode:()=> 'seeded',profileLocksCheckedItems:()=>true,roundPoints:value=>value});
+gateLoad('plugins/code-ordering/plugin.js');gateContext.studentSyntaxSource=context.invalidCSyntaxSource;
+const rejectedStudentRun=JSON.parse(vm.runInContext(`JSON.stringify(coRun({source:studentSyntaxSource,
+  orderLines:[],order:[],filename:'Student.c',language:'c',inputs:[],
+  executionGuard:{maxLoopIterations:8,detectCycles:true}}))`,gateContext));
+assert.strictEqual(rejectedStudentRun.ok,false);
+assert.strictEqual(rejectedStudentRun.failureKind,'syntax');
+assert.strictEqual(rejectedStudentRun.line,4);
+assert.strictEqual(rejectedStudentRun.frames.length,0,'student syntax errors must never reach execution playback');
+assert(/values and operators/i.test(rejectedStudentRun.message),'student run must receive actionable feedback');
+
 console.log(`Code Completion validated ${checked} seeded C/Java profile-source combinations, ${generated} generated login items including the authored-value final exam, and both loop guards.`);

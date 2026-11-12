@@ -335,6 +335,16 @@ function sourceProgramParseExercise(spec){
   spec=spec||{};const filename=spec.filename||'source',language=String(spec.language||'c').toLowerCase();
   const authored=spec.details||sourceProgramMetadataAndSource(spec.raw,filename);
   const materialized=sourceProgramMaterializeSource(authored,language,filename,spec.sourceValueMode||'authored',spec.randomInteger);
+  if(spec.syntaxChecked!==true){
+    const syntax=coreParseProgram({language,source:materialized.source,filename,inputValues:spec.inputValues||{},
+      validationMode:'syntax'});
+    const diagnostic=(syntax.diagnostics||[])[0];
+    if(!syntax.ir||diagnostic){
+      const line=diagnostic&&diagnostic.location&&diagnostic.location.start&&diagnostic.location.start.line;
+      const message=diagnostic&&diagnostic.message||'No executable statement was found.';
+      throw new Error(`${filename}: canonical syntax check failed${line?` on line ${line}`:''}: ${message}`);
+    }
+  }
   const coreProgramResult=coreParseProgram({language,source:materialized.source,filename,inputValues:spec.inputValues||{},
     maxLoopIterations:spec.maxLoopIterations,detectLoopCycles:spec.detectLoopCycles===true});
   return Object.assign({},authored,{templateSource:authored.source,source:materialized.source,
@@ -342,6 +352,49 @@ function sourceProgramParseExercise(spec){
     seedDirectives:materialized.directives,lines:materialized.source.split('\n'),coreProgramResult,
     statementsByLine:new Map((coreProgramResult.ir&&coreProgramResult.ir.statements||[])
       .map(statement=>[statement.sourceSpan.start.line,statement]))});
+}
+
+function sourceProgramFriendlySyntaxMessage(diagnostic,language){
+  const raw=String(diagnostic&&diagnostic.message||'The source code is incomplete or invalid.');
+  const label=String(language||'c').toLowerCase()==='java'?'Java':'C';
+  if(/__CODE_COMPLETION_MISSING__/.test(raw))return 'Complete every blank before running the program.';
+  if(/used before it is initialized|unknown identifier|undeclared|not declared/i.test(raw))
+    return `Check the variable name on this line and make sure it was declared earlier. ${raw}`;
+  if(/parenthes|expected.*\)|missing.*\)/i.test(raw))
+    return `Check the parentheses on this line. ${raw}`;
+  if(/operator|expression|operand/i.test(raw))
+    return `Check the values and operators in this expression. ${raw}`;
+  if(/statement|syntax|parse|unsupported|expected/i.test(raw))
+    return `This line is not valid ${label} syntax. ${raw}`;
+  return `The canonical ${label} checker could not accept this line. ${raw}`;
+}
+
+// Student-authored source must pass the same language-core parser and control-
+// flow builder as canonical execution before any execution frames are created.
+function sourceProgramCanonicalSyntaxCheck(spec){
+  spec=spec||{};const filename=spec.filename||'source',language=String(spec.language||'c').toLowerCase();
+  try{
+    const authored=spec.details||sourceProgramMetadataAndSource(spec.raw,filename);
+    const materialized=sourceProgramMaterializeSource(authored,language,filename,spec.sourceValueMode||'authored',spec.randomInteger);
+    const result=coreParseProgram({language,source:materialized.source,filename,inputValues:spec.inputValues||{},
+      validationMode:'syntax'});
+    const diagnostics=(result.diagnostics||[]).slice().sort((left,right)=>{
+      const leftLine=left.location&&left.location.start&&left.location.start.line||Number.MAX_SAFE_INTEGER;
+      const rightLine=right.location&&right.location.start&&right.location.start.line||Number.MAX_SAFE_INTEGER;
+      return leftLine-rightLine;
+    });
+    if(!result.ir&&!diagnostics.length)diagnostics.push({code:'PROGRAM_EMPTY',message:'No executable statement was found.',
+      location:{filename,start:{line:1,column:1},end:{line:1,column:1}}});
+    const diagnostic=diagnostics[0]||null,line=diagnostic&&diagnostic.location&&diagnostic.location.start&&diagnostic.location.start.line||null;
+    return {ok:!!result.ir&&!diagnostic,source:materialized.source,result,diagnostics,diagnostic,line,
+      message:diagnostic?sourceProgramFriendlySyntaxMessage(diagnostic,language):null};
+  }catch(error){
+    const raw=String(error&&error.message||error),match=raw.match(/(?:line\s+|:)(\d+)/i),line=match?Number(match[1]):null;
+    const diagnostic={code:'PROGRAM_SYNTAX_CHECK_FAILED',message:raw,
+      location:line?{filename,start:{line,column:1},end:{line,column:1}}:null};
+    return {ok:false,source:String(spec.raw||spec.details&&spec.details.source||''),result:null,
+      diagnostics:[diagnostic],diagnostic,line,message:sourceProgramFriendlySyntaxMessage(diagnostic,language)};
+  }
 }
 
 function sourceProgramTerminalScreen(stream){

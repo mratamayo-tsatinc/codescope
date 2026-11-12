@@ -168,11 +168,17 @@ function coDiagnosticPlayback(source,frames,diagnostic){
 function coRun(item){
   const source=coSource(item);
   try{
-    const parsed=sourceProgramParseExercise({details:sourceProgramMetadataAndSource(source,item.filename),
+    const request={details:sourceProgramMetadataAndSource(source,item.filename),
       filename:item.filename,language:item.language,sourceValueMode:'authored',
       maxLoopIterations:item.executionGuard&&item.executionGuard.maxLoopIterations,
       detectLoopCycles:!!(item.executionGuard&&item.executionGuard.detectCycles),
-      inputValues:Object.fromEntries((item.inputs||[]).map(v=>[v.target,{value:v.value,raw:String(v.value)}]))});
+      inputValues:Object.fromEntries((item.inputs||[]).map(v=>[v.target,{value:v.value,raw:String(v.value)}]))};
+    const syntax=sourceProgramCanonicalSyntaxCheck(request);
+    if(!syntax.ok)return {ok:false,failureKind:'syntax',source,frames:[],
+      answer:{output:'',expectedLines:[],variables:[]},line:syntax.line,message:syntax.message,
+      diagnostic:syntax.diagnostic};
+    request.syntaxChecked=true;
+    const parsed=sourceProgramParseExercise(request);
     const frames=coPlaybackFrames(parsed),diagnostics=parsed.coreProgramResult.diagnostics||[];
     const diagnostic=diagnostics.slice().sort((left,right)=>{
       const leftLine=left.location&&left.location.start&&left.location.start.line||Number.MAX_SAFE_INTEGER;
@@ -181,11 +187,15 @@ function coRun(item){
     })[0];
     if(diagnostic){
       const stopped=coDiagnosticPlayback(source,frames,diagnostic);
-      return {ok:false,source,frames:stopped.frames,answer:stopped.answer,line:stopped.line,message:stopped.message};
+      return {ok:false,failureKind:'runtime',source,frames:stopped.frames,answer:stopped.answer,
+        line:stopped.line,message:stopped.message,diagnostic};
     }
     return {ok:true,source,frames,answer:sourceProgramGenerateAnswer(parsed,item.filename)};
-  }catch(error){const m=String(error.message||error).match(/(?:line\s+|:)(\d+)/i);
-    return {ok:false,source,frames:[],answer:{output:'',expectedLines:[],variables:[]},line:m?Number(m[1]):null,message:String(error.message||error)};}
+  }catch(error){const raw=String(error.message||error),m=raw.match(/(?:line\s+|:)(\d+)/i),line=m?Number(m[1]):null;
+    const diagnostic={code:'PROGRAM_SYNTAX_CHECK_FAILED',message:raw,
+      location:line?{filename:item.filename,start:{line,column:1},end:{line,column:1}}:null};
+    return {ok:false,failureKind:'syntax',source,frames:[],answer:{output:'',expectedLines:[],variables:[]},
+      line,message:sourceProgramFriendlySyntaxMessage(diagnostic,item.language),diagnostic};}
 }
 function coCurrentPlaybackFrame(item){
   const playback=item&&item._coPlayback;
@@ -416,11 +426,13 @@ function coWorkspaceStateColumn(item,system){
 function coExecutionErrorStrip(item){
   const failure=item.runResult&&!item.runResult.ok?item.runResult:null;
   if(!failure)return null;
-  return h('button',{class:'co-execution-error-strip',type:'button',onclick:()=>coFocusExecutionError(item)},
-    h('i',{class:'fa-solid fa-triangle-exclamation','aria-hidden':'true'}),
-    h('span',{class:'co-execution-error-line'},failure.line?'Line '+failure.line:'Execution stopped'),
+  const syntax=failure.failureKind==='syntax',label=syntax?'Syntax check':'Run stopped';
+  return h('button',{class:`co-execution-error-strip${syntax?' is-syntax':''}`,type:'button',
+    role:'alert','aria-live':'assertive',onclick:()=>coFocusExecutionError(item)},
+    h('i',{class:`fa-solid ${syntax?'fa-code':'fa-triangle-exclamation'}`,'aria-hidden':'true'}),
+    h('span',{class:'co-execution-error-line'},failure.line?`${label} · Line ${failure.line}`:label),
     h('span',{class:'co-execution-error-message'},failure.message),
-    failure.line?h('span',{class:'co-execution-error-action'},'View line ',h('i',{class:'fa-solid fa-arrow-right','aria-hidden':'true'})):null);
+    failure.line?h('span',{class:'co-execution-error-action'},'Review line ',h('i',{class:'fa-solid fa-arrow-right','aria-hidden':'true'})):null);
 }
 function coStoppedScreenDiffNodes(studentScreen,systemScreen){
   const studentLines=studentScreen?studentScreen.split('\n'):[],systemLines=systemScreen?systemScreen.split('\n'):[],nodes=[];

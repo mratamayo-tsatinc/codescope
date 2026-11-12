@@ -134,10 +134,15 @@ button.co-state-status{cursor:pointer}button.co-state-status:hover,button.co-sta
 .co-output-comparison .trace-feedback-text-diff{padding:0;border-radius:0;background:transparent;color:color-mix(in srgb,var(--text-mute) 88%,var(--text));font-weight:inherit;text-decoration:none}
 .co-execution-error-strip{box-sizing:border-box;display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:9px;width:100%;margin-top:10px;padding:9px 11px;border:1px solid color-mix(in srgb,var(--bad) 42%,var(--line));border-radius:8px;background:color-mix(in srgb,var(--bad) 6%,var(--panel));color:var(--text-dim);font:500 11px/1.4 var(--ui);text-align:left;cursor:pointer}
 .co-execution-error-strip>i{color:var(--bad)}
+.co-execution-error-strip.is-syntax{border-color:color-mix(in srgb,var(--op) 48%,var(--line));background:color-mix(in srgb,var(--op) 7%,var(--panel))}
+.co-execution-error-strip.is-syntax>i,.co-execution-error-strip.is-syntax .co-execution-error-line{color:var(--op)}
 .co-execution-error-line{color:var(--bad);font-weight:800;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
 .co-execution-error-message{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .co-execution-error-action{color:var(--op);font-weight:700;white-space:nowrap}
 .co-execution-error-strip:hover,.co-execution-error-strip:focus-visible{outline:0;border-color:var(--bad);background:color-mix(in srgb,var(--bad) 9%,var(--panel))}
+.program-source-file-line.has-execution-error{background:color-mix(in srgb,var(--bad) 9%,var(--panel));box-shadow:inset 3px 0 0 var(--bad)}
+.program-source-file-line.has-execution-error .program-source-file-number{color:var(--bad);font-weight:800}
+.program-source-file-line.has-execution-error:focus{outline:1px solid color-mix(in srgb,var(--bad) 70%,var(--line));outline-offset:-1px}
 @media(max-width:900px){
   .co-main-workspace{margin:10px 10px 0}
   .co-mobile-tabs{position:sticky;top:0;z-index:6;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:9px;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--panel) 94%,transparent);overflow:hidden;backdrop-filter:blur(8px)}

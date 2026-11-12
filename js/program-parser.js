@@ -407,6 +407,7 @@ function coreExecuteParsedProgram(spec){
 }
 function parseCoreProgram(request){
   const source=String(request.source||''),language=String(request.language||'c').toLowerCase();
+  const syntaxOnly=request.validationMode==='syntax';
   const filename=request.filename||(request.location&&request.location.filename)||null;
   const rows=coreProgramStatementRows(source),memory=coreExpressionMemory(request.symbols||{});
   const statements=[],diagnostics=[],effects=[],trace=[],counts={};
@@ -446,6 +447,13 @@ function parseCoreProgram(request){
   });
   if(!statements.length) return {ir:null,diagnostics,dependencies:[],effects,trace};
   const controlFlow=coreBuildProgramControlFlow({source,language,filename,statements,symbols:memory});
+  if(syntaxOnly){
+    const dependencies=[...new Set(statements.flatMap(statement=>statement.dependencies||[]))];
+    return {ir:languageCoreProgramIr({language,source,statements,metadata:{filename,
+        statementRows:rows.map(row=>Object.assign({},row)),expectedMemory:{},
+        executionMemoryBefore:{},executionFrames:[]}}),
+      diagnostics:[...diagnostics,...controlFlow.diagnostics],dependencies,effects:[],trace:[]};
+  }
   const executed=coreExecuteParsedProgram({source,language,filename,statements,symbols:request.symbols,
     maxLoopIterations:request.maxLoopIterations,detectLoopCycles:request.detectLoopCycles===true});
   const dependencies=[...new Set(statements.flatMap(statement=>statement.dependencies||[]))];

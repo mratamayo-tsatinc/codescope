@@ -413,6 +413,12 @@ function ccSourcePanel(item){
   const source=panel.querySelector&&panel.querySelector('.program-source-file-code');
   if(source&&item._coFlowTransition&&item._coFlowTransition.duration)
     source.style.setProperty('--program-flow-duration',`${item._coFlowTransition.duration}ms`);
+  const failure=item.runResult&&!item.runResult.ok&&item.runResult.line?item.runResult:null;
+  if(failure&&panel.querySelector){
+    const row=panel.querySelector(`.program-source-file-line[data-source-line="${failure.line}"]`);
+    if(row){row.classList.add('has-execution-error');row.setAttribute('tabindex','-1');
+      row.setAttribute('aria-label',`Syntax or execution error on line ${failure.line}: ${failure.message}`);}
+  }
   item._programFlowTrailEdgeKeys=view._programFlowTrailEdgeKeys;
   return panel;
 }
@@ -437,6 +443,11 @@ function ccRender({container,item,profile}){
   ccMountCompactEvaluation(item,sourcePanel,flow);
   const notice=ccNotice(item);if(notice)flow.appendChild(notice);
   const error=CODE_ORDERING_PLAYBACK_CAPABILITY.executionError(item);if(error)flow.appendChild(error);
+  const errorLine=item._coErrorFocusLine;delete item._coErrorFocusLine;
+  if(errorLine&&typeof requestAnimationFrame==='function')requestAnimationFrame(()=>{
+    const row=flow.querySelector(`.program-source-file-line[data-source-line="${errorLine}"]`);
+    if(row){row.scrollIntoView({block:'center',behavior:'smooth'});row.focus({preventScroll:true});}
+  });
   CODE_ORDERING_PLAYBACK_CAPABILITY.scheduleTrail(item,flow);
   if(!item.checked&&!state.examExpired){
     flow.appendChild(CODE_ORDERING_PLAYBACK_CAPABILITY.playbackControls(item));
