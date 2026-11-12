@@ -172,6 +172,12 @@
           "library": "source-programs",
           "exerciseSet": "final-exam-ordering",
           "shuffle": false
+        },
+        "execution": {
+          "loopGuard": {
+            "maxIterations": 32,
+            "detectCycles": true
+          }
         }
       },
       "presentation": {

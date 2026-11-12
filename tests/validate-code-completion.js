@@ -246,5 +246,35 @@ assert.strictEqual(rejectedStudentRun.failureKind,'syntax');
 assert.strictEqual(rejectedStudentRun.line,4);
 assert.strictEqual(rejectedStudentRun.frames.length,0,'student syntax errors must never reach execution playback');
 assert(/values and operators/i.test(rejectedStudentRun.message),'student run must receive actionable feedback');
+gateContext.changingLoopSource=context.validSyntaxSource;
+gateContext.repeatingLoopSource=`#include <stdio.h>
+int main(void) {
+  int i = 0;
+  while (i < 1) {
+    printf("waiting\\n");
+  }
+  return 0;
+}`;
+const orderingGuards=JSON.parse(vm.runInContext(`(()=>{
+  const defaultGuard=coExecutionGuard({activity:{}}),configuredGuard=coExecutionGuard({activity:{execution:{
+    loopGuard:{maxIterations:32,detectCycles:true}}}});
+  const run=(source,guard)=>coRun({source,orderLines:[],order:[],filename:'StudentLoop.c',language:'c',inputs:[],executionGuard:guard});
+  const changing=run(changingLoopSource,configuredGuard),repeating=run(repeatingLoopSource,defaultGuard),
+    legacy=run(repeatingLoopSource,undefined);
+  return JSON.stringify({defaultGuard,configuredGuard,
+    changing:{ok:changing.ok,code:changing.diagnostic&&changing.diagnostic.code,frames:changing.frames.length},
+    repeating:{ok:repeating.ok,code:repeating.diagnostic&&repeating.diagnostic.code,frames:repeating.frames.length},
+    legacy:{ok:legacy.ok,code:legacy.diagnostic&&legacy.diagnostic.code,frames:legacy.frames.length}});
+})()`,gateContext));
+assert.deepStrictEqual(orderingGuards.defaultGuard,{maxLoopIterations:16,detectCycles:true});
+assert.deepStrictEqual(orderingGuards.configuredGuard,{maxLoopIterations:32,detectCycles:true});
+assert.strictEqual(orderingGuards.changing.ok,false);
+assert.strictEqual(orderingGuards.changing.code,'PROGRAM_LOOP_LIMIT');
+assert(orderingGuards.changing.frames<100,'changing-state infinite loop must stop before large playback allocation');
+assert.strictEqual(orderingGuards.repeating.ok,false);
+assert.strictEqual(orderingGuards.repeating.code,'PROGRAM_LOOP_CYCLE');
+assert(orderingGuards.repeating.frames<20,'repeating-state infinite loop must stop immediately through cycle detection');
+assert.strictEqual(orderingGuards.legacy.code,'PROGRAM_LOOP_CYCLE',
+  'persisted ordering items created before the guard must receive the safe default at run time');
 
 console.log(`Code Completion validated ${checked} seeded C/Java profile-source combinations, ${generated} generated login items including the authored-value final exam, and both loop guards.`);

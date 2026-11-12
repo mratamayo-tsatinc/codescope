@@ -47,6 +47,8 @@ assert.deepStrictEqual(profileByKind.get('code-completion').content.values,
 for(const kind of ['code-ordering','simulate-output']){
   assert.strictEqual(profileByKind.get(kind).activity.generator.shuffle,false,kind+' order');
 }
+assert.deepStrictEqual(profileByKind.get('code-ordering').activity.execution.loopGuard,
+  {maxIterations:32,detectCycles:true},'final exam ordering loop guard');
 assert.strictEqual(profileByKind.get('trace').content.selection.shuffle,false,'trace order');
 
 const banks=[

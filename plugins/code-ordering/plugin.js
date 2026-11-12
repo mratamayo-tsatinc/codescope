@@ -106,6 +106,11 @@ function coSource(item){
   return lines.join('\n');
 }
 
+function coExecutionGuard(profile){
+  const guard=profile&&profile.activity&&profile.activity.execution&&profile.activity.execution.loopGuard||{};
+  return {maxLoopIterations:guard.maxIterations||16,detectCycles:guard.detectCycles!==false};
+}
+
 function coPlaybackVariables(memory){
   return Object.values(memory||{}).filter(binding=>binding&&binding.mutable!==false&&binding.kind!=='constant'
     &&binding.initialized!==false&&binding.value!==undefined)
@@ -168,10 +173,13 @@ function coDiagnosticPlayback(source,frames,diagnostic){
 function coRun(item){
   const source=coSource(item);
   try{
+    const profile=typeof PROFILES!=='undefined'&&PROFILES.find(candidate=>candidate.id===item.profileId);
+    const executionGuard=item.executionGuard||coExecutionGuard(profile);
+    if(!item.executionGuard)item.executionGuard=executionGuard;
     const request={details:sourceProgramMetadataAndSource(source,item.filename),
       filename:item.filename,language:item.language,sourceValueMode:'authored',
-      maxLoopIterations:item.executionGuard&&item.executionGuard.maxLoopIterations,
-      detectLoopCycles:!!(item.executionGuard&&item.executionGuard.detectCycles),
+      maxLoopIterations:executionGuard.maxLoopIterations,
+      detectLoopCycles:executionGuard.detectCycles,
       inputValues:Object.fromEntries((item.inputs||[]).map(v=>[v.target,{value:v.value,raw:String(v.value)}]))};
     const syntax=sourceProgramCanonicalSyntaxCheck(request);
     if(!syntax.ok)return {ok:false,failureKind:'syntax',source,frames:[],
@@ -260,7 +268,8 @@ function coItem(profile,exercise,index,language){
   const maximum=Number.isFinite(profile.pointsPerItem)?profile.pointsPerItem:coTotal(answerKey);
   return {activityKind:'code-ordering',profileId:profile.id,itemNumber:index+1,language,exerciseId:parsed.id,
     filename:parsed.filename,source:parsed.source,orderLines,order,initialOrder:order.slice(),answerKey,inputs:parsed.inputs,
-    sourceSeedValues:parsed.seedValues,runResult:null,_coPlayback:null,_coPlaybackSpeed:.6,result:null,checked:false,itemScore:null,points:null,
+    sourceSeedValues:parsed.seedValues,executionGuard:coExecutionGuard(profile),
+    runResult:null,_coPlayback:null,_coPlaybackSpeed:.6,result:null,checked:false,itemScore:null,points:null,
     maxPoints:maximum,correctSteps:0,totalOpSteps:0,wasCorrectFinal:null,flagged:false,lockedAt:null,examActionLog:[]};
 }
 function coGenerateItem({profile,index,language,generationContext}){
@@ -974,6 +983,11 @@ function coValidate(profile){
   if(profile.itemCount!=='manifest'||profile.pointsPerItem!=='generated-answer'
     &&!(Number.isFinite(profile.pointsPerItem)&&profile.pointsPerItem>0))throw new Error(profile.id+': invalid code-ordering scoring');
   if(profileVariableValueMode(profile)!=='seeded'||profileInputValueMode(profile)!=='seeded')throw new Error(profile.id+': code ordering requires seeded values');
+  const guard=profile.activity.execution&&profile.activity.execution.loopGuard;
+  if(guard&&(!Number.isInteger(Number(guard.maxIterations))||Number(guard.maxIterations)<2||Number(guard.maxIterations)>100))
+    throw new Error(`${profile.id}: loop guard maxIterations must be from 2 to 100`);
+  if(guard&&guard.detectCycles!==undefined&&typeof guard.detectCycles!=='boolean')
+    throw new Error(`${profile.id}: loop guard detectCycles must be true or false`);
 }
 async function coLoad(){
   const profiles=PROFILES.filter(p=>profileIsEnabled(p)&&p.activity&&p.activity.kind==='code-ordering');
