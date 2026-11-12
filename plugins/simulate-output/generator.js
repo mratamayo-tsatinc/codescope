@@ -110,8 +110,9 @@ function soShuffle(values){
 function soBuildItem(profile,exercise,index,language){
   const sourceValueMode=profileVariableValueMode(profile),inputValueMode=profileInputValueMode(profile);
   const parsed=soParseExercise(exercise,language,sourceValueMode,inputValueMode);
-  const maximum=parsed.expectedLines.length+parsed.variables.reduce((sum,variable)=>
+  const answerChecks=parsed.expectedLines.length+parsed.variables.reduce((sum,variable)=>
     sum+(Array.isArray(variable.expected)?variable.expected.length:1),0);
+  const maximum=Number.isFinite(profile.pointsPerItem)?profile.pointsPerItem:answerChecks;
   return {
     activityKind:SIMULATE_OUTPUT_MANIFEST.id,profileId:profile.id,itemNumber:index+1,
     language,exerciseId:parsed.id,filename:parsed.filename,source:parsed.source,

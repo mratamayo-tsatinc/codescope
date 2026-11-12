@@ -1,6 +1,6 @@
 # Code Completion profiles
 
-Code Completion presents a complete seeded source exercise with profile-selected
+Code Completion presents a complete authored or seeded source exercise with profile-selected
 fragments removed. Students edit those fragments, run the resulting program
 through the shared language core, and reproduce the visible target output,
 selected final variables, or both. The model source remains hidden while its
@@ -55,3 +55,13 @@ lock the item. Cycle detection reports a repeated program state; the iteration
 budget reports only that the program did not terminate within the configured
 limit. Students can revise and run again, and Check becomes available only
 after playback reaches the end of an attempt.
+
+Set `content.values.variables` and `content.values.input` independently to
+`"seeded"` or `"authored"`. Authored mode keeps every literal and input value
+from the source file, which is useful when the missing fragments must be solved
+against one exact program instance.
+
+Use `pointsPerItem:"generated-answer"` to derive the maximum from the assessed
+output and memory checks, or use a positive number for a fixed item maximum.
+With a fixed maximum, partial correctness is scaled across the same detailed
+checks.

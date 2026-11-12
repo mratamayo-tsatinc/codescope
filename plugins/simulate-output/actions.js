@@ -55,9 +55,11 @@ function soCheck({item,profile,state}){
   item.result=result;item.checked=true;
   item.correctSteps=result.correct;item.totalOpSteps=result.total;
   item.wasCorrectFinal=result.correct===result.total;
-  item.points=result.correct;
-  item.maxPoints=result.total;
-  item.itemScore=item.points/item.maxPoints;
+  const maximum=Number.isFinite(profile&&profile.pointsPerItem)?profile.pointsPerItem:result.total;
+  item.points=Number.isFinite(profile&&profile.pointsPerItem)
+    ?roundPoints(maximum*(result.total?result.correct/result.total:0)):result.correct;
+  item.maxPoints=maximum;
+  item.itemScore=item.maxPoints?item.points/item.maxPoints:0;
   item.lockedAt=profileLocksCheckedItems()?Date.now():null;
   return {applied:true,completed:true};
 }

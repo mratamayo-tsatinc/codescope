@@ -276,6 +276,20 @@ function coreBuildProgramControlFlow(spec){
     if(!structure.cases.some(entry=>entry.default))structure.statement.branches.push({noMatch:true,label:'NO MATCH',
       targetLine:afterTarget.line,targetText:afterTarget.text,nextStatementId:afterTarget.id,targetStatementId:afterTarget.id});
   });
+  const controlOwner=statement=>regions.filter(region=>
+    ['loop','switch'].includes(region.owner.type)
+      &&statement.sourceLine-1>=region.start&&statement.sourceLine-1<=region.end)
+    .sort((left,right)=>(left.end-left.start)-(right.end-right.start))[0]?.owner||null;
+  statements.filter(statement=>['program-break','program-continue'].includes(statement.kind)).forEach(statement=>{
+    const owner=controlOwner(statement);if(!owner)return;
+    if(statement.kind==='program-continue'){
+      if(owner.type==='loop')statement.nextStatementId=loopContinuation(owner).id;
+      return;
+    }
+    statement.nextStatementId=targetDetails(continuationAfter(owner)).id;
+    if(owner.type==='switch')statement.switchStatementId=owner.statement.id;
+    else statement.loopStatementId=owner.statement.id;
+  });
   return {statements,structures,diagnostics};
 }
 

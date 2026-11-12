@@ -59,3 +59,6 @@ Profile Set `version` after changes that should start a fresh student session.
 - `c-midterms-expressions.json` is the C expressions midterms set. Its four
   ordered categories, seeded source libraries, and validation command are
   documented in `docs/c-midterms-expressions.md`.
+- `c-final-exam.json` is the 90-minute C final examination. Its four ordered
+  five-item categories, seeded difficulty progression, authored completion
+  values, and validation commands are documented in `docs/c-final-exam.md`.

@@ -1,0 +1,10 @@
+{
+  "title": "C Final Exam - Code Ordering",
+  "exercises": [
+    "papa.c",
+    "quebec.c",
+    "romeo.c",
+    "sierra.c",
+    "tango.c"
+  ]
+}

@@ -1,10 +1,12 @@
 // Explicit control-flow exit. Source adapters map an authored `break;` to this
-// statement and assign its destination from the enclosing control structure.
+// statement and assign its destination from the nearest enclosing switch or
+// loop.
 registerStatementPlugin({
   kind:'program-break',
 
   interactionPlan(ctx){
-    return {mode:'direct',action:{type:'break-control',statementId:ctx.statement.id},label:'Exit switch'};
+    return {mode:'direct',action:{type:'break-control',statementId:ctx.statement.id},
+      label:ctx.statement.loopStatementId?'Exit loop':'Exit switch'};
   },
 
   applyAction(ctx){
@@ -37,6 +39,7 @@ registerStatementPlugin({
 function renderProgramBreakStatement(ctx){
   const {container,item,statement,statementIndex,isActive}=ctx;
   const actionable=isActive&&!statement.runtime.checked&&!item.checked&&!examInteractionLocked();
+  const scope=statement.loopStatementId?'loop':'switch';
   const card=h('section',{class:`program-statement program-break-statement ${statement.status}`,
     'data-statement-id':statement.id});
   const timeline=h('div',{class:'timeline program-summary-timeline'});
@@ -46,11 +49,12 @@ function renderProgramBreakStatement(ctx){
   const source=statement.sourceText||'break;';
   const code=h('div',{class:'code-out program-summary-code'});
   code.appendChild(h(actionable?'button':'code',{class:`program-break-control${actionable?' actionable':''}`,
-    type:actionable?'button':null,title:actionable?'Exit switch':null,
-    'aria-label':actionable?'Execute break and exit switch':null,
+    type:actionable?'button':null,title:actionable?`Exit ${scope}`:null,
+    'aria-label':actionable?`Execute break and exit ${scope}`:null,
     onclick:actionable?()=>handleTokenClick({type:'break-control',statementId:statement.id}):null},source));
   if(statement.status==='complete') code.appendChild(h('i',{class:'fa-solid fa-circle-check program-summary-status',
-    title:'Switch exited','aria-label':'Switch exited'}));
+    title:`${scope[0].toUpperCase()+scope.slice(1)} exited`,
+    'aria-label':`${scope[0].toUpperCase()+scope.slice(1)} exited`}));
   row.appendChild(code);timeline.appendChild(row);card.appendChild(timeline);container.appendChild(card);
 }
 

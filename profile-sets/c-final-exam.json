@@ -1,0 +1,321 @@
+{
+  "schemaVersion": 1,
+  "id": "c-final-exam",
+  "name": "C Final Exam",
+  "version": "1",
+  "description": "A 90-minute C final examination with five ordered exercises each for tracing, code ordering, code completion, and output simulation.",
+  "session": {
+    "language": "c",
+    "timing": {
+      "allowReset": false,
+      "enabled": true,
+      "minutes": 90
+    },
+    "persistence": {
+      "enabled": true
+    },
+    "results": {
+      "unified": true
+    }
+  },
+  "categories": [
+    {
+      "id": "final-exam-trace",
+      "name": "Trace",
+      "enabled": true,
+      "profileIds": [
+        "final-exam-trace-loops"
+      ]
+    },
+    {
+      "id": "final-exam-ordering",
+      "name": "Code Ordering",
+      "enabled": true,
+      "profileIds": [
+        "final-exam-order-loops"
+      ]
+    },
+    {
+      "id": "final-exam-completion",
+      "name": "Complete the Code",
+      "enabled": true,
+      "profileIds": [
+        "final-exam-complete-loops"
+      ]
+    },
+    {
+      "id": "final-exam-simulate",
+      "name": "Simulate",
+      "enabled": true,
+      "profileIds": [
+        "final-exam-simulate-loops"
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "enabled": true,
+      "meta": {
+        "id": "final-exam-trace-loops",
+        "name": "Trace Loop Programs",
+        "description": "Trace five seeded C loop programs in increasing difficulty, from direct repetition through continue and nested loops."
+      },
+      "shape": {
+        "operandSources": {
+          "variable": 1,
+          "literal": 1
+        },
+        "operandRange": {
+          "min": 0,
+          "max": 20
+        },
+        "allowNegativeOperands": false
+      },
+      "operators": {
+        "allowed": [
+          "+",
+          "-",
+          "*",
+          "/",
+          "%",
+          "<",
+          ">",
+          "<=",
+          ">=",
+          "==",
+          "!="
+        ]
+      },
+      "template": "loop source program",
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 2,
+        "statementCommits": true
+      },
+      "content": {
+        "mode": "source-files",
+        "source": {
+          "library": "source-programs",
+          "exerciseSet": "final-exam-trace"
+        },
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        },
+        "selection": {
+          "count": "all",
+          "shuffle": false
+        }
+      },
+      "lesson": {
+        "focus": "program-flow",
+        "constructs": [
+          "loop"
+        ]
+      },
+      "interaction": {
+        "declarations": "interactive"
+      },
+      "manualResponses": {
+        "enabled": true,
+        "namedValueRate": 50,
+        "operatorRate": 50,
+        "output": {
+          "enabled": true,
+          "mode": "complete-emission",
+          "rate": 100
+        }
+      },
+      "presentation": {
+        "workspace": "source-program",
+        "timeline": "statement-modal",
+        "flowTrail": true
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": true,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": true,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "profile",
+          "namedValueRate": 50,
+          "operatorRate": 50
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "final-exam-order-loops",
+        "name": "Order Loop Programs",
+        "description": "Arrange five seeded C loop programs in increasing difficulty while preserving their intended execution and output."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 3
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "code-ordering",
+        "instructions": "Arrange the executable statements, run the program, and reproduce the target output and final variable state.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "final-exam-ordering",
+          "shuffle": false
+        }
+      },
+      "presentation": {
+        "flowTrail": true
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": true,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "final-exam-complete-loops",
+        "name": "Complete Loop Programs",
+        "description": "Complete the loop control logic in five C programs using their authored values and increasing difficulty."
+      },
+      "scoring": {
+        "itemCount": 5,
+        "pointsPerItem": 4
+      },
+      "content": {
+        "values": {
+          "variables": "authored",
+          "input": "authored"
+        }
+      },
+      "activity": {
+        "kind": "code-completion",
+        "instructions": "Complete the loop initialization, condition, and update, then run the program and reproduce the target state.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "final-exam-completion",
+          "shuffle": false
+        },
+        "completion": {
+          "targets": [
+            {
+              "role": "loop-initializer-value"
+            },
+            {
+              "role": "loop-condition"
+            },
+            {
+              "role": "loop-update"
+            }
+          ]
+        },
+        "assessment": {
+          "equivalence": {
+            "output": {
+              "required": true,
+              "showTarget": true
+            },
+            "memory": {
+              "required": true,
+              "showTarget": true,
+              "variables": {
+                "select": "loop-control"
+              }
+            }
+          }
+        },
+        "execution": {
+          "loopGuard": {
+            "maxIterations": 32,
+            "detectCycles": true
+          }
+        }
+      },
+      "presentation": {
+        "flowTrail": true
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": true,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    },
+    {
+      "enabled": true,
+      "meta": {
+        "id": "final-exam-simulate-loops",
+        "name": "Simulate Loop Programs",
+        "description": "Predict the output and final state of five seeded C loop programs, with each item worth exactly five points."
+      },
+      "scoring": {
+        "itemCount": "manifest",
+        "pointsPerItem": 5
+      },
+      "content": {
+        "values": {
+          "variables": "seeded",
+          "input": "seeded"
+        }
+      },
+      "activity": {
+        "kind": "simulate-output",
+        "instructions": "Read the source program, predict its complete terminal output and final variable values, then check your response.",
+        "generator": {
+          "library": "source-programs",
+          "exerciseSet": "final-exam-simulate",
+          "shuffle": false
+        }
+      },
+      "behavior": {
+        "interactionMode": "strict-sequence",
+        "allowUndo": false,
+        "allowRetry": false,
+        "allowReviewFlags": true,
+        "showNeutralGuidance": false,
+        "showScores": true,
+        "feedbackRelease": "after-timeout",
+        "lockItemAfterCheck": true,
+        "showCorrectSolution": false,
+        "manualResponses": {
+          "mode": "automatic",
+          "namedValueRate": 0,
+          "operatorRate": 0
+        }
+      }
+    }
+  ]
+}

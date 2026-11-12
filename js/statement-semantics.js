@@ -90,6 +90,9 @@ function executeCoreStatement(request){
   if(statement.kind==='program-break') return {value:null,dependencies:[],effects:[
     {kind:'flow',scope:'statement',flow:'break',nextStatementId:statement.nextStatementId||'$end'}
   ],trace:[{action:'BREAK',nextStatementId:statement.nextStatementId||'$end'}]};
+  if(statement.kind==='program-continue') return {value:null,dependencies:[],effects:[
+    {kind:'flow',scope:'statement',flow:'continue',nextStatementId:statement.nextStatementId||'$end'}
+  ],trace:[{action:'CONTINUE',nextStatementId:statement.nextStatementId||'$end'}]};
   if(statement.kind==='program-return') return {value:statement.value,dependencies:[],effects:[
     {kind:'flow',scope:'statement',flow:'return',value:statement.value,nextStatementId:'$end'}
   ],trace:[{action:'RETURN',value:statement.value}]};

@@ -6,8 +6,9 @@ function soValidateProfile(profile){
   soPathSlug(generator.library,`${profile.id}: library`);
   soPathSlug(generator.exerciseSet,`${profile.id}: exerciseSet`);
   if(profile.itemCount!=='manifest')throw new Error(`${profile.id}: itemCount must be 'manifest'`);
-  if(profile.pointsPerItem!=='generated-answer')
-    throw new Error(`${profile.id}: pointsPerItem must be 'generated-answer'`);
+  if(profile.pointsPerItem!=='generated-answer'
+    &&!(Number.isFinite(profile.pointsPerItem)&&profile.pointsPerItem>0))
+    throw new Error(`${profile.id}: pointsPerItem must be 'generated-answer' or a positive number`);
   if(generator.shuffle!==undefined&&typeof generator.shuffle!=='boolean')
     throw new Error(`${profile.id}: generator.shuffle must be a boolean`);
   for(const [label,mode] of [['variables',profileVariableValueMode(profile)],['input',profileInputValueMode(profile)]])
@@ -26,7 +27,8 @@ const simulateOutputPlugin=registerActivityPlugin({
   id:SIMULATE_OUTPUT_MANIFEST.id,manifest:SIMULATE_OUTPUT_MANIFEST,
   loadContent:soLoadExerciseContent,
   itemCount({profile,language}){return soCatalog(profile,language).length;},
-  maxPoints({item}){return soScoreResponse(item).total;},
+  maxPoints({item,profile}){return Number.isFinite(profile.pointsPerItem)
+    ?profile.pointsPerItem:soScoreResponse(item).total;},
   validateProfile:soValidateProfile,generateItem:soGenerateItem,render:soRender,
   applyAction:soApplyAction,check:soCheck,reset:soReset,retry:soRetry,
   buildCanonicalTrace:soCanonicalTrace,

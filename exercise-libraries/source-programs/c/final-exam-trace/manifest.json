@@ -1,0 +1,10 @@
+{
+  "title": "C Final Exam - Trace",
+  "exercises": [
+    "alpha.c",
+    "bravo.c",
+    "charlie.c",
+    "delta.c",
+    "echo.c"
+  ]
+}

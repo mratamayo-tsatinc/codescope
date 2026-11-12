@@ -137,8 +137,11 @@ function coPlaybackFrames(parsed){
     return {index,line:frame.sourceLine,endLine:frame.sourceEndLine,statementId:frame.statementId,
       statementKind:frame.statementKind,loopKind:coreStatement.loopKind||null,
       forPhase:frame.forPhase||frame.phase||null,
+      conditionSource:coreStatement.conditionSource||null,updateSource:coreStatement.updateSource||null,
       runtime:{checked:!!conditionStep,assignedValue:conditionStep?Boolean(conditionStep.value):null},
       sourceText:frame.sourceText,error:frame.error||null,
+      trace:(frame.trace||[]).map(step=>Object.assign({},step)),
+      memoryBefore:frame.memoryBefore||{},memoryAfter:frame.memoryAfter||{},
       reads:[...new Set((frame.effects||[]).filter(effect=>effect.kind==='read').map(effect=>effect.target))],
       writes:[...new Set((frame.effects||[]).filter(effect=>effect.kind==='write'||effect.kind==='declare').map(effect=>effect.target))],
       consoleActive:(frame.effects||[]).some(effect=>effect.kind==='output'||effect.kind==='input'),
@@ -244,10 +247,11 @@ function coItem(profile,exercise,index,language){
   const answerKey={output:parsed.output,expectedLines:parsed.expectedLines,variables:parsed.variables,terminalOutput:true};
   if(!coTotal(answerKey))throw new Error(exercise.filename+': canonical source has no observable state');
   const order=coShuffle(orderLines);
+  const maximum=Number.isFinite(profile.pointsPerItem)?profile.pointsPerItem:coTotal(answerKey);
   return {activityKind:'code-ordering',profileId:profile.id,itemNumber:index+1,language,exerciseId:parsed.id,
     filename:parsed.filename,source:parsed.source,orderLines,order,initialOrder:order.slice(),answerKey,inputs:parsed.inputs,
     sourceSeedValues:parsed.seedValues,runResult:null,_coPlayback:null,_coPlaybackSpeed:.6,result:null,checked:false,itemScore:null,points:null,
-    maxPoints:coTotal(answerKey),correctSteps:0,totalOpSteps:0,wasCorrectFinal:null,flagged:false,lockedAt:null,examActionLog:[]};
+    maxPoints:maximum,correctSteps:0,totalOpSteps:0,wasCorrectFinal:null,flagged:false,lockedAt:null,examActionLog:[]};
 }
 function coGenerateItem({profile,index,language,generationContext}){
   if(!generationContext.order){const list=soCatalog(profile,language).slice();
@@ -316,12 +320,16 @@ function coApplyAction({item,action}){
   const total=coTotal(expected),correct=outputCorrect+variableCorrect;
   return {correct,total,outputResults,variableResults};
 }
-function coCheck({item,state}){if(!item||item.checked)return {applied:false};item.runResult=coRun(item);
+function coCheck({item,profile,state}){if(!item||item.checked)return {applied:false};item.runResult=coRun(item);
   item._coPlayback={index:item.runResult.frames.length,playing:false,speed:item._coPlaybackSpeed==null?.6:item._coPlaybackSpeed,
     sequenceVersion:CO_PLAYBACK_SEQUENCE_VERSION,arrangedSource:item.runResult.source,
     frames:item.runResult.frames,finalRun:item.runResult};item._coMobileTab='run';item.result=coScore(item,item.runResult);
-  item.checked=true;item.correctSteps=item.points=item.result.correct;item.totalOpSteps=item.maxPoints=item.result.total;
-  item.itemScore=item.points/item.maxPoints;item.wasCorrectFinal=item.points===item.maxPoints;item.lockedAt=profileLocksCheckedItems()?Date.now():null;
+  const maximum=Number.isFinite(profile&&profile.pointsPerItem)?profile.pointsPerItem:item.result.total;
+  item.checked=true;item.correctSteps=item.result.correct;item.totalOpSteps=item.result.total;
+  item.points=Number.isFinite(profile&&profile.pointsPerItem)
+    ?roundPoints(maximum*(item.result.total?item.result.correct/item.result.total:0)):item.result.correct;
+  item.maxPoints=maximum;item.itemScore=item.maxPoints?item.points/item.maxPoints:0;
+  item.wasCorrectFinal=item.result.correct===item.result.total;item.lockedAt=profileLocksCheckedItems()?Date.now():null;
   return {applied:true,completed:true};}
 function coReset({item}){if(!item||item.checked)return {applied:false};const changed=!coEqual(item.order,item.initialOrder)||!!item.runResult
     ||!!(item._coPlayback&&item._coPlayback.index);
@@ -857,7 +865,10 @@ function coSchedulePlayback(item){
     }
     coDo(item,{type:'PLAYBACK_TICK'});
   };
-  coPlaybackTimer=setTimeout(advance,playback.speed*1000);
+  const frame=playback.index>0?playback.frames[playback.index-1]:null;
+  const compactEvaluation=item.activityKind==='code-completion'&&!item._ccFastForward&&frame
+    &&frame.statementKind==='loop'&&['condition','update'].includes(frame.forPhase);
+  coPlaybackTimer=setTimeout(advance,compactEvaluation?Math.max(1050,playback.speed*1000):playback.speed*1000);
 }
 function coRectCanAnimate(rect){return !!(rect&&rect.width>0&&rect.height>0);}
 function coPlaybackMemoryCard(flow,name){
@@ -948,7 +959,8 @@ function coRender({container,item,profile}){
 function coValidate(profile){
   const g=profile.activity&&profile.activity.generator;if(!g||!g.library||!g.exerciseSet)throw new Error(profile.id+': missing code-ordering source');
   soPathSlug(g.library,profile.id+': library');soPathSlug(g.exerciseSet,profile.id+': exerciseSet');
-  if(profile.itemCount!=='manifest'||profile.pointsPerItem!=='generated-answer')throw new Error(profile.id+': invalid code-ordering scoring');
+  if(profile.itemCount!=='manifest'||profile.pointsPerItem!=='generated-answer'
+    &&!(Number.isFinite(profile.pointsPerItem)&&profile.pointsPerItem>0))throw new Error(profile.id+': invalid code-ordering scoring');
   if(profileVariableValueMode(profile)!=='seeded'||profileInputValueMode(profile)!=='seeded')throw new Error(profile.id+': code ordering requires seeded values');
 }
 async function coLoad(){
@@ -975,7 +987,8 @@ const CODE_ORDERING_PLAYBACK_CAPABILITY=Object.freeze({
   syncFeedback:coSyncFeedback
 });
 registerActivityPlugin({id:'code-ordering',manifest:CODE_ORDERING_MANIFEST,loadContent:coLoad,
-  itemCount({profile,language}){return soCatalog(profile,language).length;},maxPoints({item}){return coTotal(item.answerKey);},
+  itemCount({profile,language}){return soCatalog(profile,language).length;},
+  maxPoints({item,profile}){return Number.isFinite(profile.pointsPerItem)?profile.pointsPerItem:coTotal(item.answerKey);},
   validateProfile:coValidate,generateItem:coGenerateItem,render:coRender,applyAction:coApplyAction,check:coCheck,
   reset:coReset,retry:coRetry,buildFeedback:coFeedback,hasAttempt({item}){return !!(item&&(item.runResult
     ||item._coPlayback&&item._coPlayback.index||!coEqual(item.order,item.initialOrder)));}});

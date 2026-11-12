@@ -32,8 +32,11 @@ exercise-libraries/source-programs/c/it3-midterm-a/manifest.json
 
 `itemCount:'manifest'` loads every listed file. `pointsPerItem:'generated-answer'`
 means the maximum is derived from the generated output lines and initialized
-mutable variables. `shuffle:false` preserves manifest order; `true` produces a
-seeded order that is retained in persisted sessions.
+mutable variables. A positive numeric value instead fixes the item maximum and
+scales partial correctness across the detailed output and variable checks. For
+example, `pointsPerItem:2` makes every exercise worth exactly two points.
+`shuffle:false` preserves manifest order; `true` produces a seeded order that
+is retained in persisted sessions.
 
 ## Authoring workflow
 

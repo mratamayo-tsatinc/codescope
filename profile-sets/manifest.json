@@ -36,6 +36,13 @@
       "description": "An isolated Code Completion set using existing seeded C and Java loop exercises.",
       "file": "c-java-loop-completion.json",
       "enabled": true
+    },
+    {
+      "id": "c-final-exam",
+      "name": "C Final Exam",
+      "description": "A 90-minute C final examination with ordered trace, code ordering, code completion, and simulation exercises.",
+      "file": "c-final-exam.json",
+      "enabled": true
     }
   ]
 }

@@ -167,6 +167,16 @@ function programBreakStatement(spec){
   };
 }
 
+function programContinueStatement(spec){
+  spec=spec||{};
+  return {
+    id:spec.id||null,
+    kind:'program-continue',
+    sourceSpan:spec.sourceSpan||null,
+    runtime:{checked:false}
+  };
+}
+
 function collectExpressionDependencies(expression, out){
   out = out || new Set();
   if(!expression || typeof expression !== 'object') return out;

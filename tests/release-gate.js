@@ -183,6 +183,7 @@ function main(){
   const content=assertExerciseContent();
   assertArchitectureCleanup();
   assertResponsiveContracts();
+  runNode('tests/validate-final-exam.js');
   runNode('tests/validate-code-completion.js');
   runNode('tests/phase0-baseline.js',['--check']);
   runNode('tests/run-tests.js');

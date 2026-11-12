@@ -126,6 +126,41 @@ for(const language of ['c','java']){
   }
 }
 
+const finalSet=JSON.parse(fs.readFileSync(path.join(ROOT,'profile-sets','c-final-exam.json'),'utf8'));
+const finalCompletion=finalSet.profiles.find(profile=>profile.activity&&profile.activity.kind==='code-completion');
+assert(finalCompletion,'C Final Exam needs a Code Completion profile');
+assert.deepStrictEqual(finalCompletion.content.values,{variables:'authored',input:'authored'});
+context.ccProfile=finalCompletion;
+evaluate(`ccValidate(finalizeProfile(ccProfile))`);
+const finalDirectory=path.join(ROOT,'exercise-libraries','source-programs','c','final-exam-completion');
+const finalManifest=JSON.parse(fs.readFileSync(path.join(finalDirectory,'manifest.json'),'utf8'));
+const finalRows=finalManifest.exercises.map(filename=>({filename,raw:fs.readFileSync(path.join(finalDirectory,filename),'utf8')}));
+context.ccManifest=finalManifest;context.ccRows=finalRows;
+evaluate(`soInstallExerciseBank('source-programs/c/final-exam-completion/manifest.json','c','final-exam-completion',ccManifest,ccRows)`);
+const finalResult=JSON.parse(evaluate(`(()=>{const profile=finalizeProfile(ccProfile),generationContext={},items=[];
+  initializeSeededRandom(90125);
+  try{for(let index=0;index<5;index++)items.push(ccGenerateItem({profile,index,language:'c',generationContext}));
+    return JSON.stringify({filenames:items.map(item=>item.filename),seedCounts:items.map(item=>Object.keys(item.sourceSeedValues).length),
+      maxPoints:items.map(item=>item.maxPoints),
+      roles:items.map(item=>item.slots.map(slot=>slot.role)),reconstructed:items.every(item=>{
+        item.slots.forEach(slot=>item.slotValues[slot.id]=slot.answer);return ccCompletedSource(item,false)===item.templateSource;
+      })});}finally{resetRandomGenerator();}})()`));
+assert.deepStrictEqual(finalResult.filenames,finalManifest.exercises,'final completion order');
+assert.deepStrictEqual(finalResult.seedCounts,[0,0,0,0,0],'final completion must keep authored values');
+assert.deepStrictEqual(finalResult.maxPoints,[4,4,4,4,4],'final completion fixed points');
+assert(finalResult.roles.every(roles=>roles.slice().sort().join(',')
+  ===['loop-initializer-value','loop-condition','loop-update'].sort().join(',')));
+assert.strictEqual(finalResult.reconstructed,true);
+context.CODE_ORDERING_PLAYBACK_CAPABILITY.score=()=>({correct:1,total:2});
+context.profileLocksCheckedItems=()=>true;context.roundPoints=value=>Math.round(value*10)/10;
+context.fixedCompletionItem={checked:false,slots:[{id:'slot'}],slotValues:{slot:'answer'},runResult:{ok:true}};
+context.fixedCompletionProfile={pointsPerItem:4};
+const fixedCompletionScore=JSON.parse(evaluate(`(()=>{ccCheck({item:fixedCompletionItem,profile:fixedCompletionProfile});
+  return JSON.stringify({points:fixedCompletionItem.points,maxPoints:fixedCompletionItem.maxPoints,
+    checks:[fixedCompletionItem.correctSteps,fixedCompletionItem.totalOpSteps]});})()`));
+assert.deepStrictEqual(fixedCompletionScore,{points:2,maxPoints:4,checks:[1,2]});
+generated+=5;
+
 context.cycleSource=`#include <stdio.h>\nint main(void) {\n  int i = 0;\n  while (i < 3) {\n    printf("x\\n");\n  }\n  return 0;\n}`;
 context.limitSource=`#include <stdio.h>\nint main(void) {\n  int i = 0;\n  while (i >= 0) {\n    i++;\n  }\n  return 0;\n}`;
 const guards=JSON.parse(evaluate(`(()=>{const parse=source=>sourceProgramParseExercise({raw:source,filename:'Guard.c',language:'c',
@@ -134,4 +169,4 @@ const guards=JSON.parse(evaluate(`(()=>{const parse=source=>sourceProgramParseEx
 assert(guards.cycle.includes('PROGRAM_LOOP_CYCLE'));
 assert(guards.limit.includes('PROGRAM_LOOP_LIMIT'));
 
-console.log(`Code Completion validated ${checked} seeded C/Java profile-source combinations, ${generated} generated login items, and both loop guards.`);
+console.log(`Code Completion validated ${checked} seeded C/Java profile-source combinations, ${generated} generated login items including the authored-value final exam, and both loop guards.`);

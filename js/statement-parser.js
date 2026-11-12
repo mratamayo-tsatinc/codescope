@@ -2,7 +2,8 @@
 // SHARED SIMPLE STATEMENT PARSER
 // ----------------------------------------------------------------------------
 // Owns the C/Java grammar shared by sourced activities for declarations,
-// assignments, standalone unary updates, break, and the C `return 0` marker.
+// assignments, standalone unary updates, loop/switch control, and the C
+// `return 0` marker.
 // Future constructs remain with their adapters until their dedicated core
 // migration phases.
 // ============================================================================
@@ -93,6 +94,10 @@ function parseCoreStatement(request){
 
   if(source==='break'){
     const statement=programBreakStatement({sourceSpan:location});
+    return {ir:statement,dependencies:[],diagnostics:[],effects:[],trace:[]};
+  }
+  if(source==='continue'){
+    const statement=programContinueStatement({sourceSpan:location});
     return {ir:statement,dependencies:[],diagnostics:[],effects:[],trace:[]};
   }
   if(language==='c'&&/^return\s+0$/.test(source)){

@@ -150,16 +150,19 @@ function ccEnsureDisplayAnswer(item){
   return item.displayAnswerKey;
 }
 function ccItem(profile,row,index,language){
-  const parsed=soParseExercise(row.exercise,language,'seeded','seeded'),completion=ccCompletionSlots(parsed,profile);
+  const parsed=soParseExercise(row.exercise,language,profileVariableValueMode(profile),profileInputValueMode(profile));
+  const completion=ccCompletionSlots(parsed,profile);
   const answerKey=ccTargetAnswer(parsed,profile,completion.controlName),displayAnswerKey=ccFullDisplayAnswer(parsed),
     slotValues=Object.fromEntries(completion.slots.map(slot=>[slot.id,'']));
   const guard=profile.activity.execution&&profile.activity.execution.loopGuard||{};
+  const generatedMaximum=Math.max(1,answerKey.expectedLines.length+answerKey.variables.length);
+  const maximum=Number.isFinite(profile.pointsPerItem)?profile.pointsPerItem:generatedMaximum;
   const item={activityKind:'code-completion',profileId:profile.id,itemNumber:index+1,language,exerciseId:parsed.id,
     filename:parsed.filename,exerciseSet:row.exerciseSet,templateSource:parsed.source,source:parsed.source,
     slots:completion.slots,slotValues,controlName:completion.controlName,orderLines:[],order:[],initialOrder:[],answerKey,displayAnswerKey,
     inputs:parsed.inputs,sourceSeedValues:parsed.seedValues,executionGuard:{maxLoopIterations:guard.maxIterations||16,
       detectCycles:guard.detectCycles!==false},runResult:null,_coPlayback:null,_coPlaybackSpeed:.6,result:null,
-    checked:false,itemScore:null,points:null,maxPoints:Math.max(1,answerKey.expectedLines.length+answerKey.variables.length),
+    checked:false,itemScore:null,points:null,maxPoints:maximum,
     correctSteps:0,totalOpSteps:0,wasCorrectFinal:null,flagged:false,lockedAt:null,examActionLog:[]};
   item.source=ccCompletedSource(item);return item;
 }
@@ -190,12 +193,16 @@ function ccApplyAction(context){
   }
   return result;
 }
-function ccCheck({item}){
+function ccCheck({item,profile}){
   if(!item||item.checked||!ccAllComplete(item)){if(item)item._ccCompletionMessage='Complete every blank before checking.';return {applied:false};}
   if(!item.runResult){item._ccCompletionMessage='Run the completed program to the end before checking it.';return {applied:false};}
   item.result=CODE_ORDERING_PLAYBACK_CAPABILITY.score(item,item.runResult);item.checked=true;
-  item.correctSteps=item.points=item.result.correct;item.totalOpSteps=item.maxPoints=item.result.total;
-  item.itemScore=item.maxPoints?item.points/item.maxPoints:0;item.wasCorrectFinal=item.runResult.ok&&item.points===item.maxPoints;
+  const maximum=Number.isFinite(profile&&profile.pointsPerItem)?profile.pointsPerItem:item.result.total;
+  item.correctSteps=item.result.correct;item.totalOpSteps=item.result.total;
+  item.points=Number.isFinite(profile&&profile.pointsPerItem)
+    ?roundPoints(maximum*(item.result.total?item.result.correct/item.result.total:0)):item.result.correct;
+  item.maxPoints=maximum;item.itemScore=item.maxPoints?item.points/item.maxPoints:0;
+  item.wasCorrectFinal=item.runResult.ok&&item.result.correct===item.result.total;
   item.lockedAt=profileLocksCheckedItems()?Date.now():null;return {applied:true,completed:true};
 }
 function ccReset({item}){
@@ -211,6 +218,108 @@ function ccRetry({item}){
 }
 function ccAppendFragments(target,text,item){soSourceFragments(text,item.language).forEach(fragment=>
   target.appendChild(typeof fragment==='string'?document.createTextNode(fragment):fragment));}
+function ccPlaybackBinding(memory,name){
+  const binding=memory&&memory[name];
+  if(binding==null)return null;
+  return binding&&typeof binding==='object'&&!Array.isArray(binding)
+    ?Object.assign({name,kind:'variable'},binding):{name,kind:'variable',value:binding};
+}
+function ccAppendExposedExpression(target,text,item,frame,idPrefix){
+  const source=String(text||''),pattern=/[A-Za-z_$][\w$]*/g;let cursor=0,match,index=0;
+  while((match=pattern.exec(source))){
+    ccAppendFragments(target,source.slice(cursor,match.index),item);
+    const binding=ccPlaybackBinding(frame.memoryBefore,match[0]);
+    if(binding&&binding.initialized!==false&&binding.value!==undefined){
+      target.appendChild(renderValueCard({id:`${idPrefix}-binding-${index++}`,name:match[0],value:binding.value,
+        kind:binding.kind==='constant'?'constant':'variable',dataType:binding.dataType||null,color:null,isFlash:false}));
+    }else ccAppendFragments(target,match[0],item);
+    cursor=match.index+match[0].length;
+  }
+  ccAppendFragments(target,source.slice(cursor),item);
+}
+function ccCompactConditionEvaluation(item,frame){
+  if(!frame||frame.forPhase!=='condition')return null;
+  const trace=frame.trace||[],condition=trace.find(step=>step.action==='LOOP_CONDITION');
+  const operation=trace.slice().reverse().find(step=>step.action==='EVALUATE');
+  if(!condition||!operation)return null;
+  const operator=operation.operator||(operation.target&&operation.target.operator);if(!operator)return null;
+  const source=String(frame.conditionSource||'');let split=source.indexOf(operator);
+  const operands=operation.target&&operation.target.operands||[];
+  const left=split>=0?source.slice(0,split):String(operands[0]),right=split>=0
+    ?source.slice(split+operator.length):String(operands[1]);
+  return {title:'Evaluating condition',operator,left,right,result:Boolean(condition.value),resultKind:'condition'};
+}
+function ccCompactUpdateEvaluation(item,frame){
+  if(!frame||frame.forPhase!=='update')return null;
+  const trace=frame.trace||[],unary=trace.find(step=>step.action==='UNARY');
+  const assignment=trace.find(step=>step.action==='ASSIGN');
+  const step=unary||assignment;if(!step)return null;
+  const target=step.target||item.controlName,operator=step.operator||step.op;
+  const before=step.sourceValue!=null?step.sourceValue:step.beforeValue;
+  const result=step.writeValue!=null?step.writeValue:step.result;
+  const updateSource=String(frame.updateSource||frame.sourceText||'');
+  let right='';if(assignment){const at=updateSource.indexOf(operator);right=at>=0?updateSource.slice(at+operator.length):String(step.rhsValue);}
+  return {title:'Applying update',operator,left:target,right,result,resultKind:'update',target,before};
+}
+function ccCompactEvaluation(item,frame){return ccCompactConditionEvaluation(item,frame)||ccCompactUpdateEvaluation(item,frame);}
+function ccRenderCompactEvaluation(item,frame,evaluation){
+  const key=`cc-eval-${frame.index}`,leftId=`${key}-left`,rightId=`${key}-right`,resultId=`${key}-result`;
+  const source=h('div',{class:'code-out cc-evaluation-expression'});
+  if(evaluation.resultKind==='update'){
+    const binding=ccPlaybackBinding(frame.memoryBefore,evaluation.target)||{kind:'variable',dataType:null};
+    source.appendChild(renderValueCard({id:`${key}-source`,name:evaluation.target,value:evaluation.before,
+      kind:binding.kind==='constant'?'constant':'variable',dataType:binding.dataType||null,color:null,isFlash:false}));
+  }else ccAppendExposedExpression(source,evaluation.left,item,frame,`${key}-left`);
+  const operator=h('span',{class:'tok tok-op-muted tok-colored cc-evaluation-operator',
+    'data-op-left':leftId,'data-op-right':rightId},evaluation.operator);
+  source.appendChild(document.createTextNode(' '));source.appendChild(operator);
+  if(evaluation.right){source.appendChild(document.createTextNode(' '));
+    ccAppendExposedExpression(source,evaluation.right,item,frame,`${key}-right`);}
+  const operationColor=stepVisualColor({action:'EVALUATE',operator:evaluation.operator},0);
+  operator.style.color=operationColor;
+  const destination=evaluation.resultKind==='condition'
+    ?h('span',{class:'tok tok-lit tok-colored-flash cc-evaluation-condition-result','data-token-id':resultId,
+      style:`color:${operationColor};`},String(evaluation.result))
+    :renderValueCard({id:resultId,name:evaluation.target,value:evaluation.result,kind:'variable',dataType:null,
+      color:operationColor,isFlash:true});
+  const timeline=h('div',{class:'timeline expression-timeline cc-evaluation-timeline'},
+    h('div',{class:'tl-row done'},source),
+    h('div',{class:'tl-row current cc-evaluation-result-row'},h('div',{class:'code-out'},destination)));
+  const body=h('div',{class:'eval-panel cc-evaluation-body'},timeline);
+  const callout=h('aside',{class:'cc-evaluation-callout','aria-live':'polite','aria-label':evaluation.title},body);
+  callout._ccConnector={body,step:{action:'EVALUATE',operator:evaluation.operator,leftId,rightId,resultNodeId:resultId,
+    target:{operator:evaluation.operator,operands:[]},result:evaluation.result}};
+  return callout;
+}
+function ccDrawCompactEvaluationConnector(callout){
+  const connector=callout&&callout._ccConnector;if(!connector||typeof buildConnectorVisuals!=='function')return;
+  const panel=connector.body,rows=panel.querySelectorAll('.tl-row');
+  panel.classList.add('connector-measuring');
+  const metrics=typeof connectorContentRect==='function'
+    ?connectorContentRect(panel):panel.getBoundingClientRect();
+  const visuals=buildConnectorVisuals(metrics,rows,[connector.step],1);
+  appendConnectorSvg(panel,visuals.paths,visuals.dots);panel.classList.remove('connector-measuring');
+}
+function ccMountCompactEvaluation(item,panel,host){
+  const frame=CODE_ORDERING_PLAYBACK_CAPABILITY.currentFrame(item),evaluation=ccCompactEvaluation(item,frame);
+  if(!evaluation||!panel||!host||typeof requestAnimationFrame!=='function')return;
+  const source=panel.querySelector('.program-source-file-code');if(!source)return;
+  const callout=ccRenderCompactEvaluation(item,frame,evaluation);host.appendChild(callout);
+  requestAnimationFrame(()=>{
+    if(!source.isConnected||!callout.isConnected)return;
+    const row=source.querySelector(`.program-source-file-line[data-source-line="${frame.line}"]`);
+    const phase=frame.forPhase||'condition';
+    const anchor=row&&(row.querySelector(`[data-for-phase="${phase}"]`)
+      ||row.querySelector('.program-source-condition')||row.querySelector('.program-source-file-text'));
+    if(!anchor)return;
+    const anchorRect=anchor.getBoundingClientRect(),targetX=anchorRect.left+anchorRect.width/2;
+    const width=callout.offsetWidth,left=Math.max(8,Math.min(targetX-width/2,window.innerWidth-width-8));
+    const top=Math.max(8,anchorRect.top-callout.offsetHeight-14);
+    callout.style.left=`${left}px`;callout.style.top=`${top}px`;
+    callout.style.setProperty('--cc-callout-anchor-x',`${Math.max(18,Math.min(width-18,targetX-left))}px`);
+    ccDrawCompactEvaluationConnector(callout);
+  });
+}
 function ccTraceProgram(item){
   const playback=item._coPlayback,index=playback?Math.min(playback.index,playback.frames.length):0;
   const frames=playback&&playback.frames||[],source=item.templateSource.split('\n'),idsByLine=new Map();
@@ -320,10 +429,12 @@ function ccRender({container,item,profile}){
   const flow=renderProgramWorkspaceShell(container,item,{statements:[],cursor:0,status:item.checked?'complete':'running',progressMode:'completion'});
   flow.parentNode.classList.add('code-ordering-workspace','code-completion-workspace');
   flow.appendChild(h('div',{class:'so-instruction'},h('i',{class:'fa-solid fa-circle-info'}),profile.activity.instructions));
+  const sourcePanel=ccSourcePanel(item);
   flow.appendChild(h('div',{class:'co-main-workspace'},h('div',{class:'co-main-grid'},
-    h('div',{class:'co-main-pane co-order-pane is-active'},ccSourcePanel(item)),
+    h('div',{class:'co-main-pane co-order-pane is-active'},sourcePanel),
     h('div',{class:'co-main-pane is-active'},CODE_ORDERING_PLAYBACK_CAPABILITY.stateColumn(item,false)),
     h('div',{class:'co-main-pane is-active'},CODE_ORDERING_PLAYBACK_CAPABILITY.stateColumn(item,true)))));
+  ccMountCompactEvaluation(item,sourcePanel,flow);
   const notice=ccNotice(item);if(notice)flow.appendChild(notice);
   const error=CODE_ORDERING_PLAYBACK_CAPABILITY.executionError(item);if(error)flow.appendChild(error);
   CODE_ORDERING_PLAYBACK_CAPABILITY.scheduleTrail(item,flow);
@@ -345,8 +456,11 @@ function ccValidate(profile){
   if(!completion||!Array.isArray(completion.targets)||!completion.targets.length||completion.targets.some(target=>!roles.has(target.role)))
     throw new Error(`${profile.id}: invalid code-completion targets`);
   if(!Number.isInteger(Number(profile.itemCount))||Number(profile.itemCount)<1)throw new Error(`${profile.id}: item count must be a positive number`);
-  if(profile.pointsPerItem!=='generated-answer')throw new Error(`${profile.id}: pointsPerItem must be generated-answer`);
-  if(profileVariableValueMode(profile)!=='seeded'||profileInputValueMode(profile)!=='seeded')throw new Error(`${profile.id}: code completion requires seeded values`);
+  if(profile.pointsPerItem!=='generated-answer'
+    &&!(Number.isFinite(profile.pointsPerItem)&&profile.pointsPerItem>0))
+    throw new Error(`${profile.id}: pointsPerItem must be generated-answer or a positive number`);
+  for(const [label,mode] of [['variables',profileVariableValueMode(profile)],['input',profileInputValueMode(profile)]])
+    if(!['authored','seeded'].includes(mode))throw new Error(`${profile.id}: ${label} value mode must be authored or seeded`);
   const equivalence=profile.activity.assessment&&profile.activity.assessment.equivalence||{};
   if(equivalence.output&&equivalence.output.required===false&&!(equivalence.memory&&equivalence.memory.required===true))
     throw new Error(`${profile.id}: code completion must assess output, memory, or both`);
@@ -355,6 +469,7 @@ function ccValidate(profile){
     throw new Error(`${profile.id}: loop guard maxIterations must be from 2 to 100`);
 }
 registerActivityPlugin({id:'code-completion',manifest:CODE_COMPLETION_MANIFEST,loadContent:ccLoad,itemCount:ccItemCount,
-  maxPoints({item}){return item.maxPoints;},validateProfile:ccValidate,generateItem:ccGenerateItem,render:ccRender,
+  maxPoints({item,profile}){return Number.isFinite(profile.pointsPerItem)?profile.pointsPerItem:item.maxPoints;},
+  validateProfile:ccValidate,generateItem:ccGenerateItem,render:ccRender,
   applyAction:ccApplyAction,check:ccCheck,reset:ccReset,retry:ccRetry,
   hasAttempt({item}){return !!(item&&(Object.values(item.slotValues||{}).some(Boolean)||item.runResult||item._coPlayback&&item._coPlayback.index));}});
