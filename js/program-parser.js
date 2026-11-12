@@ -101,7 +101,7 @@ function coreProgramFollowingClauseLine(lines,blockEnd){
   return coreProgramNextMeaningfulLine(lines,blockEnd+1);
 }
 
-function coreProgramElseHeader(line){return /^\s*(?:}\s*)?else\s*{/.test(String(line||''));}
+function coreProgramElseHeader(line){return /^\s*(?:}\s*)?else(?:\s*{)?\s*$/.test(String(line||''));}
 
 // Build the canonical statement graph used by both answer generation and
 // interactive trace presentations. Plugins may decorate this graph, but they
@@ -288,7 +288,10 @@ function coreBuildProgramControlFlow(spec){
     }
     statement.nextStatementId=targetDetails(continuationAfter(owner)).id;
     if(owner.type==='switch')statement.switchStatementId=owner.statement.id;
-    else statement.loopStatementId=owner.statement.id;
+    else{
+      statement.loopStatementId=owner.statement.id;
+      statement.loopContinuationStatementId=loopContinuation(owner).id;
+    }
   });
   return {statements,structures,diagnostics};
 }
@@ -380,6 +383,14 @@ function coreExecuteParsedProgram(spec){
             rowFor(current),filename,'PROGRAM_LOOP_LIMIT');
           diagnostics.push(diagnostic);executionFrames[executionFrames.length-1].error=diagnostic.message;break;
         }
+      }
+      if(current.kind==='loop'&&conditionStep&&conditionStep.value===false){
+        loopVisits.delete(current.id);loopVisits.delete('guard:'+current.id);loopStateSignatures.delete(current.id);
+      }
+      if(current.kind==='program-break'&&current.loopStatementId){
+        [current.loopStatementId,current.loopContinuationStatementId].filter(Boolean).forEach(loopId=>{
+          loopVisits.delete(loopId);loopVisits.delete('guard:'+loopId);loopStateSignatures.delete(loopId);
+        });
       }
       current=nextId==='$end'?null:(byId.get(nextId)||null);
     }catch(error){

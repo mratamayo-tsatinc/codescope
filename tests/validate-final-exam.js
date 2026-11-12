@@ -21,6 +21,7 @@ function evaluate(source){return vm.runInContext(source,context);}
 const set=JSON.parse(fs.readFileSync(path.join(ROOT,'profile-sets','c-final-exam.json'),'utf8'));
 assert.strictEqual(set.id,'c-final-exam');
 assert.strictEqual(set.name,'C Final Exam');
+assert.strictEqual(set.version,'2');
 assert.strictEqual(set.session.language,'c');
 assert.deepStrictEqual(set.session.timing,{allowReset:false,enabled:true,minutes:90});
 assert.deepStrictEqual(set.categories.map(category=>category.name),
@@ -54,6 +55,36 @@ const banks=[
   {name:'final-exam-completion',files:['kilo.c','lima.c','mike.c','november.c','oscar.c'],seeded:false},
   {name:'final-exam-simulate',files:['foxtrot.c','golf.c','hotel.c','india.c','juliett.c'],seeded:true}
 ];
+const expectedLines={
+  'final-exam-trace/alpha.c':{authored:4,min:3,max:4},
+  'final-exam-trace/bravo.c':{authored:5,min:4,max:5},
+  'final-exam-trace/charlie.c':{authored:4,min:3,max:4},
+  'final-exam-trace/delta.c':{authored:4,min:4,max:5},
+  'final-exam-trace/echo.c':{authored:6,min:4,max:8},
+  'final-exam-ordering/papa.c':{authored:4,min:3,max:4},
+  'final-exam-ordering/quebec.c':{authored:5,min:4,max:6},
+  'final-exam-ordering/romeo.c':{authored:4,min:3,max:5},
+  'final-exam-ordering/sierra.c':{authored:4,min:3,max:5},
+  'final-exam-ordering/tango.c':{authored:9,min:6,max:12},
+  'final-exam-completion/kilo.c':{authored:6},
+  'final-exam-completion/lima.c':{authored:5},
+  'final-exam-completion/mike.c':{authored:7},
+  'final-exam-completion/november.c':{authored:7},
+  'final-exam-completion/oscar.c':{authored:7},
+  'final-exam-simulate/foxtrot.c':{authored:6,min:5,max:6},
+  'final-exam-simulate/golf.c':{authored:7,min:6,max:7},
+  'final-exam-simulate/hotel.c':{authored:9,min:8,max:10},
+  'final-exam-simulate/india.c':{authored:6,min:5,max:7},
+  'final-exam-simulate/juliett.c':{authored:7,min:7,max:10}
+};
+const authoredVariables={
+  'final-exam-trace/echo.c':{row:'3',col:'4'},
+  'final-exam-ordering/tango.c':{row:'4',col:'3'},
+  'final-exam-completion/mike.c':{n:'7',big:'3'},
+  'final-exam-completion/oscar.c':{row:'4',col:'4',count:'6'},
+  'final-exam-simulate/hotel.c':{i:'8',even:'3',odd:'4'},
+  'final-exam-simulate/juliett.c':{row:'4',col:'4',count:'6'}
+};
 let parsedPrograms=0;
 for(const bank of banks){
   const directory=path.join(ROOT,'exercise-libraries','source-programs','c',bank.name);
@@ -64,7 +95,7 @@ for(const bank of banks){
     assert(/@codescope\b/.test(raw)&&/@title\s+\S/.test(raw),bank.name+'/'+filename+' metadata');
     assert.strictEqual(/@seed\b/.test(raw),bank.seeded,bank.name+'/'+filename+' seed policy');
     context.examRaw=raw;context.examFilename=filename;
-    const selectors=bank.seeded?['min','mid','max']:['authored'];
+    const selectors=bank.seeded?['authored','min','mid','max']:['authored'];
     for(const selector of selectors){
       context.examSelector=selector;
       const result=JSON.parse(evaluate(`(()=>{const details=sourceProgramMetadataAndSource(examRaw,examFilename);
@@ -73,9 +104,15 @@ for(const bank of banks){
           sourceValueMode:examSelector==='authored'?'authored':'seeded',randomInteger:choose,inputValues:{}});
         const answer=sourceProgramGenerateAnswer(parsed,examFilename,{allowDiagnostics:true});
         return JSON.stringify({diagnostics:parsed.coreProgramResult.diagnostics,output:answer.output,
+          lines:answer.expectedLines.length,variables:Object.fromEntries(answer.variables.map(row=>[row.name,row.expected])),
           seeds:Object.keys(parsed.seedValues).length,loops:parsed.coreProgramResult.ir.statements.filter(row=>row.kind==='loop').length});})()`));
+      const key=bank.name+'/'+filename,expected=expectedLines[key]&&expectedLines[key][selector];
       assert.deepStrictEqual(result.diagnostics,[],bank.name+'/'+filename+'/'+selector+' diagnostics');
       assert(result.output.length>0,bank.name+'/'+filename+'/'+selector+' output');
+      if(expected!==undefined)assert.strictEqual(result.lines,expected,key+'/'+selector+' output lines');
+      if(selector==='authored'&&authoredVariables[key])
+        Object.entries(authoredVariables[key]).forEach(([name,value])=>
+          assert.strictEqual(result.variables[name],value,key+' authored '+name));
       assert(result.loops>0,bank.name+'/'+filename+'/'+selector+' loop');
       assert.strictEqual(result.seeds>0,bank.seeded,bank.name+'/'+filename+'/'+selector+' materialized seeds');
       parsedPrograms++;

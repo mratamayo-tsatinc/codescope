@@ -1,7 +1,6 @@
 /*
 @codescope
 @title Simulate a running total with an early stop
-@seed limit min=8 max=12
 @seed stopTotal min=8 max=15
 */
 #include <stdio.h>

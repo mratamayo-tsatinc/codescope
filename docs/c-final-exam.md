@@ -4,6 +4,10 @@
 set. It is registered as an enabled, non-default option in
 `profile-sets/manifest.json`.
 
+Version 2 tightens seeded ranges and corrects canonical nested-loop and
+selection execution. Earlier saved attempts are intentionally incompatible
+with this revised exercise generation contract.
+
 ## Session policy
 
 - C language only

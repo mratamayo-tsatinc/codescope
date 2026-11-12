@@ -2,7 +2,6 @@
 @codescope
 @title Order nested loops with row summaries
 @seed rowLimit min=2 max=4
-@seed colLimit min=2 max=4
 */
 #include <stdio.h>
 

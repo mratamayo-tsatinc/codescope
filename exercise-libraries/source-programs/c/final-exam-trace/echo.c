@@ -1,7 +1,6 @@
 /*
 @codescope
 @title Trace nested row and column loops
-@seed rowLimit min=2 max=3
 @seed colLimit min=2 max=4
 */
 #include <stdio.h>

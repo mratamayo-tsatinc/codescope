@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "c-final-exam",
   "name": "C Final Exam",
-  "version": "1",
+  "version": "2",
   "description": "A 90-minute C final examination with five ordered exercises each for tracing, code ordering, code completion, and output simulation.",
   "session": {
     "language": "c",

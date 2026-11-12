@@ -1,7 +1,6 @@
 /*
 @codescope
 @title Order a for loop that stops early
-@seed limit min=5 max=8
 @seed stopValue min=3 max=5
 */
 #include <stdio.h>

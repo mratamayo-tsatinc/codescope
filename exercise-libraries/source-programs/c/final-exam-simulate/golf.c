@@ -2,7 +2,6 @@
 @codescope
 @title Simulate a descending even-number sum
 @seed start min=8 max=10 step=2
-@seed end min=2 max=4 step=2
 */
 #include <stdio.h>
 

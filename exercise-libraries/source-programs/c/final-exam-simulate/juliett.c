@@ -1,8 +1,7 @@
 /*
 @codescope
 @title Simulate nested loops with continue
-@seed rowLimit min=2 max=4
-@seed colLimit min=2 max=4
+@seed rowLimit min=3 max=4
 */
 #include <stdio.h>
 
