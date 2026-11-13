@@ -43,6 +43,13 @@
       "description": "A 90-minute C final examination with ordered trace, code ordering, code completion, and simulation exercises.",
       "file": "c-final-exam.json",
       "enabled": true
+    },
+    {
+      "id": "java-final-exam",
+      "name": "Java Final Exam",
+      "description": "A 90-minute final examination with ordered trace, code ordering, code completion, and simulation exercises.",
+      "file": "java-final-exam.json",
+      "enabled": true
     }
   ]
 }
